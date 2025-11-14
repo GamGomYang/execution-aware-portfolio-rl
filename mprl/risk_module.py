@@ -67,6 +67,10 @@ class RiskModule(nn.Module):
         super().__init__()
         self.encoder = HebbianRiskEncoder(feature_dim, hebb_dim)
         self.head = PlasticityHead(128, hebb_dim, cfg.beta_min, cfg.beta_max)
+        self.trace_encoder = nn.Sequential(
+            nn.Linear(feature_dim, hebb_dim),
+            nn.Tanh(),
+        )
         self.cfg = cfg
         self.hebb_dim = hebb_dim
         self.register_buffer("hebb_trace", torch.zeros(hebb_dim))
@@ -81,7 +85,8 @@ class RiskModule(nn.Module):
         hebb_snapshot = self.hebb_trace.detach().clone()
         latent = self.encoder(features, hebb_snapshot.unsqueeze(0))
         beta_val, beta_vec = self.head(latent, hebb_snapshot.unsqueeze(0))
-        update = self.decay * hebb_snapshot + self.learning_rate * (features.squeeze(0) * signal.squeeze(0))
+        feature_proj = self.trace_encoder(features).squeeze(0)
+        update = self.decay * hebb_snapshot + self.learning_rate * (feature_proj * signal.squeeze(0))
         self.hebb_trace.copy_(update.detach().clamp(-5.0, 5.0))
         next_hebb = self.hebb_trace.detach().clone()
         self.update_homeostat(beta_val.detach())

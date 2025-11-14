@@ -127,7 +127,8 @@ class FeatureConfig:
 
     @property
     def portfolio_dim(self) -> int:
-        return len(self.portfolio_features)
+        # weights contribute num_assets dimensions; the remaining stats are scalar features
+        return self.num_assets + max(len(self.portfolio_features) - 1, 0)
 
     @property
     def total_state_dim(self) -> int:

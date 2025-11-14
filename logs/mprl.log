@@ -1,0 +1,6 @@
+2025-11-14 17:56:17 [INFO] mprl - Loaded real market data from 2010-01-01 to 2024-01-01 (0 samples)
+2025-11-14 18:03:47 [INFO] mprl - Using stochastic stub environment
+2025-11-14 18:04:36 [INFO] mprl - Using stochastic stub environment
+2025-11-14 18:05:15 [INFO] mprl - Using stochastic stub environment
+2025-11-14 18:06:40 [INFO] mprl - Using stochastic stub environment
+2025-11-14 18:06:43 [WARNING] mprl - Buffer did not reach warmup size; no training stats to report.
