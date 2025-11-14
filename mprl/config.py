@@ -141,6 +141,27 @@ class FeatureConfig:
     def hebbian_dim(self) -> int:
         return 32
 
+    @property
+    def risk_feature_names(self) -> List[str]:
+        return [
+            "asset_vol_total",
+            "asset_vol_5d",
+            "asset_vol_last",
+            "cvar_all",
+            "vix",
+            "move",
+            "vvix",
+            "ted_spread",
+            "hy_ig_spread",
+            "mean_corr",
+            "max_corr",
+            "eig1",
+            "eig2",
+            "portfolio_drawdown",
+            "mean_abs_ret",
+            "sector_vol_last",
+        ]
+
 
 @dataclass
 class TrainingConfig:

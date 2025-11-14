@@ -25,6 +25,7 @@ class PortfolioEnvStub:
         self.portfolio_ctx = self._init_portfolio_ctx()
         self.prev_weights = np.ones(self.cfg.num_assets, dtype=np.float32) / self.cfg.num_assets
         self.portfolio_returns: List[float] = []
+        self.step_counter = 0
 
     def _init_macro_state(self) -> Dict[str, float]:
         return {
@@ -68,6 +69,7 @@ class PortfolioEnvStub:
         self.portfolio_ctx = self._init_portfolio_ctx()
         self.portfolio_returns.clear()
         self.prev_weights = self.portfolio_ctx["weights"].copy()
+        self.step_counter = 0
         return self._observe()
 
     def _observe(self) -> Tuple[np.ndarray, np.ndarray, float]:
@@ -146,5 +148,11 @@ class PortfolioEnvStub:
         )
 
         state, risk_features, signal = self._observe()
-        info = {"risk_features": risk_features, "signal": signal}
+        self.step_counter += 1
+        info = {
+            "risk_features": risk_features,
+            "signal": signal,
+            "date": f"sim_{self.step_counter}",
+            "done": False,
+        }
         return state, reward, risk_metric, signal, info
