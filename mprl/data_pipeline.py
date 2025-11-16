@@ -18,7 +18,7 @@ from .config import FeatureConfig
 
 EXTRA_TICKERS = {
     "vix": "^VIX",
-    "move": "^IRX",  # short-rate proxy
+    "move": "^IRX",  
     "vvix": "^VVIX",
     "spx": "^GSPC",
     "nasdaq": "^IXIC",
