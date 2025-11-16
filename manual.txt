@@ -1,0 +1,58 @@
+# Neural-Plasticity MPRL 실행 매뉴얼
+
+## 1. 환경 준비
+1. PowerShell을 열고 `cd "C:\VS code\Trading-model"`을 실행합니다.
+2. Python 3.11 이상과 pip가 PATH에 있는지 확인합니다.
+3. yfinance SSL 문제를 피하려면 한 번만 CA 번들을 지정합니다.
+   ```powershell
+   python -m pip install --upgrade certifi
+   python -c "import certifi, os; print(certifi.where())"
+   setx SSL_CERT_FILE "<위 출력 경로>"
+   setx REQUESTS_CA_BUNDLE "<위 출력 경로>"
+   ```
+   `setx` 이후에는 새 PowerShell 세션을 열어야 적용됩니다.
+
+## 2. 의존성 설치
+```powershell
+python -m pip install -r requirements.txt
+```
+
+## 3. 스텁 환경(모의) 학습
+직접 임포트하거나 CLI 엔트리 포인트를 사용할 수 있습니다.
+```powershell
+# 방법 A: 파이썬 한 줄 호출
+python -c "from mprl.trainer import run_mock_training; run_mock_training(steps=512)"
+
+# 방법 B: CLI 래퍼
+python -m mprl.main --env stub --steps 512
+```
+산출물:
+- 학습 로그: `logs/mprl.log`
+- 의사결정 로그: `logs/decisions.jsonl`
+
+## 4. 실데이터(yfinance) 학습
+CLI 래퍼가 가장 간단합니다.
+```powershell
+python -m mprl.main --env real --steps 1000 --start 2010-01-01 --end 2024-01-01 --data-dir data --log-dir logs
+```
+위 명령은 아래 직접 호출과 동일합니다.
+```powershell
+python -c "from mprl.trainer import run_training; run_training(env_type='real', steps=1000, start='2010-01-01', end='2024-01-01', data_dir='data', log_dir='logs')"
+```
+
+## 5. 결과 확인
+1. `logs/mprl.log` – critic/actor/meta 손실과 가소성 통계를 확인합니다.
+2. `logs/decisions.jsonl` – 스텝별 베타, 가소성 신호, 행동, 보상, 리스크 설명이 JSONL로 저장됩니다.
+3. `data/` – yfinance 캐시 `.npz` 파일이 생성됩니다(기간별 1개). 실험을 구분하려면 폴더명을 바꿔 보관하세요.
+
+## 6. 자주 겪는 문제
+- **“second backward” RuntimeError**: `__pycache__/` 폴더를 삭제하고 다시 실행합니다.
+- **SSL 인증 에러**: `echo $env:SSL_CERT_FILE`로 1단계에서 지정한 경로가 적용됐는지 확인하고, 새 셸에서 재시도합니다.
+- **패키지 누락**: 메시지에 나온 패키지를 `pip install <패키지명>`으로 설치한 후 명령을 다시 실행합니다.
+
+## 7. 핵심 소스 파일
+- 설정: `mprl/config.py`
+- 가소성 로직: `mprl/plasticity.py`
+- 에이전트·훈련 루프: `mprl/agent.py`, `mprl/trainer.py`
+- CLI 엔트리 포인트: `mprl/main.py`
+- yfinance 데이터 파이프라인: `mprl/data_pipeline.py`

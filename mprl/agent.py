@@ -137,9 +137,10 @@ class MPRLAgent:
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 5.0)
         self.actor_opt.step()
 
+        beta_t_meta, _ = self.encode_beta_batch(risk_feat, hebb)
         homeostat = self.risk_module.beta_center.detach()
         meta_loss = actor_loss.detach() + critic_loss.detach()
-        meta_penalty = torch.mean((beta_t - homeostat) ** 2)
+        meta_penalty = torch.mean((beta_t_meta - homeostat) ** 2)
         total_meta = meta_loss + meta_penalty
         self.meta_opt.zero_grad()
         total_meta.backward()
@@ -153,6 +154,6 @@ class MPRLAgent:
             "critic_loss": float(critic_loss.item()),
             "actor_loss": float(actor_loss.item()),
             "meta_penalty": float(meta_penalty.item()),
-            "beta_mean": float(beta_t.mean().item()),
+            "beta_mean": float(beta_t_meta.mean().item()),
             "plasticity_mean": mean_plasticity,
         }
