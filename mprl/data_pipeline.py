@@ -6,8 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple
 
+import os
+
 import numpy as np
 import pandas as pd
+import certifi
 import yfinance as yf
 
 from .config import FeatureConfig
@@ -23,6 +26,10 @@ EXTRA_TICKERS = {
     "hyg": "HYG",
     "lqd": "LQD",
 }
+
+CERT_PATH = certifi.where()
+os.environ.setdefault("SSL_CERT_FILE", CERT_PATH)
+os.environ.setdefault("REQUESTS_CA_BUNDLE", CERT_PATH)
 
 
 @dataclass

@@ -11,7 +11,14 @@ Tensor = torch.Tensor
 
 
 class ReplayBuffer:
-    def __init__(self, capacity: int, state_dim: int, action_dim: int, risk_dim: int, hebb_dim: int):
+    def __init__(
+        self,
+        capacity: int,
+        state_dim: int,
+        action_dim: int,
+        risk_dim: int,
+        hebb_dim: int,
+    ):
         self.capacity = capacity
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -26,6 +33,8 @@ class ReplayBuffer:
         self.rewards = np.zeros((capacity, 1), dtype=np.float32)
         self.risks = np.zeros((capacity, 1), dtype=np.float32)
         self.dones = np.zeros((capacity, 1), dtype=np.float32)
+        self.plasticity = np.zeros((capacity, 1), dtype=np.float32)
+        self.next_plasticity = np.zeros((capacity, 1), dtype=np.float32)
         self.risk_feats = np.zeros((capacity, risk_dim), dtype=np.float32)
         self.next_risk_feats = np.zeros((capacity, risk_dim), dtype=np.float32)
         self.hebb = np.zeros((capacity, hebb_dim), dtype=np.float32)
@@ -43,6 +52,8 @@ class ReplayBuffer:
         next_risk_feat: np.ndarray,
         hebb_state: np.ndarray,
         next_hebb_state: np.ndarray,
+        plasticity_value: float,
+        next_plasticity_value: float,
     ) -> None:
         idx = self.ptr % self.capacity
         self.states[idx] = state
@@ -55,6 +66,8 @@ class ReplayBuffer:
         self.next_risk_feats[idx] = next_risk_feat
         self.hebb[idx] = hebb_state
         self.next_hebb[idx] = next_hebb_state
+        self.plasticity[idx] = plasticity_value
+        self.next_plasticity[idx] = next_plasticity_value
 
         self.ptr += 1
         self.size = min(self.size + 1, self.capacity)
@@ -72,4 +85,6 @@ class ReplayBuffer:
             "next_risk_feat": torch.tensor(self.next_risk_feats[idx], device=device),
             "hebb": torch.tensor(self.hebb[idx], device=device),
             "next_hebb": torch.tensor(self.next_hebb[idx], device=device),
+            "plasticity": torch.tensor(self.plasticity[idx], device=device),
+            "next_plasticity": torch.tensor(self.next_plasticity[idx], device=device),
         }

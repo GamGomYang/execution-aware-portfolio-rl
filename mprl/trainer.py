@@ -12,6 +12,7 @@ from .data_pipeline import MarketDataLoader
 from .env_real import YFinancePortfolioEnv
 from .env_stub import PortfolioEnvStub
 from .logging_utils import DecisionLogger, setup_logging
+from .plasticity import PlasticityCoefficients, PlasticityController
 from .replay_buffer import ReplayBuffer
 
 
@@ -54,12 +55,27 @@ def run_training(
     )
 
     state, risk_feat, signal = env.reset()
+    plasticity_ctrl = PlasticityController(
+        PlasticityCoefficients(
+            train_cfg.plasticity_alpha_state,
+            train_cfg.plasticity_alpha_reward,
+            train_cfg.plasticity_alpha_uncertainty,
+        )
+    )
+    plasticity_ctrl.reset()
+    current_plasticity = plasticity_ctrl.observe(state, reward=0.0, uncertainty=signal)
     stats_history: List[Dict[str, float]] = []
 
     for step in range(train_cfg.total_steps):
-        action, beta_val, hebb_state, next_hebb_state = agent.select_action(state, risk_feat, signal)
+        action, beta_val, hebb_state, next_hebb_state = agent.select_action(
+            state,
+            risk_feat,
+            signal,
+            plasticity_signal=current_plasticity,
+        )
         next_state, reward, risk_metric, next_signal, info = env.step(action)
         done = info.get("done", False)
+        next_plasticity = plasticity_ctrl.observe(next_state, reward, next_signal)
         buffer.push(
             state,
             action,
@@ -71,6 +87,8 @@ def run_training(
             info["risk_features"],
             hebb_state,
             next_hebb_state,
+            current_plasticity,
+            next_plasticity,
         )
 
         decision_logger.log_step(
@@ -82,16 +100,20 @@ def run_training(
             risk_metric=risk_metric,
             stress_signal=info.get("signal", float(next_signal)),
             risk_features=info["risk_features"],
+            plasticity=current_plasticity,
         )
 
-        state = next_state if not done else state
-        risk_feat = info["risk_features"] if not done else risk_feat
-        signal = next_signal if not done else signal
-
         if done:
+            plasticity_ctrl.reset()
             state, risk_feat, signal = env.reset()
+            current_plasticity = plasticity_ctrl.observe(state, reward=0.0, uncertainty=signal)
             logger.info("Episode reset at step %d", step)
             continue
+
+        state = next_state
+        risk_feat = info["risk_features"]
+        signal = next_signal
+        current_plasticity = next_plasticity
 
         if buffer.size > train_cfg.warmup_steps and step % train_cfg.update_every == 0:
             batch = buffer.sample(train_cfg.batch_size, torch.device(train_cfg.device))

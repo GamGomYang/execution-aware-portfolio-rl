@@ -37,8 +37,17 @@ class MPRLAgent:
         )
         self.meta_opt = torch.optim.Adam(self.risk_module.parameters(), lr=train_cfg.lr_meta)
 
+        self.base_lr_actor = train_cfg.lr_actor
+        self.base_lr_critic = train_cfg.lr_critic
+        self.base_lr_meta = train_cfg.lr_meta
+
     def select_action(
-        self, state: np.ndarray, risk_features: np.ndarray, signal: float, deterministic: bool = False
+        self,
+        state: np.ndarray,
+        risk_features: np.ndarray,
+        signal: float,
+        plasticity_signal: float = 0.0,
+        deterministic: bool = False,
     ) -> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
         state_t = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
         risk_t = torch.tensor(risk_features, dtype=torch.float32, device=self.device)
@@ -49,6 +58,11 @@ class MPRLAgent:
                 action = self.actor.deterministic(state_t, beta_val.unsqueeze(0))
             else:
                 action, _ = self.actor.sample(state_t, beta_val.unsqueeze(0))
+                epsilon = self.cfg.epsilon_base * (1.0 + self.cfg.epsilon_beta * plasticity_signal)
+                epsilon = float(np.clip(epsilon, 0.0, 0.5))
+                if epsilon > 1e-6:
+                    uniform = torch.ones_like(action) / action.size(-1)
+                    action = (1.0 - epsilon) * action + epsilon * uniform
         return action.squeeze(0).cpu().numpy(), float(beta_val.item()), hebb, next_hebb
 
     def encode_beta_batch(self, risk_feat: Tensor, hebb: Tensor) -> Tuple[Tensor, Tensor]:
@@ -59,6 +73,15 @@ class MPRLAgent:
         for p, tp in zip(net.parameters(), target.parameters()):
             tp.data.mul_(self.cfg.polyak)
             tp.data.add_(tau * p.data)
+
+    def _alpha_with_plasticity(self, plasticity: Tensor) -> Tensor:
+        return self.cfg.alpha * (1.0 + self.cfg.plasticity_lambda_entropy * plasticity)
+
+    def _set_optimizer_lr(self, optimizer: torch.optim.Optimizer, base_lr: float, plasticity_value: float) -> None:
+        scale = max(0.0, 1.0 + self.cfg.plasticity_lr_beta * plasticity_value)
+        lr = base_lr * scale
+        for group in optimizer.param_groups:
+            group["lr"] = lr
 
     def update(self, batch: Dict[str, Tensor]) -> Dict[str, float]:
         state = batch["state"]
@@ -71,6 +94,13 @@ class MPRLAgent:
         next_risk_feat = batch["next_risk_feat"]
         hebb = batch["hebb"]
         next_hebb = batch["next_hebb"]
+        plasticity = batch["plasticity"]
+        next_plasticity = batch["next_plasticity"]
+
+        mean_plasticity = float(plasticity.mean().item())
+        self._set_optimizer_lr(self.actor_opt, self.base_lr_actor, mean_plasticity)
+        self._set_optimizer_lr(self.critic_opt, self.base_lr_critic, mean_plasticity)
+        self._set_optimizer_lr(self.meta_opt, self.base_lr_meta, mean_plasticity)
 
         beta_t, _ = self.encode_beta_batch(risk_feat, hebb)
         beta_tp1, _ = self.encode_beta_batch(next_risk_feat, next_hebb)
@@ -81,9 +111,10 @@ class MPRLAgent:
             next_action, next_log_prob = self.actor.sample(next_state, beta_tp1)
             target_q1 = self.target_critic1(next_state, next_action)
             target_q2 = self.target_critic2(next_state, next_action)
-            entropy_weight = self.cfg.alpha * (1.0 + self.cfg.k_alpha * beta_tp1)
+            alpha_tp1 = self._alpha_with_plasticity(next_plasticity)
+            entropy_weight_tp1 = alpha_tp1 * (1.0 + self.cfg.k_alpha * beta_tp1)
             target_q = torch.min(target_q1, target_q2)
-            target = tilde_reward + (1.0 - done) * self.cfg.gamma * (target_q - entropy_weight * next_log_prob)
+            target = tilde_reward + (1.0 - done) * self.cfg.gamma * (target_q - entropy_weight_tp1 * next_log_prob)
 
         current_q1 = self.critic1(state, action)
         current_q2 = self.critic2(state, action)
@@ -98,7 +129,8 @@ class MPRLAgent:
         q2_pi = self.critic2(state, actions_pi)
         q_pi = torch.min(q1_pi, q2_pi)
         value_weight = 1.0 + self.cfg.k_q * beta_t
-        entropy_weight = self.cfg.alpha * (1.0 + self.cfg.k_alpha * beta_t)
+        alpha_t = self._alpha_with_plasticity(plasticity)
+        entropy_weight = alpha_t * (1.0 + self.cfg.k_alpha * beta_t)
         actor_loss = (entropy_weight * log_prob_pi - value_weight * q_pi).mean()
         self.actor_opt.zero_grad()
         actor_loss.backward()
@@ -122,4 +154,5 @@ class MPRLAgent:
             "actor_loss": float(actor_loss.item()),
             "meta_penalty": float(meta_penalty.item()),
             "beta_mean": float(beta_t.mean().item()),
+            "plasticity_mean": mean_plasticity,
         }

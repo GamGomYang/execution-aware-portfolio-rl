@@ -54,6 +54,7 @@ class DecisionLogger:
         risk_metric: float,
         stress_signal: float,
         risk_features: np.ndarray,
+        plasticity: float,
     ) -> None:
         record = {
             "step": step,
@@ -63,6 +64,7 @@ class DecisionLogger:
             "reward": reward,
             "risk_metric": risk_metric,
             "stress_signal": stress_signal,
+            "plasticity": plasticity,
             "explanations": explain_risk_vector(risk_features, self.feature_cfg.risk_feature_names),
         }
         self._fp.write(json.dumps(record) + "\n")

@@ -172,6 +172,14 @@ class TrainingConfig:
     k_alpha: float = 0.6
     k_q: float = 0.4
     risk_lambda: float = 2.5
+    num_strategies: int = 4
+    epsilon_base: float = 0.05
+    epsilon_beta: float = 0.8
+    plasticity_alpha_state: float = 0.6
+    plasticity_alpha_reward: float = 0.4
+    plasticity_alpha_uncertainty: float = 1.0
+    plasticity_lr_beta: float = 1.2
+    plasticity_lambda_entropy: float = 0.9
     lr_actor: float = 3e-4
     lr_critic: float = 3e-4
     lr_meta: float = 1e-4
@@ -187,3 +195,10 @@ class TrainingConfig:
     homeostat_tau: float = 0.01
     tc_penalty: float = 0.0005
     transaction_cost: float = 0.001
+    replicator_min: float = 1e-3
+    crisis_alpha_vol: float = 4.5
+    crisis_alpha_dd: float = 6.0
+    crisis_alpha_sharpe: float = 2.0
+    crisis_alpha_cvar: float = 3.5
+    transport_epsilon: float = 0.02
+    transport_steps: int = 5
