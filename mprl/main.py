@@ -11,11 +11,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run MPRL training")
     parser.add_argument("--env", choices=["stub", "real"], default="stub", help="Environment type")
     parser.add_argument("--steps", type=int, default=600, help="Total training steps")
-    parser.add_argument("--start", type=str, default="2005-01-01", help="Data start date (real env)")
-    parser.add_argument("--end", type=str, default="2024-01-01", help="Data end date (real env)")
+    parser.add_argument("--start", type=str, default="2018-01-01", help="Data start date (real env)")
+    parser.add_argument("--end", type=str, default="2023-12-31", help="Data end date (real env)")
     parser.add_argument("--data-dir", type=str, default="data", help="Directory to cache downloaded data")
     parser.add_argument("--log-dir", type=str, default="logs", help="Directory for logs and decision traces")
     parser.add_argument("--no-cache", action="store_true", help="Disable cached market data")
+    parser.add_argument("--checkpoint", type=str, default=None, help="Path to save the trained policy")
     return parser.parse_args()
 
 
@@ -29,6 +30,7 @@ def main() -> None:
         data_dir=args.data_dir,
         log_dir=args.log_dir,
         cache=not args.no_cache,
+        checkpoint_path=args.checkpoint,
     )
 
 

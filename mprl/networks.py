@@ -17,6 +17,7 @@ class Critic(nn.Module):
             nn.GELU(),
             nn.Linear(256, 256),
             nn.GELU(),
+            nn.LayerNorm(256),
             nn.Linear(256, 1),
         )
 
@@ -31,6 +32,7 @@ class DirichletPolicy(nn.Module):
             nn.Linear(state_dim + 1, 256),
             nn.GELU(),
             nn.Linear(256, 256),
+            nn.LayerNorm(256),
             nn.GELU(),
             nn.Linear(256, action_dim),
         )
@@ -40,7 +42,9 @@ class DirichletPolicy(nn.Module):
             beta = beta.unsqueeze(-1)
         payload = torch.cat([state, beta], dim=-1)
         logits = self.net(payload)
-        return torch.nn.functional.softplus(logits) + 1e-3
+        conc = torch.nn.functional.softplus(logits)
+        conc = conc.clamp(max=50.0)
+        return conc + 1e-3
 
     def sample(self, state: Tensor, beta: Tensor) -> tuple[Tensor, Tensor]:
         conc = self._concentration(state, beta)

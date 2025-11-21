@@ -19,3 +19,27 @@ def cvar(values: np.ndarray, alpha: float = 0.95) -> float:
     cutoff = max(cutoff, 1)
     tail = np.sort(values)[:cutoff]
     return float(tail.mean())
+
+
+def safe_corrcoef(matrix: np.ndarray, eps: float = 1e-6) -> np.ndarray:
+    """Compute a correlation matrix that is numerically stable for near-constant columns."""
+    arr = np.asarray(matrix, dtype=np.float64)
+    if arr.ndim == 1:
+        arr = arr[:, None]
+    if arr.shape[0] < 2:
+        size = arr.shape[1]
+        return np.eye(size, dtype=np.float64)
+
+    cov = np.cov(arr, rowvar=False)
+    if cov.ndim == 0:
+        return np.eye(1, dtype=np.float64)
+
+    diag = np.diag(cov)
+    scale = np.sqrt(np.maximum(diag, eps))
+    denom = scale[:, None] * scale[None, :]
+    corr = cov / denom
+    corr = np.clip(corr, -1.0, 1.0)
+    corr = np.nan_to_num(corr, nan=0.0, posinf=0.0, neginf=0.0)
+    np.fill_diagonal(corr, 1.0)
+    corr += eps * np.eye(corr.shape[0], dtype=np.float64)
+    return corr

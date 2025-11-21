@@ -47,7 +47,8 @@ class PlasticityController:
             + self.coeffs.alpha_reward * delta_reward
             + self.coeffs.alpha_uncertainty * float(uncertainty)
         )
-        self.current_signal = float(1.0 / (1.0 + np.exp(-raw)))
+        sigmoid = float(1.0 / (1.0 + np.exp(-raw)))
+        self.current_signal = 0.4 + 0.3 * sigmoid
         self.prev_state = state.copy()
         self.prev_reward = float(reward)
         return self.current_signal

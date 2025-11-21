@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 import torch
 
@@ -40,9 +40,41 @@ class FeatureConfig:
             "UNH",
             "V",
             "VZ",
-            "WBA",
             "WMT",
         ]
+    )
+    dow_sector_map: Dict[str, str] = field(
+        default_factory=lambda: {
+            "AAPL": "Information Technology",
+            "AMGN": "Health Care",
+            "AXP": "Financials",
+            "BA": "Industrials",
+            "CAT": "Industrials",
+            "CRM": "Information Technology",
+            "CSCO": "Information Technology",
+            "CVX": "Energy",
+            "DIS": "Communication Services",
+            "DOW": "Materials",
+            "GS": "Financials",
+            "HD": "Consumer Discretionary",
+            "HON": "Industrials",
+            "IBM": "Information Technology",
+            "INTC": "Information Technology",
+            "JNJ": "Health Care",
+            "JPM": "Financials",
+            "KO": "Consumer Staples",
+            "MCD": "Consumer Discretionary",
+            "MMM": "Industrials",
+            "MRK": "Health Care",
+            "MSFT": "Information Technology",
+            "NKE": "Consumer Discretionary",
+            "PG": "Consumer Staples",
+            "TRV": "Financials",
+            "UNH": "Health Care",
+            "V": "Information Technology",
+            "VZ": "Communication Services",
+            "WMT": "Consumer Staples",
+        }
     )
     sector_etfs: List[str] = field(
         default_factory=lambda: [
@@ -110,12 +142,37 @@ class FeatureConfig:
     lookback: int = 20
 
     @property
+    def sector_names(self) -> List[str]:
+        return sorted(set(self.dow_sector_map.get(sym, "Unknown") for sym in self.dow_symbols))
+
+    @property
+    def sector_encoding_dim(self) -> int:
+        return len(self.sector_names)
+
+    def sector_one_hot(self, symbol: str) -> List[float]:
+        encoding = [0.0] * self.sector_encoding_dim
+        sector = self.dow_sector_map.get(symbol)
+        if sector is None:
+            return encoding
+        idx = self.sector_names.index(sector)
+        encoding[idx] = 1.0
+        return encoding
+
+    @property
+    def assets_by_sector(self) -> Dict[str, List[int]]:
+        mapping: Dict[str, List[int]] = {name: [] for name in self.sector_names}
+        for idx, symbol in enumerate(self.dow_symbols):
+            sector = self.dow_sector_map.get(symbol, self.sector_names[0])
+            mapping.setdefault(sector, []).append(idx)
+        return mapping
+
+    @property
     def num_assets(self) -> int:
         return len(self.dow_symbols)
 
     @property
     def micro_dim(self) -> int:
-        return self.num_assets * len(self.micro_features)
+        return self.num_assets * (len(self.micro_features) + self.sector_encoding_dim)
 
     @property
     def sector_dim(self) -> int:
@@ -131,8 +188,19 @@ class FeatureConfig:
         return self.num_assets + max(len(self.portfolio_features) - 1, 0)
 
     @property
+    def sector_summary_dim(self) -> int:
+        # latest return, 5d volatility, 5d momentum per sector
+        return self.sector_encoding_dim * 3
+
+    @property
     def total_state_dim(self) -> int:
-        return self.micro_dim + self.sector_dim + self.macro_dim + self.portfolio_dim
+        return (
+            self.micro_dim
+            + self.sector_dim
+            + self.macro_dim
+            + self.portfolio_dim
+            + self.sector_summary_dim
+        )
 
     @property
     def risk_feature_dim(self) -> int:
@@ -168,20 +236,22 @@ class FeatureConfig:
 class TrainingConfig:
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     gamma: float = 0.99
-    alpha: float = 0.1
-    k_alpha: float = 0.6
-    k_q: float = 0.4
-    risk_lambda: float = 2.5
+    alpha: float = 0.08
+    k_alpha: float = 0.45
+    k_q: float = 0.3
+    risk_lambda: float = 0.9
     num_strategies: int = 4
-    epsilon_base: float = 0.05
-    epsilon_beta: float = 0.8
+    epsilon_base: float = 0.08
+    epsilon_beta: float = 0.6
+    epsilon_min: float = 0.02
+    epsilon_decay: float = 8000.0
     plasticity_alpha_state: float = 0.6
     plasticity_alpha_reward: float = 0.4
     plasticity_alpha_uncertainty: float = 1.0
     plasticity_lr_beta: float = 1.2
     plasticity_lambda_entropy: float = 0.9
-    lr_actor: float = 3e-4
-    lr_critic: float = 3e-4
+    lr_actor: float = 1e-4
+    lr_critic: float = 1e-4
     lr_meta: float = 1e-4
     batch_size: int = 32
     replay_capacity: int = 100_000
@@ -189,16 +259,23 @@ class TrainingConfig:
     total_steps: int = 1_000
     update_every: int = 2
     polyak: float = 0.995
-    beta_min: float = 0.05
-    beta_max: float = 1.5
+    beta_min: float = 0.2
+    beta_max: float = 1.1
     homeostat_target: float = 0.35
     homeostat_tau: float = 0.01
     tc_penalty: float = 0.0005
-    transaction_cost: float = 0.001
+    transaction_cost: float = 0.0005
     replicator_min: float = 1e-3
     crisis_alpha_vol: float = 4.5
     crisis_alpha_dd: float = 6.0
-    crisis_alpha_sharpe: float = 2.0
-    crisis_alpha_cvar: float = 3.5
-    transport_epsilon: float = 0.02
-    transport_steps: int = 5
+    max_weight_change: float = 0.06
+    no_trade_threshold: float = 0.01
+    max_total_weight_change: float = 0.35
+    cooldown_steps: int = 7
+    sector_max_weight_change: float = 0.2
+    sector_no_trade_threshold: float = 0.02
+    sector_max_total_weight_change: float = 0.7
+    risk_penalty_base: float = 0.3
+    risk_penalty_beta: float = 0.4
+    turnover_penalty_gamma: float = 1.5
+    turnover_penalty_threshold: float = 0.0

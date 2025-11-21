@@ -26,6 +26,8 @@ class PortfolioEnvStub:
         self.prev_weights = np.ones(self.cfg.num_assets, dtype=np.float32) / self.cfg.num_assets
         self.portfolio_returns: List[float] = []
         self.step_counter = 0
+        self.cooldown_timer = 0
+        self._last_state_signal = 0.0
 
     def _init_macro_state(self) -> Dict[str, float]:
         return {
@@ -70,12 +72,93 @@ class PortfolioEnvStub:
         self.portfolio_returns.clear()
         self.prev_weights = self.portfolio_ctx["weights"].copy()
         self.step_counter = 0
+        self.cooldown_timer = 0
+        self._last_state_signal = 0.0
+        self.asset_sector_ids = np.array(
+            [
+                feature_cfg.sector_names.index(feature_cfg.dow_sector_map.get(symbol, feature_cfg.sector_names[0]))
+                for symbol in feature_cfg.dow_symbols
+            ]
+        )
+        self.sector_masks = [
+            self.asset_sector_ids == idx for idx in range(len(feature_cfg.sector_names))
+        ]
         return self._observe()
 
     def _observe(self) -> Tuple[np.ndarray, np.ndarray, float]:
-        return self.assembler.build_state(self.asset_hist, self.sector_hist, self.macro_state, self.portfolio_ctx)
+        state_vec, risk_feats, signal = self.assembler.build_state(
+            self.asset_hist, self.sector_hist, self.macro_state, self.portfolio_ctx
+        )
+        if not np.isfinite(signal):
+            signal = self._last_state_signal
+        else:
+            self._last_state_signal = signal
+        return state_vec, risk_feats, signal
+
+    def _sector_weights(self, weights: np.ndarray) -> np.ndarray:
+        accum = np.zeros(len(self.sector_masks), dtype=np.float64)
+        np.add.at(accum, self.asset_sector_ids, weights)
+        return accum
+
+    def _apply_sector_constraints(self, candidate: np.ndarray, prev: np.ndarray) -> np.ndarray:
+        prev_sector = self._sector_weights(prev)
+        cand_sector = self._sector_weights(candidate)
+        diff_sector = cand_sector - prev_sector
+        adjusted = candidate.copy()
+        for idx, mask in enumerate(self.sector_masks):
+            sector_diff = diff_sector[idx]
+            if abs(sector_diff) < self.train_cfg.sector_no_trade_threshold:
+                adjusted[mask] = prev[mask]
+                continue
+            max_change = self.train_cfg.sector_max_weight_change
+            if max_change < 1.0 and abs(sector_diff) > max_change:
+                scale = max_change / abs(sector_diff)
+                adjusted[mask] = prev[mask] + (adjusted[mask] - prev[mask]) * scale
+        total_sector_change = np.abs(adjusted - prev).sum()
+        if (
+            self.train_cfg.sector_max_total_weight_change < 1.0
+            and total_sector_change > self.train_cfg.sector_max_total_weight_change
+        ):
+            scale = self.train_cfg.sector_max_total_weight_change / max(total_sector_change, 1e-8)
+            adjusted = prev + (adjusted - prev) * scale
+        adjusted = np.clip(adjusted, 0.0, None)
+        norm = adjusted.sum()
+        if norm <= 0.0:
+            adjusted = np.ones_like(adjusted) / len(adjusted)
+        else:
+            adjusted /= norm
+        return adjusted
+
+    def _apply_action_constraints(self, action: np.ndarray) -> np.ndarray:
+        prev = self.prev_weights
+        if self.cooldown_timer > 0:
+            self.cooldown_timer -= 1
+            return prev.copy()
+        diff = action - prev
+        if self.train_cfg.no_trade_threshold > 0.0:
+            diff = np.where(np.abs(diff) < self.train_cfg.no_trade_threshold, 0.0, diff)
+        if self.train_cfg.max_weight_change < 1.0:
+            diff = np.clip(diff, -self.train_cfg.max_weight_change, self.train_cfg.max_weight_change)
+        total_change = np.abs(diff).sum()
+        if (
+            self.train_cfg.max_total_weight_change < 1.0
+            and total_change > self.train_cfg.max_total_weight_change
+        ):
+            scale = self.train_cfg.max_total_weight_change / max(total_change, 1e-8)
+            diff *= scale
+        constrained = prev + diff
+        constrained = np.clip(constrained, 0.0, None)
+        total = constrained.sum()
+        if total <= 0.0:
+            constrained = np.ones_like(constrained) / len(constrained)
+        else:
+            constrained /= total
+        constrained = self._apply_sector_constraints(constrained, prev)
+        return constrained
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, float, float, Dict]:
+        action = self._apply_action_constraints(action)
+        constrained_diff = action - self.prev_weights
         market_vol = np.random.gamma(shape=1.5, scale=0.01)
         systematic = np.random.normal(0.0, market_vol)
         asset_returns = np.random.normal(0.0004 + systematic, market_vol, size=self.cfg.num_assets)
@@ -102,10 +185,14 @@ class PortfolioEnvStub:
 
         portfolio_return = float(np.dot(action, asset_returns))
         risk_metric = float(np.abs(asset_returns).mean())
-        tc = float(np.abs(action - self.prev_weights).sum() * self.train_cfg.transaction_cost)
-        reward = portfolio_return - self.train_cfg.tc_penalty * tc - 0.5 * risk_metric
+        l1_change = float(np.abs(constrained_diff).sum())
+        l2_change = float(np.square(constrained_diff).sum())
+        tc = float(l1_change * self.train_cfg.transaction_cost + l2_change * self.train_cfg.tc_penalty)
+        reward = portfolio_return - tc - 0.5 * risk_metric
 
         self.prev_weights = action.copy()
+        if l1_change > 0.0:
+            self.cooldown_timer = self.train_cfg.cooldown_steps
         self.portfolio_returns.append(portfolio_return)
         if len(self.portfolio_returns) > 30:
             self.portfolio_returns.pop(0)
@@ -154,5 +241,6 @@ class PortfolioEnvStub:
             "signal": signal,
             "date": f"sim_{self.step_counter}",
             "done": False,
+            "executed_action": action,
         }
         return state, reward, risk_metric, signal, info
