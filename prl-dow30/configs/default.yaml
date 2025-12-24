@@ -1,0 +1,32 @@
+dates:
+  train_start: '2010-01-01'
+  train_end: '2021-12-31'
+  test_start: '2022-01-01'
+  test_end: '2025-12-31'
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+
+env:
+  L: 30              # rolling return window length
+  Lv: 30             # rolling volatility window length
+  c_tc: 0.0005       # transaction cost coefficient
+
+prl:
+  alpha0: 0.2
+  beta: 1.0
+  lambdav: 2.0
+  bias: 0.0
+  alpha_min: 0.01
+  alpha_max: 1.0
+
+sac:
+  learning_rate: 0.0003
+  batch_size: 256
+  gamma: 0.99
+  tau: 0.005
+  buffer_size: 5000
+  total_timesteps: 2000
+  eval_freq: 500
+  ent_coef: 0.2
