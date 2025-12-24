@@ -96,7 +96,7 @@ class Dow30PortfolioEnv(Env):
         return float(np.dot(self.prev_weights, arithmetic_returns))
 
     def _turnover(self, weights: np.ndarray) -> float:
-        return float(0.5 * np.abs(weights - self.prev_weights).sum())
+        return float(np.abs(weights - self.prev_weights).sum())
 
     def step(self, action: np.ndarray):
         z = np.clip(action, self.action_space.low, self.action_space.high)

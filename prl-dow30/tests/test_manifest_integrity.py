@@ -25,7 +25,7 @@ def test_manifest_contains_expected_fields(tmp_path, monkeypatch):
         quality_params={"min_vol_std": 0.0, "min_max_abs_return": 0.0, "max_missing_fraction": 1.0},
     )
     manifest = json.loads((processed_dir / "data_manifest.json").read_text())
-    assert manifest["source"] == "yfinance"
+    assert manifest["source"] == "yfinance_only"
     assert manifest["price_type"] == "adj_close"
     assert set(manifest["tickers"]) == {"AAA", "BBB"}
     hashes = manifest["processed_hashes"]

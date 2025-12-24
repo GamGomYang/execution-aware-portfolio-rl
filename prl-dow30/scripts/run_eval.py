@@ -100,6 +100,10 @@ def main():
         num_assets = market.returns.shape[1]
         scheduler = create_scheduler(prl_cfg, env_cfg["L"], num_assets, features.stats_path)
 
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Model not found at {model_path}. Run training first or provide --model-path to an existing *_final.zip."
+        )
     model = load_model(model_path, args.model_type, env, scheduler=scheduler)
     metrics = run_backtest_episode(model, env)
     row = {

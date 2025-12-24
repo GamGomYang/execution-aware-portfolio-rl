@@ -41,7 +41,7 @@ class PRLAlphaScheduler:
         V = th.mean(vol_vector, dim=1, keepdim=True)
         vol_mean = self.vol_mean.to(obs.device)
         vol_std = self.vol_std.to(obs.device)
-        Vz = (V - vol_mean) / vol_std
+        Vz = (V - vol_mean) / (vol_std + 1e-8)
         return th.sigmoid(self.cfg.lambdav * Vz + self.cfg.bias)
 
     def alpha_from_obs(self, obs: th.Tensor) -> th.Tensor:

@@ -28,6 +28,7 @@ def main():
     data_cfg = cfg.get("data", {})
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
+    cache_only = data_cfg.get("paper_mode", False) or data_cfg.get("require_cache", False)
     model_path = run_training(
         config=cfg,
         model_type=args.model_type,
@@ -37,6 +38,7 @@ def main():
         output_dir="outputs/models",
         force_refresh=data_cfg.get("force_refresh", True),
         offline=args.offline or data_cfg.get("offline", False),
+        cache_only=cache_only,
     )
     print(f"Model saved to {model_path}")
 

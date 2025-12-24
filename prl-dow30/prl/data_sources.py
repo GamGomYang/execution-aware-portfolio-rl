@@ -74,6 +74,8 @@ def fetch_yfinance(
             auto_adjust=False,
         )
     adj_close = _normalize_adj_close(data, tickers_list)
+    if set(adj_close.columns) != set(tickers_list):
+        raise RuntimeError(f"Adj Close columns missing tickers. expected={tickers_list}, got={list(adj_close.columns)}")
     return adj_close
 
 

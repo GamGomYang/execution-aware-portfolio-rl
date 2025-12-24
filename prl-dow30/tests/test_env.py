@@ -63,7 +63,7 @@ def test_reward_uses_previous_weights_with_turnover_penalty():
     returns_t = env.returns.iloc[step_idx].to_numpy()
     arithmetic_returns = np.expm1(returns_t)
     portfolio_return = float(np.dot(old_weights, arithmetic_returns))
-    turnover = 0.5 * np.abs(new_weights - old_weights).sum()
+    turnover = np.abs(new_weights - old_weights).sum()
     expected = math.log(max(1.0 + portfolio_return, env.cfg.log_clip)) - env.cfg.transaction_cost * turnover
 
     wrong_portfolio = float(np.dot(new_weights, arithmetic_returns))
@@ -80,5 +80,5 @@ def test_turnover_matches_half_l1_distance():
     action = np.array([-2.0, 2.0], dtype=np.float32)
     _, _, _, _, info = env.step(action)
     new_weights = env.prev_weights
-    expected_turnover = 0.5 * np.abs(new_weights - np.array([0.6, 0.4], dtype=np.float32)).sum()
+    expected_turnover = np.abs(new_weights - np.array([0.6, 0.4], dtype=np.float32)).sum()
     assert info["turnover"] == pytest.approx(expected_turnover)

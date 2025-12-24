@@ -78,3 +78,4 @@ class PRLSAC(SAC):
             self.logger.record("train/actor_loss", actor_loss.item())
             self.logger.record("train/alpha_obs_mean", alpha_obs.mean().item())
             self.logger.record("train/alpha_next_mean", alpha_next.mean().item())
+            self.logger.record("train/entropy_loss", float((alpha_obs * log_prob).mean().item()))

@@ -50,13 +50,13 @@ def main():
     data_cfg = cfg.get("data", {})
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
-    allow_unadjusted_prices = data_cfg.get("allow_unadjusted_prices", True)
     min_history_days = data_cfg.get("min_history_days", 500)
     quality_params = data_cfg.get("quality_params", None)
     source = data_cfg.get("source", "yfinance_only")
     require_cache = data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
     paper_mode = data_cfg.get("paper_mode", False)
     offline = args.offline or data_cfg.get("offline", False) or paper_mode or require_cache
+    cache_only = paper_mode or require_cache
     require_cache = require_cache or offline
     session_opts = data_cfg.get("session_opts", None)
 
@@ -76,6 +76,7 @@ def main():
         require_cache=require_cache,
         paper_mode=paper_mode,
         session_opts=session_opts,
+        cache_only=cache_only,
     )
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
@@ -91,6 +92,7 @@ def main():
                 output_dir="outputs/models",
                 force_refresh=data_cfg.get("force_refresh", True),
                 offline=offline,
+                cache_only=cache_only,
             )
 
             env = build_env_for_range(
@@ -113,6 +115,7 @@ def main():
             row = {
                 "model_type": model_type,
                 "seed": seed,
+                "model_path": str(model_path),
                 **metrics.to_dict(),
             }
             summary_rows.append(row)

@@ -1,0 +1,458 @@
+[
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "e5940eecab502f021858ba94a2ca20ad953255b9cb27be0492f4f7561a594b70",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:31.707098+00:00"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "c8a0dea7b279920dfb6c2e877a8c5a84c0892350c69c6cec9ed24367fb0d2aab",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:31.903597+00:00"
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:32.104403+00:00"
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:32.210257+00:00"
+  },
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "679e3934ef9c8264b2c12c1cfd452fbd86157c21bba1c310790d99930e6e6fe2",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:50.711115+00:00"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "f0830c8e24716985f33c54f3964988c7aa1d47afc8589202becd5cfb062802cf",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:50.945196+00:00"
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:51.109378+00:00"
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "n/a",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:35:51.206784+00:00"
+  },
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "ae9dd0a18a06c936fffbdb1316c5d55ca632cbaf16c60243f8a1c292739ff14f",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:17.906165+00:00",
+    "data_manifest_hash": "3fca0728340f433c34a6442cad4b8f4387f097d1609f9ca1966cd6eed91f618a"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "a855ec370d88fc9918c1108535404288faf07bbc6b0b8bdeea77f176fd6b0350",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:18.100859+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:18.303600+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:18.334683+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "6fdfb139c7edc373b86f43d42e637ee70e9168a2c901916e527032a52dc29d39",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:39.053289+00:00",
+    "data_manifest_hash": "240192fb3fdd3efafa0055a5fa8c7406e37dfd7e809733d93f397ab2303f1531"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "d924017f9fa7c16ec5b4f3e3a1b633254f1a3036d964281742e5bc9076a86d08",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:39.195470+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:39.332888+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:41:39.502376+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "21867b98d0082f06d2e7596c7e70229a67c8a52b7a36c7d6dfa981be905a7a3a",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:01.098347+00:00",
+    "data_manifest_hash": "8dd3fe4123d98501eaf9d484742036343184a81c6db19d33595ee3b93d5b8fc4"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "22c1bf17ea008a3526aa0ba905af5a2365a2e53023a485ba68d37a0677190ddc",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:01.300637+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:01.498998+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:01.599629+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "a14d2cef81aea3e8f6774b36bed26c8e8e05f3b1d6e75723f663cf930515029e",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:19.728409+00:00",
+    "data_manifest_hash": "730d148ee51bf3aa8139c7b80f11e41ba2f857cc91da1b8ff8f1dad40db2387c"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "9069f5c22ad14128394258e342e9e3df7d2b51e46fef456bc062ae2c48b7f7e4",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:19.821503+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:20.007214+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:20.098050+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 0,
+    "mode": "default",
+    "model_type": "baseline",
+    "config_hash": "0e2720e72a71a6800653124d951acb233e66489c7c1edcab7ea2ee518592124a",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:38.114063+00:00",
+    "data_manifest_hash": "b73f0f4856e04ccffcec9248191ecd761a48bb34b78359879aba1da9354712c7"
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "cb385a5d43c34abb80cb01826fa7230bdca2c89bf2dae7c57f3c9538183d236c",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:38.297141+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:38.443125+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 123,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "3667dcc9a523af9c23c995340004d245956094c06f67f00f39a98109393f56a7",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:38.500948+00:00",
+    "data_manifest_hash": ""
+  },
+  {
+    "seed": 0,
+    "mode": "smoke",
+    "model_type": "baseline",
+    "config_hash": "16b4c9545e48ca1ce20121d54fcac3a40842d99fab3995a9ef4cd5dde1c4900b",
+    "git_commit": "eb3785d404bde756de6540741f04d94ec1cc3f78",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "packages": {
+      "torch": "2.3.0+cpu",
+      "pandas": "2.3.3",
+      "yfinance": "1.0",
+      "stable_baselines3": "2.3.0"
+    },
+    "created_at": "2025-12-24T14:42:38.698950+00:00",
+    "data_manifest_hash": ""
+  }
+]

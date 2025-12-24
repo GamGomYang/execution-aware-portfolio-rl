@@ -28,7 +28,7 @@ def test_build_cache_yfinance_success(tmp_path, monkeypatch):
     assert processed_dir.joinpath("prices.parquet").exists()
     assert processed_dir.joinpath("returns.parquet").exists()
     manifest = json.loads((processed_dir / "data_manifest.json").read_text())
-    assert manifest["source"] == "yfinance"
+    assert manifest["source"] == "yfinance_only"
     assert manifest["price_type"] == "adj_close"
     assert market.prices.shape[1] == 1
 

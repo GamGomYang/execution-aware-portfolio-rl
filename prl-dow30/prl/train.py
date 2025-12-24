@@ -13,6 +13,7 @@ import hashlib
 import numpy as np
 import pandas as pd
 import torch
+import yfinance as yf
 from stable_baselines3 import SAC, __version__ as sb3_version
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -123,10 +124,11 @@ def _git_commit() -> str:
 
 
 class TrainLoggingCallback(BaseCallback):
-    def __init__(self, log_path: Path, verbose: int = 0):
+    def __init__(self, log_path: Path, log_interval: int = 1000, verbose: int = 0):
         super().__init__(verbose)
         self.log_path = log_path
-        self.records: List[Dict] = []
+        self.log_interval = max(1, log_interval)
+        self.buffer: List[Dict] = []
 
     def _on_step(self) -> bool:
         logger_vals = self.model.logger.name_to_value
@@ -136,20 +138,31 @@ class TrainLoggingCallback(BaseCallback):
             "critic_loss": logger_vals.get("train/critic_loss"),
             "entropy_loss": logger_vals.get("train/entropy_loss"),
         }
-        self.records.append(record)
+        self.buffer.append(record)
+        if len(self.buffer) >= self.log_interval:
+            self._flush()
         return True
 
-    def _on_training_end(self) -> None:
-        if not self.records:
+    def _flush(self) -> None:
+        if not self.buffer:
             return
-        df = pd.DataFrame(self.records)
+        df = pd.DataFrame(self.buffer)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(self.log_path, index=False)
+        header = not self.log_path.exists()
+        df.to_csv(self.log_path, mode="a", index=False, header=header)
+        self.buffer.clear()
+
+    def _on_training_end(self) -> None:
+        self._flush()
 
 
 def _write_run_metadata(
     path: Path, config: Dict, seed: int, mode: str, model_type: str
 ) -> None:
+    manifest_hash = ""
+    manifest_path = Path(config.get("data", {}).get("processed_dir", "data/processed")) / "data_manifest.json"
+    if manifest_path.exists():
+        manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     meta = {
         "seed": seed,
         "mode": mode,
@@ -160,10 +173,11 @@ def _write_run_metadata(
         "packages": {
             "torch": torch.__version__,
             "pandas": pd.__version__,
-            "yfinance": config.get("data", {}).get("yfinance_version", "n/a"),
+            "yfinance": yf.__version__,
             "stable_baselines3": sb3_version,
         },
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "data_manifest_hash": manifest_hash,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -244,6 +258,7 @@ def run_training(
     output_dir: str | Path = "outputs/models",
     force_refresh: bool = True,
     offline: bool = False,
+    cache_only: bool = False,
 ) -> Path:
     dates = config["dates"]
     env_cfg = config["env"]
@@ -258,9 +273,10 @@ def run_training(
     paper_mode = data_cfg.get("paper_mode", False)
     offline = offline or data_cfg.get("offline", False) or paper_mode or require_cache
     session_opts = data_cfg.get("session_opts", None)
-    cache_only = require_cache or paper_mode
+    cache_only = cache_only or require_cache or paper_mode
     require_cache = require_cache or offline
     checkpoint_interval = sac_cfg.get("checkpoint_interval")
+    log_interval = sac_cfg.get("log_interval_steps", 1000 if mode == "paper" else 50)
 
     if mode == "paper":
         if sac_cfg["total_timesteps"] < 100000:
@@ -305,7 +321,7 @@ def run_training(
     num_assets = market.returns.shape[1]
     log_dir = Path("outputs/logs")
     log_path = log_dir / f"{model_type}_seed{seed}_train_log.csv"
-    callbacks = [TrainLoggingCallback(log_path)]
+    callbacks = [TrainLoggingCallback(log_path, log_interval=log_interval)]
     if mode == "paper" and checkpoint_interval:
         callbacks.append(
             CheckpointCallback(
