@@ -25,6 +25,7 @@ env:
   L: 30              # rolling return window length
   Lv: 30             # rolling volatility window length
   c_tc: 0.0005       # transaction cost coefficient
+  logit_scale: 10.0
 
 prl:
   alpha0: 0.2

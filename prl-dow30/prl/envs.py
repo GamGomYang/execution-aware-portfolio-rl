@@ -9,8 +9,8 @@ import pandas as pd
 from gymnasium import Env, spaces
 
 
-def stable_softmax(logits: np.ndarray) -> np.ndarray:
-    logits = np.asarray(logits, dtype=np.float64)
+def stable_softmax(logits: np.ndarray, scale: float = 1.0) -> np.ndarray:
+    logits = np.asarray(logits, dtype=np.float64) * float(scale)
     shifted = logits - np.max(logits)
     exps = np.exp(shifted)
     denom = np.sum(exps)
@@ -27,6 +27,7 @@ class EnvConfig:
     window_size: int
     transaction_cost: float
     log_clip: float = 1e-8
+    logit_scale: float = 10.0
 
 
 class Dow30PortfolioEnv(Env):
@@ -99,7 +100,7 @@ class Dow30PortfolioEnv(Env):
 
     def step(self, action: np.ndarray):
         z = np.clip(action, self.action_space.low, self.action_space.high)
-        weights = stable_softmax(z)
+        weights = stable_softmax(z, scale=self.cfg.logit_scale)
 
         if self.current_step >= len(self.returns):
             raise RuntimeError("Environment step beyond data length.")

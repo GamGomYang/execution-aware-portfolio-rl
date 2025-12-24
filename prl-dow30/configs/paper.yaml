@@ -25,6 +25,7 @@ env:
   L: 30
   Lv: 30
   c_tc: 0.0005
+  logit_scale: 10.0
 
 prl:
   alpha0: 0.2

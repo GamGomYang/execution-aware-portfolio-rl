@@ -1,4 +1,5 @@
 import argparse
+import logging
 from pathlib import Path
 
 import yaml
@@ -21,6 +22,7 @@ def parse_args():
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     data_cfg = cfg.get("data", {})

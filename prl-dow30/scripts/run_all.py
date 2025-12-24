@@ -1,5 +1,6 @@
 import argparse
 import csv
+import logging
 from pathlib import Path
 
 import yaml
@@ -40,6 +41,7 @@ def write_summary(path: Path, rows: list[dict]):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     dates = cfg["dates"]

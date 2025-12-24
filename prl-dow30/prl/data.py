@@ -86,7 +86,7 @@ def _write_manifest(
         "start_date": start,
         "end_date": end,
         "tickers": tickers,
-        "source": "yfinance",
+        "source": "yfinance_only",
         "price_type": "adj_close",
         "processed_hashes": processed_hashes,
         "yfinance_version": getattr(yf, "__version__", "unknown"),
@@ -165,6 +165,7 @@ def load_market_data(
     offline: bool = False,
     require_cache: bool = False,
     paper_mode: bool = False,
+    cache_only: bool = False,
 ) -> MarketData:
     if source != "yfinance_only":
         raise ValueError("Unsupported data source; only yfinance_only is permitted.")
@@ -176,12 +177,8 @@ def load_market_data(
     proc_path = Path(processed_dir)
     proc_path.mkdir(parents=True, exist_ok=True)
 
-    must_use_cache = offline or require_cache or paper_mode
-    if must_use_cache and not force_refresh:
-        return _load_processed_cache(proc_path)
-
+    must_use_cache = offline or require_cache or cache_only
     if must_use_cache:
-        # In offline/paper mode, downloading is forbidden.
         return _load_processed_cache(proc_path)
 
     series, errors = _download_yfinance_all(tickers, start_date, end_date, session_opts)

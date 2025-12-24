@@ -67,7 +67,7 @@ def fetch_yfinance(
         )
     except TypeError:
         data = yf.download(
-            tickers_list[0],
+            tickers=tickers_list,
             start=start,
             end=end,
             progress=False,

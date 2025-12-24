@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+from datetime import datetime, timezone
 import random
 import subprocess
 import sys
@@ -11,7 +13,7 @@ import hashlib
 import numpy as np
 import pandas as pd
 import torch
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC, __version__ as sb3_version
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -20,6 +22,8 @@ from .envs import Dow30PortfolioEnv, EnvConfig
 from .features import VolatilityFeatures, compute_volatility_features, load_vol_stats
 from .prl import PRLAlphaScheduler, PRLConfig
 from .sb3_prl_sac import PRLSAC
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _align_frames(returns: pd.DataFrame, volatility: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -156,7 +160,10 @@ def _write_run_metadata(
         "packages": {
             "torch": torch.__version__,
             "pandas": pd.__version__,
+            "yfinance": config.get("data", {}).get("yfinance_version", "n/a"),
+            "stable_baselines3": sb3_version,
         },
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -187,6 +194,7 @@ def prepare_market_and_features(
     require_cache: bool = False,
     paper_mode: bool = False,
     session_opts: Dict | None = None,
+    cache_only: bool = False,
 ) -> tuple[MarketData, VolatilityFeatures]:
     market = load_market_data(
         start_date=start_date,
@@ -201,6 +209,7 @@ def prepare_market_and_features(
         require_cache=require_cache,
         paper_mode=paper_mode,
         session_opts=session_opts,
+        cache_only=cache_only,
     )
     vol_features = compute_volatility_features(
         returns=market.returns,
@@ -249,6 +258,7 @@ def run_training(
     paper_mode = data_cfg.get("paper_mode", False)
     offline = offline or data_cfg.get("offline", False) or paper_mode or require_cache
     session_opts = data_cfg.get("session_opts", None)
+    cache_only = require_cache or paper_mode
     require_cache = require_cache or offline
     checkpoint_interval = sac_cfg.get("checkpoint_interval")
 
@@ -280,6 +290,7 @@ def run_training(
         require_cache=require_cache,
         paper_mode=paper_mode,
         session_opts=session_opts,
+        cache_only=cache_only,
     )
 
     env = build_env_for_range(

@@ -1,4 +1,5 @@
 import argparse
+import logging
 from pathlib import Path
 
 import yaml
@@ -13,6 +14,7 @@ def parse_args():
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     data_cfg = cfg.get("data", {})
@@ -34,7 +36,8 @@ def main():
         source=source,
         offline=False,
         require_cache=False,
-        paper_mode=data_cfg.get("paper_mode", False),
+        paper_mode=False,
+        cache_only=False,
     )
     print(f"Cache built with {market.prices.shape[1]} tickers and {len(market.prices)} rows.")
 

@@ -1,5 +1,6 @@
 import argparse
 import csv
+import logging
 from pathlib import Path
 
 import yaml
@@ -40,6 +41,7 @@ def write_metrics(path: Path, row: dict):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     dates = cfg["dates"]
@@ -48,13 +50,13 @@ def main():
     data_cfg = cfg.get("data", {})
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
-    allow_unadjusted_prices = data_cfg.get("allow_unadjusted_prices", True)
     min_history_days = data_cfg.get("min_history_days", 500)
     quality_params = data_cfg.get("quality_params", None)
     source = data_cfg.get("source", "yfinance_only")
     require_cache = data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
     paper_mode = data_cfg.get("paper_mode", False)
     offline = args.offline or data_cfg.get("offline", False) or paper_mode or require_cache
+    cache_only = paper_mode or require_cache
     require_cache = require_cache or offline
     session_opts = data_cfg.get("session_opts", None)
 
@@ -73,6 +75,7 @@ def main():
         offline=offline,
         require_cache=require_cache,
         paper_mode=paper_mode,
+        cache_only=cache_only,
         session_opts=session_opts,
     )
 
@@ -89,7 +92,7 @@ def main():
     model_path = (
         Path(args.model_path)
         if args.model_path
-        else Path("outputs/models") / f"{args.model_type}_seed{args.seed}.zip"
+        else Path("outputs/models") / f"{args.model_type}_seed{args.seed}_final.zip"
     )
 
     scheduler = None
