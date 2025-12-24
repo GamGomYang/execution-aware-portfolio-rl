@@ -7,11 +7,11 @@
 - Anti-lookahead: every reward at index `t` must consume realized returns using previous weights `w_{t-1}`.
 
 ### Data Pipeline
-1. **Source hierarchy**: pull Adjusted Close daily bars via `yfinance` and cache to `data/raw`. If the network call fails or cache is missing for a symbol, fall back to a user-provided local CSV under `data/raw`.
-2. **Calendar alignment**: combine all tickers on the union of trading days, then reindex to the intersection of valid dates across the entire Dow30 universe over the full 2010-2025 interval.
-3. **Missing data**: forward fill once, then backward fill once, per symbol. Any rows still containing NaNs after the two-pass fill are dropped entirely.
-4. **Split**: persist aligned price matrices into `data/processed` and maintain explicit metadata for train vs. test periods (2010-2021 vs. 2022-2025).
-5. **Returns**: compute daily log returns and rolling windows of length `L` for features after split to avoid leakage.
+1. **Source**: yfinance-only Adjusted Close. `build_cache.py` always downloads a fresh snapshot (no stooq, no synthetic), runs quality checks, and writes `data/processed/prices.parquet`, `returns.parquet`, and `data_manifest.json` plus `outputs/reports/data_quality_summary.csv`.
+2. **Cache-only modes**: when `paper_mode=true` and `require_cache=true` (or `offline=true`), train/eval/run_all load only the processed cache; if missing they raise `CACHE_MISSING` instructing `build_cache.py`.
+3. **Calendar alignment**: combine all tickers on the union of trading days, forward/backward fill once, drop remaining NaNs, and persist aligned matrices.
+4. **Split**: maintain explicit metadata for train vs. test periods (2010-2021 vs. 2022-2025) and hashes inside the manifest.
+5. **Returns**: compute daily log returns after alignment; rolling windows of length `L` are applied after the split to avoid leakage.
 
 ### Environment Specification
 - **Observation**: concatenate `(returns_window(L, N) -> flattened L*N vector)` + `(vol_vector of size N)` + `(previous_weights of size N)`. The resulting observation dimension is `obs_dim = L*N + 2*N`.
@@ -21,7 +21,7 @@
 
 ### Reward Definition
 - Primary reward: `r_t = log(1 + sum(w_{t-1} * return_t))` with a small `rp` clamp (e.g., min value) to keep the log argument positive even in stress scenarios.
-- Transaction cost penalty: `turnover_t = 0.5 * sum(|w_t - w_{t-1}|)` (exact formula TBD later) and reward subtracts `c_tc * turnover_t`.
+- Transaction cost penalty: `turnover_t = sum(|w_t - w_{t-1}|)` and reward subtracts `c_tc * turnover_t`.
 - Anti-lookahead enforcement: all calculations for `r_t` use `return_t` (current realized returns) but `w_{t-1}` (previous action) to avoid peeking ahead.
 
 ### Volatility & PRL Logic
@@ -35,6 +35,6 @@
 5. **Alpha slices**: both `alpha_obs` and `alpha_next` derive their volatility component from the observation slice `vol_slice = obs[L*N : L*N + N]`, ensuring local volatility drives the adaptive alpha signal.
 
 ### Evaluation & Metrics Notes
-- Training: 2010-01-01 through 2021-12-31, with validation/backtest left strictly to 2022-01-01 through 2025-12-31.  
-- Performance metrics (Sharpe, max drawdown, etc.) and diagnostic plots will be defined later but must consume the processed data and environment outputs described above.  
-- Scripts `scripts/run_train.py`, `scripts/run_eval.py`, and `scripts/run_all.py` will orchestrate workflows once implementation begins; this document freezes interfaces for those future steps.
+- Training: 2010-01-01 through 2021-12-31, with validation/backtest strictly 2022-01-01 through 2025-12-31.  
+- Performance metrics (Sharpe, max drawdown, turnover) consume the processed data and environment outputs described above; turnover is the full L1 distance between consecutive weight vectors.  
+- Scripts `scripts/run_train.py`, `scripts/run_eval.py`, and `scripts/run_all.py` orchestrate workflows; `build_cache.py` must be run online once to freeze the reproducible snapshot used in paper/offline modes.

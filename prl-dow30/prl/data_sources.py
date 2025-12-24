@@ -73,6 +73,15 @@ def fetch_yfinance(
             progress=False,
             auto_adjust=False,
         )
+    except Exception as exc:
+        LOGGER.warning("yfinance download with session failed (%s); retrying without session", exc)
+        data = yf.download(
+            tickers=tickers_list,
+            start=start,
+            end=end,
+            progress=False,
+            auto_adjust=False,
+        )
     adj_close = _normalize_adj_close(data, tickers_list)
     if set(adj_close.columns) != set(tickers_list):
         raise RuntimeError(f"Adj Close columns missing tickers. expected={tickers_list}, got={list(adj_close.columns)}")

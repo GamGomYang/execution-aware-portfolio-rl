@@ -26,9 +26,12 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     data_cfg = cfg.get("data", {})
+    if data_cfg.get("paper_mode", False) and not data_cfg.get("require_cache", False):
+        raise ValueError("paper_mode=true requires require_cache=true.")
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
-    cache_only = data_cfg.get("paper_mode", False) or data_cfg.get("require_cache", False)
+    offline_flag = args.offline or data_cfg.get("offline", False) or data_cfg.get("paper_mode", False)
+    cache_only = data_cfg.get("paper_mode", False) or data_cfg.get("require_cache", False) or offline_flag
     model_path = run_training(
         config=cfg,
         model_type=args.model_type,
@@ -37,7 +40,7 @@ def main():
         processed_dir=processed_dir,
         output_dir="outputs/models",
         force_refresh=data_cfg.get("force_refresh", True),
-        offline=args.offline or data_cfg.get("offline", False),
+        offline=offline_flag,
         cache_only=cache_only,
     )
     print(f"Model saved to {model_path}")

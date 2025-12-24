@@ -48,17 +48,21 @@ def main():
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
     data_cfg = cfg.get("data", {})
+    if data_cfg.get("paper_mode", False) and not data_cfg.get("require_cache", False):
+        raise ValueError("paper_mode=true requires require_cache=true.")
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
     min_history_days = data_cfg.get("min_history_days", 500)
     quality_params = data_cfg.get("quality_params", None)
     source = data_cfg.get("source", "yfinance_only")
-    require_cache = data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
     paper_mode = data_cfg.get("paper_mode", False)
+    require_cache_cfg = data_cfg.get("require_cache", False)
+    require_cache = require_cache_cfg or paper_mode
     offline = args.offline or data_cfg.get("offline", False) or paper_mode or require_cache
-    cache_only = paper_mode or require_cache
+    cache_only = paper_mode or require_cache or offline
     require_cache = require_cache or offline
     session_opts = data_cfg.get("session_opts", None)
+    ticker_substitutions = data_cfg.get("ticker_substitutions")
 
     market, features = prepare_market_and_features(
         start_date=dates["train_start"],
@@ -77,6 +81,7 @@ def main():
         paper_mode=paper_mode,
         session_opts=session_opts,
         cache_only=cache_only,
+        ticker_substitutions=ticker_substitutions,
     )
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])

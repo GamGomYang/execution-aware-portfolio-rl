@@ -67,8 +67,10 @@ def _compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
 def _align_prices(series_list: List[pd.Series]) -> tuple[pd.DataFrame, dict]:
     raw = pd.concat(series_list, axis=1, join="outer")
     raw.columns = [s.name for s in series_list]
-    missing_fraction = raw.isna().mean().to_dict()
-    prices = raw.sort_index().ffill().bfill().dropna(how="any")
+    filled = raw.sort_index().ffill().bfill()
+    prices = filled.dropna(how="any")
+    trimmed = filled.loc[prices.index]
+    missing_fraction = trimmed.isna().mean().to_dict()
     return prices, missing_fraction
 
 
@@ -80,6 +82,8 @@ def _write_manifest(
     processed_hashes: Dict[str, str],
     quality_params: Dict,
     min_history_days: int,
+    fallback_from_cache: list[str] | None = None,
+    substitutions: Dict[str, str] | None = None,
 ) -> None:
     manifest = {
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -94,6 +98,10 @@ def _write_manifest(
         "min_history_days": min_history_days,
         "python_version": sys.version,
     }
+    if fallback_from_cache:
+        manifest["fallback_from_cache"] = sorted(fallback_from_cache)
+    if substitutions:
+        manifest["substitutions"] = substitutions
     manifest_path = processed_dir / "data_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
 
@@ -121,9 +129,14 @@ def _download_yfinance_all(
     start: str,
     end: str,
     session_opts: Dict | None,
-) -> tuple[List[pd.Series], Dict[str, str]]:
+    fallback_prices: pd.DataFrame | None = None,
+    ticker_subs: Dict[str, str] | None = None,
+) -> tuple[List[pd.Series], Dict[str, str], list[str], Dict[str, str]]:
     series: List[pd.Series] = []
     errors: Dict[str, str] = {}
+    fallback_used: list[str] = []
+    subs_used: Dict[str, str] = {}
+    start_ts = pd.to_datetime(start)
     for ticker in tickers:
         try:
             df = fetch_yfinance([ticker], start, end, session_opts=session_opts)
@@ -135,10 +148,54 @@ def _download_yfinance_all(
             ser.name = ticker
             if ser.empty:
                 raise RuntimeError("empty series")
+            if ticker_subs and ticker in ticker_subs and not ser.index.empty:
+                first_ts = pd.to_datetime(ser.index[0])
+                if first_ts > start_ts + pd.Timedelta(days=30):
+                    alt = ticker_subs[ticker]
+                    try:
+                        df_alt = fetch_yfinance([alt], start, end, session_opts=session_opts)
+                        ser_alt = df_alt.iloc[:, 0].dropna()
+                        ser_alt.name = ticker
+                        if not ser_alt.empty and pd.to_datetime(ser_alt.index[0]) <= first_ts:
+                            LOGGER.warning(
+                                "Using substitution ticker %s for %s due to late start (%s > %s)",
+                                alt,
+                                ticker,
+                                first_ts.date(),
+                                start_ts.date(),
+                            )
+                            series.append(ser_alt)
+                            subs_used[ticker] = alt
+                            continue
+                    except Exception:
+                        pass
             series.append(ser)
         except Exception as exc:
+            if ticker_subs and ticker in ticker_subs:
+                alt = ticker_subs[ticker]
+                try:
+                    df_alt = fetch_yfinance([alt], start, end, session_opts=session_opts)
+                    ser_alt = df_alt.iloc[:, 0].dropna()
+                    ser_alt.name = ticker
+                    if ser_alt.empty:
+                        raise RuntimeError("empty series from substitution ticker")
+                    LOGGER.warning("Using substitution ticker %s for %s due to download failure: %s", alt, ticker, exc)
+                    series.append(ser_alt)
+                    subs_used[ticker] = alt
+                    continue
+                except Exception as sub_exc:
+                    errors[ticker] = f"{exc}; substitution {alt} failed: {sub_exc}"
+                    continue
+            if fallback_prices is not None and ticker in fallback_prices.columns:
+                cached = fallback_prices[ticker].dropna()
+                cached.name = ticker
+                if not cached.empty:
+                    LOGGER.warning("Using existing cached series for %s due to download failure: %s", ticker, exc)
+                    series.append(cached)
+                    fallback_used.append(ticker)
+                    continue
             errors[ticker] = str(exc)
-    return series, errors
+    return series, errors, fallback_used, subs_used
 
 
 def _raise_download_failure(errors: Dict[str, str], total: int) -> None:
@@ -166,6 +223,8 @@ def load_market_data(
     require_cache: bool = False,
     paper_mode: bool = False,
     cache_only: bool = False,
+    use_existing_on_fail: bool = True,
+    ticker_substitutions: Dict[str, str] | None = None,
 ) -> MarketData:
     if source != "yfinance_only":
         raise ValueError("Unsupported data source; only yfinance_only is permitted.")
@@ -179,9 +238,30 @@ def load_market_data(
 
     must_use_cache = offline or require_cache or cache_only
     if must_use_cache:
+        LOGGER.info(
+            "Cache-only mode enabled (offline=%s, require_cache=%s, cache_only=%s); loading processed cache.",
+            offline,
+            require_cache,
+            cache_only,
+        )
         return _load_processed_cache(proc_path)
 
-    series, errors = _download_yfinance_all(tickers, start_date, end_date, session_opts)
+    fallback_prices = None
+    fallback_returns = None
+    prices_path = proc_path / "prices.parquet"
+    if use_existing_on_fail and prices_path.exists():
+        try:
+            fallback_prices = pd.read_parquet(prices_path)
+        except Exception:
+            fallback_prices = None
+    series, errors, fallback_used, subs_used = _download_yfinance_all(
+        tickers,
+        start_date,
+        end_date,
+        session_opts,
+        fallback_prices=fallback_prices,
+        ticker_subs=ticker_substitutions,
+    )
     if errors:
         _raise_download_failure(errors, total=len(tickers))
 
@@ -216,6 +296,8 @@ def load_market_data(
         processed_hashes,
         quality_params or {},
         min_history_days,
+        fallback_from_cache=fallback_used,
+        substitutions=subs_used if subs_used else None,
     )
     _write_quality_summary(prices, returns, missing_fraction)
 

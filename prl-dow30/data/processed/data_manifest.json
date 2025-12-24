@@ -1,0 +1,56 @@
+{
+  "created_at": "2025-12-24T15:40:27.539271+00:00",
+  "start_date": "2010-01-01",
+  "end_date": "2025-12-31",
+  "tickers": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "TRV",
+    "UNH",
+    "V",
+    "VZ",
+    "WBA",
+    "WMT",
+    "DOW"
+  ],
+  "source": "yfinance_only",
+  "price_type": "adj_close",
+  "processed_hashes": {
+    "prices": "529e130aee696b627874e9216e3d50148f3757dc31a227a6d2f7a4367b579eb7",
+    "returns": "95ba44db16c48873cb28b2c15d53664a05c1b22ced3cbb4e4ec301eecee490fb"
+  },
+  "yfinance_version": "1.0",
+  "quality_params": {
+    "min_vol_std": 0.005,
+    "min_max_abs_return": 0.02,
+    "max_flat_fraction": 0.2,
+    "max_missing_fraction": 0.01
+  },
+  "min_history_days": 500,
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "substitutions": {
+    "WBA": "CVS",
+    "DOW": "DD"
+  }
+}

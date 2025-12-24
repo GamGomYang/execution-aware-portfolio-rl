@@ -38,6 +38,7 @@ def main():
         require_cache=False,
         paper_mode=False,
         cache_only=False,
+        ticker_substitutions=data_cfg.get("ticker_substitutions"),
     )
     print(f"Cache built with {market.prices.shape[1]} tickers and {len(market.prices)} rows.")
 

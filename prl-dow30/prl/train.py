@@ -157,17 +157,29 @@ class TrainLoggingCallback(BaseCallback):
 
 
 def _write_run_metadata(
-    path: Path, config: Dict, seed: int, mode: str, model_type: str
-) -> None:
+    base_dir: Path,
+    config: Dict,
+    seed: int,
+    mode: str,
+    model_type: str,
+    model_path: Path,
+    log_path: Path,
+) -> Path:
     manifest_hash = ""
     manifest_path = Path(config.get("data", {}).get("processed_dir", "data/processed")) / "data_manifest.json"
     if manifest_path.exists():
         manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    now = datetime.now(timezone.utc)
+    config_hash_val = _config_hash(config)
+    created_at = now.isoformat()
+    run_id_ts = now.strftime("%Y%m%dT%H%M%SZ")
+    run_id = f"{run_id_ts}_{config_hash_val[:8]}_seed{seed}_{model_type}"
     meta = {
+        "run_id": run_id,
         "seed": seed,
         "mode": mode,
         "model_type": model_type,
-        "config_hash": _config_hash(config),
+        "config_hash": config_hash_val,
         "git_commit": _git_commit(),
         "python_version": sys.version,
         "packages": {
@@ -176,20 +188,17 @@ def _write_run_metadata(
             "yfinance": yf.__version__,
             "stable_baselines3": sb3_version,
         },
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": created_at,
         "data_manifest_hash": manifest_hash,
+        "artifacts": {
+            "model_path": str(model_path),
+            "train_log_path": str(log_path),
+        },
     }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        try:
-            data = json.loads(path.read_text())
-            if isinstance(data, list):
-                data.append(meta)
-                path.write_text(json.dumps(data, indent=2))
-                return
-        except Exception:
-            pass
-    path.write_text(json.dumps([meta], indent=2))
+    base_dir.mkdir(parents=True, exist_ok=True)
+    out_path = base_dir / f"run_metadata_{run_id}.json"
+    out_path.write_text(json.dumps(meta, indent=2))
+    return out_path
 
 
 def prepare_market_and_features(
@@ -209,6 +218,7 @@ def prepare_market_and_features(
     paper_mode: bool = False,
     session_opts: Dict | None = None,
     cache_only: bool = False,
+    ticker_substitutions: Dict[str, str] | None = None,
 ) -> tuple[MarketData, VolatilityFeatures]:
     market = load_market_data(
         start_date=start_date,
@@ -224,6 +234,7 @@ def prepare_market_and_features(
         paper_mode=paper_mode,
         session_opts=session_opts,
         cache_only=cache_only,
+        ticker_substitutions=ticker_substitutions,
     )
     vol_features = compute_volatility_features(
         returns=market.returns,
@@ -269,11 +280,15 @@ def run_training(
     min_history_days = data_cfg.get("min_history_days", 500)
     quality_params = data_cfg.get("quality_params", None)
     source = data_cfg.get("source", "yfinance_only")
-    require_cache = data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
     paper_mode = data_cfg.get("paper_mode", False)
+    require_cache_cfg = data_cfg.get("require_cache", False)
+    if paper_mode and not require_cache_cfg:
+        raise ValueError("paper_mode=true requires require_cache=true.")
+    require_cache = require_cache_cfg or paper_mode
     offline = offline or data_cfg.get("offline", False) or paper_mode or require_cache
     session_opts = data_cfg.get("session_opts", None)
-    cache_only = cache_only or require_cache or paper_mode
+    ticker_substitutions = data_cfg.get("ticker_substitutions")
+    cache_only = cache_only or require_cache or paper_mode or offline
     require_cache = require_cache or offline
     checkpoint_interval = sac_cfg.get("checkpoint_interval")
     log_interval = sac_cfg.get("log_interval_steps", 1000 if mode == "paper" else 50)
@@ -307,6 +322,7 @@ def run_training(
         paper_mode=paper_mode,
         session_opts=session_opts,
         cache_only=cache_only,
+        ticker_substitutions=ticker_substitutions,
     )
 
     env = build_env_for_range(
@@ -347,5 +363,5 @@ def run_training(
     output_path.mkdir(parents=True, exist_ok=True)
     model_path = output_path / f"{model_type}_seed{seed}_final.zip"
     model.save(model_path)
-    _write_run_metadata(Path("outputs/reports/run_metadata.json"), config, seed, mode, model_type)
+    _write_run_metadata(Path("outputs/reports"), config, seed, mode, model_type, model_path, log_path)
     return model_path

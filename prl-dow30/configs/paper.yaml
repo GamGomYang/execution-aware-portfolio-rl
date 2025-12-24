@@ -15,6 +15,9 @@ data:
   require_cache: true
   paper_mode: true
   min_history_days: 500
+  ticker_substitutions:
+    WBA: CVS
+    DOW: DD
   quality_params:
     min_vol_std: 0.005
     min_max_abs_return: 0.02
@@ -44,6 +47,7 @@ sac:
   total_timesteps: 500000
   eval_freq: 5000
   ent_coef: 0.2
+  log_interval_steps: 1000
   checkpoint_interval: 50000
 
 seeds:

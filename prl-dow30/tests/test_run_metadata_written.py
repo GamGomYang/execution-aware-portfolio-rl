@@ -100,10 +100,11 @@ def test_run_metadata_written(tmp_path, monkeypatch):
 
     run_training(cfg, "baseline", seed=0, raw_dir=tmp_path / "raw", processed_dir=tmp_path / "processed", output_dir=tmp_path / "models", force_refresh=False)
 
-    meta_path = Path("outputs/reports/run_metadata.json")
-    assert meta_path.exists()
-    data = json.loads(meta_path.read_text())
-    assert isinstance(data, list)
-    entry = data[-1]
-    for key in ["seed", "mode", "model_type", "config_hash", "python_version", "packages", "created_at"]:
-        assert key in entry
+    meta_dir = Path("outputs/reports")
+    files = sorted(meta_dir.glob("run_metadata_*.json"))
+    assert files, "run_metadata_*.json not created"
+    data = json.loads(files[-1].read_text())
+    for key in ["run_id", "seed", "mode", "model_type", "config_hash", "python_version", "packages", "created_at", "artifacts"]:
+        assert key in data
+    assert "model_path" in data["artifacts"]
+    assert "train_log_path" in data["artifacts"]

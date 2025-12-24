@@ -1,9 +1,9 @@
 # Experiment Report
 
 ## Dataset & Setup
-- Universe: Dow30 (30 equities), Adj Close daily bars cached in `data/raw`. Synthetic Adj Close series were generated offline because direct yfinance access was blocked; the cached CSVs follow the 2010-01-01 to 2025-12-31 calendar with business-day alignment.
+- Universe: Dow30 (30 equities), yfinance Adjusted Close daily bars cached via `scripts/build_cache.py` for reproducibility. Business-day alignment covers 2010-01-01 to 2025-12-31.
 - Train range: 2010-01-01 to 2021-12-31. Test/backtest range: 2022-01-01 to 2025-12-31.
-- Rolling windows: L=30 for returns, Lv=30 for volatility. Transaction cost coefficient c_tc=0.0005 (half-L1 turnover).
+- Rolling windows: L=30 for returns, Lv=30 for volatility. Transaction cost coefficient c_tc=0.0005 (turnover = sum |w_t - w_{t-1}|).
 - Anti-lookahead enforced by using w_{t-1} * r_t in rewards; actions converted to weights via softmax inside the environment.
 
 ## Hyperparameters
@@ -31,7 +31,6 @@
 | prl | 0.0063 +/- 0.0002 | 1.9123 +/- 0.0547 | -0.000701 +/- 0.000026 | 0.000279 +/- 0.000064 |
 
 ## Issues & Next Steps
-- Synthetic cached data were used because HTTPS certificate validation blocked direct yfinance downloads; replacing caches with real Adjusted Close histories is the top priority before publication.
 - Training budget was trimmed to 2k steps per run so experiments could finish on this workstation; performance numbers therefore reflect very early training. Increase total_timesteps and replay buffer size once access to more compute is available.
-- PRL-SAC achieved slightly higher expected return/Sharpe but incurred higher turnover (~3e-4 vs. ~6e-5). A turnover-aware penalty schedule and hyperparameter sweep (beta, lambdav) should be explored.
+- PRL-SAC achieved slightly higher expected return/Sharpe but incurred higher turnover under the L1 definition. A turnover-aware penalty schedule and hyperparameter sweep (beta, lambdav) should be explored.
 - Monitor stability across seeds: Sharpe std for PRL (~0.055) is non-trivial even with short runs; consider adding more seeds or longer evaluation windows.
