@@ -1,8 +1,11 @@
 numpy>=1.24
 pandas>=2.0
 yfinance>=0.2
+pyarrow>=14.0
 torch>=2.1
 stable-baselines3>=2.3.0
 gymnasium>=0.29.1
 PyYAML>=6.0
 matplotlib>=3.8
+requests>=2.31
+certifi>=2024.0

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
 import logging
+import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Dict, Iterable, List, Sequence
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+from .data_sources import compute_quality_summary, data_quality_check, fetch_yfinance, hash_file
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,82 +52,8 @@ DOW30_TICKERS: Sequence[str] = (
 
 @dataclass
 class MarketData:
-    """Container for aligned price and return frames."""
-
     prices: pd.DataFrame
     returns: pd.DataFrame
-
-
-def _ticker_path(raw_dir: Path, ticker: str) -> Path:
-    return raw_dir / f"{ticker}.csv"
-
-
-def _download_ticker(
-    ticker: str,
-    start: str,
-    end: str,
-) -> pd.Series:
-    LOGGER.info("Downloading %s from yfinance (%s -> %s)", ticker, start, end)
-    data = yf.download(
-        ticker,
-        start=start,
-        end=end,
-        progress=False,
-        auto_adjust=False,
-    )
-    if "Adj Close" not in data:
-        raise ValueError(f"Adj Close field missing for {ticker}")
-    series = data["Adj Close"].copy()
-    series.index.name = "Date"
-    return series
-
-
-def _load_cached_series(path: Path) -> pd.Series:
-    df = pd.read_csv(path, parse_dates=["Date"], index_col="Date")
-    if "Adj Close" in df.columns:
-        return df["Adj Close"]
-    if len(df.columns) == 1:
-        return df.iloc[:, 0]
-    raise ValueError(f"Unexpected columns in {path}: {df.columns}")
-
-
-def _store_series(path: Path, series: pd.Series) -> None:
-    df = series.to_frame(name="Adj Close")
-    df.to_csv(path)
-
-
-def _load_ticker_series(
-    ticker: str,
-    start: str,
-    end: str,
-    raw_dir: Path,
-    force_refresh: bool,
-) -> pd.Series:
-    cache_path = _ticker_path(raw_dir, ticker)
-    if cache_path.exists() and not force_refresh:
-        try:
-            return _load_cached_series(cache_path)
-        except Exception as exc:  # pragma: no cover - log path
-            LOGGER.warning("Failed to load cache for %s (%s). Redownloading.", ticker, exc)
-    try:
-        series = _download_ticker(ticker, start, end)
-        _store_series(cache_path, series)
-        return series
-    except Exception as download_exc:
-        LOGGER.warning("Download failed for %s (%s)", ticker, download_exc)
-        if cache_path.exists():
-            LOGGER.info("Falling back to cached CSV for %s", ticker)
-            return _load_cached_series(cache_path)
-        raise
-
-
-def _align_prices(series_list: List[pd.Series]) -> pd.DataFrame:
-    prices = pd.concat(series_list, axis=1, join="outer")
-    prices.columns = [s.name for s in series_list]
-    prices = prices.sort_index()
-    prices = prices.ffill().bfill()
-    prices = prices.dropna(how="any")
-    return prices
 
 
 def _compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
@@ -133,44 +64,168 @@ def _compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
     return returns
 
 
+def _align_prices(series_list: List[pd.Series]) -> tuple[pd.DataFrame, dict]:
+    raw = pd.concat(series_list, axis=1, join="outer")
+    raw.columns = [s.name for s in series_list]
+    missing_fraction = raw.isna().mean().to_dict()
+    prices = raw.sort_index().ffill().bfill().dropna(how="any")
+    return prices, missing_fraction
+
+
+def _write_manifest(
+    processed_dir: Path,
+    tickers: list[str],
+    start: str,
+    end: str,
+    processed_hashes: Dict[str, str],
+    quality_params: Dict,
+    min_history_days: int,
+) -> None:
+    manifest = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "start_date": start,
+        "end_date": end,
+        "tickers": tickers,
+        "source": "yfinance",
+        "price_type": "adj_close",
+        "processed_hashes": processed_hashes,
+        "yfinance_version": getattr(yf, "__version__", "unknown"),
+        "quality_params": quality_params,
+        "min_history_days": min_history_days,
+        "python_version": sys.version,
+    }
+    manifest_path = processed_dir / "data_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+
+
+def _write_quality_summary(prices: pd.DataFrame, returns: pd.DataFrame, missing_fraction: Dict[str, float]) -> None:
+    summary = compute_quality_summary(prices, returns, missing_fraction)
+    out_dir = Path("outputs/reports")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(out_dir / "data_quality_summary.csv", index=False)
+
+
+def _load_processed_cache(processed_dir: Path) -> MarketData:
+    prices_path = processed_dir / "prices.parquet"
+    returns_path = processed_dir / "returns.parquet"
+    if not prices_path.exists() or not returns_path.exists():
+        raise RuntimeError("CACHE_MISSING: processed parquet files not found; run build_cache.py")
+    LOGGER.info("Loading processed cache from %s", processed_dir)
+    prices = pd.read_parquet(prices_path)
+    returns = pd.read_parquet(returns_path)
+    return MarketData(prices=prices, returns=returns)
+
+
+def _download_yfinance_all(
+    tickers: list[str],
+    start: str,
+    end: str,
+    session_opts: Dict | None,
+) -> tuple[List[pd.Series], Dict[str, str]]:
+    series: List[pd.Series] = []
+    errors: Dict[str, str] = {}
+    for ticker in tickers:
+        try:
+            df = fetch_yfinance([ticker], start, end, session_opts=session_opts)
+            try:
+                ser = df[ticker]
+            except KeyError:
+                ser = df.iloc[:, 0]
+            ser = ser.dropna()
+            ser.name = ticker
+            if ser.empty:
+                raise RuntimeError("empty series")
+            series.append(ser)
+        except Exception as exc:
+            errors[ticker] = str(exc)
+    return series, errors
+
+
+def _raise_download_failure(errors: Dict[str, str], total: int) -> None:
+    failed = list(errors.keys())
+    success_count = total - len(failed)
+    msg = (
+        f"YFINANCE_DOWNLOAD_FAILED: failed_tickers={failed}; "
+        f"success_count={success_count}/{total}; causes={errors}"
+    )
+    raise RuntimeError(msg)
+
+
 def load_market_data(
     start_date: str,
     end_date: str,
     raw_dir: str | Path = "data/raw",
     processed_dir: str | Path = "data/processed",
     tickers: Iterable[str] | None = None,
-    force_refresh: bool = False,
+    force_refresh: bool = True,
+    session_opts: Dict | None = None,
+    min_history_days: int = 500,
+    quality_params: Dict | None = None,
+    source: str = "yfinance_only",
+    offline: bool = False,
+    require_cache: bool = False,
+    paper_mode: bool = False,
 ) -> MarketData:
-    """Download (or load cached) Adj Close data and compute log returns."""
+    if source != "yfinance_only":
+        raise ValueError("Unsupported data source; only yfinance_only is permitted.")
 
     tickers = list(tickers or DOW30_TICKERS)
     if len(tickers) != 30:
         LOGGER.warning("Ticker universe size is %d (expected 30)", len(tickers))
 
-    raw_path = Path(raw_dir)
     proc_path = Path(processed_dir)
-    raw_path.mkdir(parents=True, exist_ok=True)
     proc_path.mkdir(parents=True, exist_ok=True)
 
-    series: List[pd.Series] = []
-    for ticker in tickers:
-        ticker_series = _load_ticker_series(ticker, start_date, end_date, raw_path, force_refresh)
-        ticker_series.name = ticker
-        series.append(ticker_series)
+    must_use_cache = offline or require_cache or paper_mode
+    if must_use_cache and not force_refresh:
+        return _load_processed_cache(proc_path)
 
-    prices = _align_prices(series)
+    if must_use_cache:
+        # In offline/paper mode, downloading is forbidden.
+        return _load_processed_cache(proc_path)
+
+    series, errors = _download_yfinance_all(tickers, start_date, end_date, session_opts)
+    if errors:
+        _raise_download_failure(errors, total=len(tickers))
+
+    prices, missing_fraction = _align_prices(series)
     prices = prices.loc[start_date:end_date]
     returns = _compute_log_returns(prices)
+    qp = quality_params or {}
+    data_quality_check(
+        prices,
+        returns,
+        min_days=min_history_days,
+        min_vol_std=qp.get("min_vol_std", 0.002),
+        min_max_abs_return=qp.get("min_max_abs_return", 0.01),
+        max_flat_fraction=qp.get("max_flat_fraction", 0.30),
+        missing_fraction=missing_fraction,
+        max_missing_fraction=qp.get("max_missing_fraction", 0.05),
+    )
 
-    prices.to_parquet(proc_path / "prices.parquet")
-    returns.to_parquet(proc_path / "returns.parquet")
+    prices_path = proc_path / "prices.parquet"
+    returns_path = proc_path / "returns.parquet"
+    prices.to_parquet(prices_path)
+    returns.to_parquet(returns_path)
+    processed_hashes = {
+        "prices": hash_file(prices_path),
+        "returns": hash_file(returns_path),
+    }
+    _write_manifest(
+        proc_path,
+        tickers,
+        start_date,
+        end_date,
+        processed_hashes,
+        quality_params or {},
+        min_history_days,
+    )
+    _write_quality_summary(prices, returns, missing_fraction)
 
     return MarketData(prices=prices, returns=returns)
 
 
 def slice_frame(frame: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
-    """Utility to slice a frame by inclusive date strings."""
-
     return frame.loc[start:end]
 
 
@@ -181,8 +236,6 @@ def split_returns(
     test_start: str,
     test_end: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return train/test slices for downstream environment construction."""
-
     train = slice_frame(returns, train_start, train_end)
     test = slice_frame(returns, test_start, test_end)
     return train, test

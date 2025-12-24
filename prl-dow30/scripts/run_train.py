@@ -16,7 +16,7 @@ def parse_args():
         help="Training mode to run.",
     )
     parser.add_argument("--seed", type=int, default=0, help="Random seed for the run.")
-    parser.add_argument("--force-refresh", action="store_true", help="Re-download raw data.")
+    parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
     return parser.parse_args()
 
 
@@ -33,7 +33,8 @@ def main():
         raw_dir=raw_dir,
         processed_dir=processed_dir,
         output_dir="outputs/models",
-        force_refresh=args.force_refresh,
+        force_refresh=data_cfg.get("force_refresh", True),
+        offline=args.offline or data_cfg.get("offline", False),
     )
     print(f"Model saved to {model_path}")
 

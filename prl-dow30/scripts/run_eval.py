@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument("--model-type", choices=["baseline", "prl"], required=True, help="Model variant to evaluate.")
     parser.add_argument("--seed", type=int, default=0, help="Seed identifier used during training.")
     parser.add_argument("--model-path", type=str, help="Optional explicit model path.")
+    parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
     return parser.parse_args()
 
 
@@ -47,6 +48,15 @@ def main():
     data_cfg = cfg.get("data", {})
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
+    allow_unadjusted_prices = data_cfg.get("allow_unadjusted_prices", True)
+    min_history_days = data_cfg.get("min_history_days", 500)
+    quality_params = data_cfg.get("quality_params", None)
+    source = data_cfg.get("source", "yfinance_only")
+    require_cache = data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
+    paper_mode = data_cfg.get("paper_mode", False)
+    offline = args.offline or data_cfg.get("offline", False) or paper_mode or require_cache
+    require_cache = require_cache or offline
+    session_opts = data_cfg.get("session_opts", None)
 
     market, features = prepare_market_and_features(
         start_date=dates["train_start"],
@@ -56,7 +66,14 @@ def main():
         lv=env_cfg["Lv"],
         raw_dir=raw_dir,
         processed_dir=processed_dir,
-        force_refresh=False,
+        force_refresh=data_cfg.get("force_refresh", True),
+        min_history_days=min_history_days,
+        quality_params=quality_params,
+        source=source,
+        offline=offline,
+        require_cache=require_cache,
+        paper_mode=paper_mode,
+        session_opts=session_opts,
     )
 
     env = build_env_for_range(

@@ -15,7 +15,7 @@ from prl.train import (
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run training + evaluation for multiple seeds/model types.")
-    parser.add_argument("--config", type=str, default="configs/default.yaml", help="YAML config.")
+    parser.add_argument("--config", type=str, default="configs/paper.yaml", help="YAML config.")
     parser.add_argument(
         "--model-types",
         nargs="+",
@@ -23,7 +23,8 @@ def parse_args():
         default=["baseline", "prl"],
         help="Model variants to execute.",
     )
-    parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2], help="Seeds to iterate.")
+    parser.add_argument("--seeds", nargs="+", type=int, help="Seeds to iterate (defaults to config).")
+    parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
     return parser.parse_args()
 
 
@@ -47,6 +48,15 @@ def main():
     data_cfg = cfg.get("data", {})
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
+    allow_unadjusted_prices = data_cfg.get("allow_unadjusted_prices", True)
+    min_history_days = data_cfg.get("min_history_days", 500)
+    quality_params = data_cfg.get("quality_params", None)
+    source = data_cfg.get("source", "yfinance_only")
+    require_cache = data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
+    paper_mode = data_cfg.get("paper_mode", False)
+    offline = args.offline or data_cfg.get("offline", False) or paper_mode or require_cache
+    require_cache = require_cache or offline
+    session_opts = data_cfg.get("session_opts", None)
 
     market, features = prepare_market_and_features(
         start_date=dates["train_start"],
@@ -56,12 +66,20 @@ def main():
         lv=env_cfg["Lv"],
         raw_dir=raw_dir,
         processed_dir=processed_dir,
-        force_refresh=False,
+        force_refresh=data_cfg.get("force_refresh", True),
+        min_history_days=min_history_days,
+        quality_params=quality_params,
+        source=source,
+        offline=offline,
+        require_cache=require_cache,
+        paper_mode=paper_mode,
+        session_opts=session_opts,
     )
 
+    seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
     summary_rows = []
     for model_type in args.model_types:
-        for seed in args.seeds:
+        for seed in seeds:
             model_path = run_training(
                 config=cfg,
                 model_type=model_type,
@@ -69,7 +87,8 @@ def main():
                 raw_dir=raw_dir,
                 processed_dir=processed_dir,
                 output_dir="outputs/models",
-                force_refresh=False,
+                force_refresh=data_cfg.get("force_refresh", True),
+                offline=offline,
             )
 
             env = build_env_for_range(

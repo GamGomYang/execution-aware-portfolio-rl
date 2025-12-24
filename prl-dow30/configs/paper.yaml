@@ -1,4 +1,4 @@
-mode: default
+mode: paper
 
 dates:
   train_start: '2010-01-01'
@@ -12,19 +12,19 @@ data:
   source: yfinance_only
   force_refresh: true
   offline: false
-  require_cache: false
-  paper_mode: false
+  require_cache: true
+  paper_mode: true
   min_history_days: 500
   quality_params:
-    min_vol_std: 0.002
-    min_max_abs_return: 0.01
-    max_flat_fraction: 0.30
-    max_missing_fraction: 0.05
+    min_vol_std: 0.005
+    min_max_abs_return: 0.02
+    max_flat_fraction: 0.20
+    max_missing_fraction: 0.01
 
 env:
-  L: 30              # rolling return window length
-  Lv: 30             # rolling volatility window length
-  c_tc: 0.0005       # transaction cost coefficient
+  L: 30
+  Lv: 30
+  c_tc: 0.0005
 
 prl:
   alpha0: 0.2
@@ -39,11 +39,13 @@ sac:
   batch_size: 256
   gamma: 0.99
   tau: 0.005
-  buffer_size: 5000
-  total_timesteps: 2000
-  eval_freq: 500
+  buffer_size: 200000
+  total_timesteps: 500000
+  eval_freq: 5000
   ent_coef: 0.2
-  checkpoint_interval: null
+  checkpoint_interval: 50000
 
 seeds:
   - 0
+  - 1
+  - 2
