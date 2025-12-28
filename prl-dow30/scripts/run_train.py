@@ -26,12 +26,15 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     data_cfg = cfg.get("data", {})
-    if data_cfg.get("paper_mode", False) and not data_cfg.get("require_cache", False):
+    paper_mode = data_cfg.get("paper_mode", False)
+    require_cache_cfg = data_cfg.get("require_cache", False)
+    offline_cfg = data_cfg.get("offline", False)
+    if paper_mode and not require_cache_cfg:
         raise ValueError("paper_mode=true requires require_cache=true.")
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
-    offline_flag = args.offline or data_cfg.get("offline", False) or data_cfg.get("paper_mode", False)
-    cache_only = data_cfg.get("paper_mode", False) or data_cfg.get("require_cache", False) or offline_flag
+    offline_flag = args.offline or offline_cfg or paper_mode
+    cache_only = paper_mode or require_cache_cfg or offline_cfg or args.offline
     model_path = run_training(
         config=cfg,
         model_type=args.model_type,

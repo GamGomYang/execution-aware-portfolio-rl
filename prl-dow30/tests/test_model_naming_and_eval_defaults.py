@@ -24,7 +24,13 @@ def _tiny_config(tmp_path):
         "data": {
             "raw_dir": str(tmp_path / "data" / "raw"),
             "processed_dir": str(tmp_path / "data" / "processed"),
+            "universe_policy": "availability_filtered",
+            "min_assets": 1,
+            "history_tolerance_days": 0,
             "min_history_days": 5,
+            "require_cache": False,
+            "offline": False,
+            "paper_mode": False,
             "quality_params": {
                 "min_vol_std": 0.0,
                 "min_max_abs_return": 0.0,
@@ -33,6 +39,7 @@ def _tiny_config(tmp_path):
             },
             "source": "yfinance_only",
             "force_refresh": False,
+            "ticker_substitutions": {},
         },
         "env": {"L": 2, "Lv": 2, "c_tc": 0.0, "logit_scale": 1.0},
         "prl": {
@@ -79,7 +86,7 @@ def test_model_naming_and_run_eval_default(tmp_path, monkeypatch):
     market = _fake_market()
 
     def _fake_load_market_data(*args, **kwargs):
-        return market
+        return market.prices, market.returns, {"kept_tickers": list(market.returns.columns)}, pd.DataFrame()
 
     def _fake_compute_vol(*args, **kwargs):
         class FV:
@@ -125,6 +132,9 @@ def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
             "raw_dir": "data/raw",
             "processed_dir": "data/processed",
             "source": "yfinance_only",
+            "universe_policy": "availability_filtered",
+            "min_assets": 1,
+            "history_tolerance_days": 0,
             "require_cache": False,
             "paper_mode": False,
             "force_refresh": False,
@@ -135,6 +145,7 @@ def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
                 "max_missing_fraction": 1.0,
                 "max_flat_fraction": 1.0,
             },
+            "ticker_substitutions": {},
         },
         "env": {"L": 2, "Lv": 2, "c_tc": 0.0, "logit_scale": 1.0},
         "prl": {

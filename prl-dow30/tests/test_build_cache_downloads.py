@@ -37,10 +37,15 @@ data:
   raw_dir: data/raw
   processed_dir: data/processed
   source: yfinance_only
+  universe_policy: availability_filtered
+  min_assets: 2
   paper_mode: true
   require_cache: true
+  offline: false
   force_refresh: true
+  history_tolerance_days: 0
   min_history_days: 5
+  ticker_substitutions: {}
   quality_params:
     min_vol_std: 0.0
     min_max_abs_return: 0.0

@@ -202,45 +202,45 @@ def _write_run_metadata(
 
 
 def prepare_market_and_features(
-    start_date: str,
-    end_date: str,
-    train_start: str,
-    train_end: str,
+    config: Dict,
     lv: int,
-    raw_dir: str | Path,
-    processed_dir: str | Path,
     force_refresh: bool = True,
-    min_history_days: int = 500,
-    quality_params: Dict | None = None,
-    source: str = "yfinance_only",
     offline: bool = False,
     require_cache: bool = False,
     paper_mode: bool = False,
     session_opts: Dict | None = None,
     cache_only: bool = False,
-    ticker_substitutions: Dict[str, str] | None = None,
 ) -> tuple[MarketData, VolatilityFeatures]:
-    market = load_market_data(
-        start_date=start_date,
-        end_date=end_date,
-        raw_dir=raw_dir,
-        processed_dir=processed_dir,
-        force_refresh=force_refresh,
-        min_history_days=min_history_days,
-        quality_params=quality_params,
-        source=source,
+    dates = config["dates"]
+    data_cfg = {**config.get("data", {})}
+    processed_dir = data_cfg.get("processed_dir", "data/processed")
+    data_cfg.update(
+        {
+            "raw_dir": data_cfg.get("raw_dir", "data/raw"),
+            "processed_dir": processed_dir,
+            "offline": offline,
+            "require_cache": require_cache,
+            "paper_mode": paper_mode,
+            "session_opts": session_opts if session_opts is not None else data_cfg.get("session_opts"),
+        }
+    )
+    load_cfg = {
+        "dates": {"train_start": dates["train_start"], "test_end": dates["test_end"]},
+        "data": data_cfg,
+    }
+    prices, returns, manifest, quality_summary = load_market_data(
+        load_cfg,
         offline=offline,
         require_cache=require_cache,
-        paper_mode=paper_mode,
-        session_opts=session_opts,
         cache_only=cache_only,
-        ticker_substitutions=ticker_substitutions,
+        force_refresh=force_refresh,
     )
+    market = MarketData(prices=prices, returns=returns, manifest=manifest, quality_summary=quality_summary)
     vol_features = compute_volatility_features(
         returns=market.returns,
         lv=lv,
-        train_start=train_start,
-        train_end=train_end,
+        train_start=dates["train_start"],
+        train_end=dates["train_end"],
         processed_dir=processed_dir,
     )
     return market, vol_features
@@ -276,20 +276,24 @@ def run_training(
     sac_cfg = config["sac"]
     prl_cfg = config.get("prl", {})
     mode = config.get("mode", "default")
-    data_cfg = config.get("data", {})
-    min_history_days = data_cfg.get("min_history_days", 500)
-    quality_params = data_cfg.get("quality_params", None)
-    source = data_cfg.get("source", "yfinance_only")
+    data_cfg = {**config.get("data", {})}
+    data_cfg.setdefault("raw_dir", raw_dir)
+    data_cfg.setdefault("processed_dir", processed_dir)
+    config = {**config, "data": data_cfg}
     paper_mode = data_cfg.get("paper_mode", False)
     require_cache_cfg = data_cfg.get("require_cache", False)
     if paper_mode and not require_cache_cfg:
         raise ValueError("paper_mode=true requires require_cache=true.")
-    require_cache = require_cache_cfg or paper_mode
-    offline = offline or data_cfg.get("offline", False) or paper_mode or require_cache
+    offline = offline or data_cfg.get("offline", False)
+    require_cache = require_cache_cfg or paper_mode or offline
+    cache_only = (
+        cache_only
+        or data_cfg.get("paper_mode", False)
+        or data_cfg.get("require_cache", False)
+        or data_cfg.get("offline", False)
+        or offline
+    )
     session_opts = data_cfg.get("session_opts", None)
-    ticker_substitutions = data_cfg.get("ticker_substitutions")
-    cache_only = cache_only or require_cache or paper_mode or offline
-    require_cache = require_cache or offline
     checkpoint_interval = sac_cfg.get("checkpoint_interval")
     log_interval = sac_cfg.get("log_interval_steps", 1000 if mode == "paper" else 50)
 
@@ -306,23 +310,14 @@ def run_training(
     _set_global_seeds(seed)
 
     market, features = prepare_market_and_features(
-        start_date=dates["train_start"],
-        end_date=dates["test_end"],
-        train_start=dates["train_start"],
-        train_end=dates["train_end"],
+        config=config,
         lv=env_cfg["Lv"],
-        raw_dir=raw_dir,
-        processed_dir=processed_dir,
         force_refresh=force_refresh,
-        min_history_days=min_history_days,
-        quality_params=quality_params,
-        source=source,
         offline=offline,
         require_cache=require_cache,
         paper_mode=paper_mode,
         session_opts=session_opts,
         cache_only=cache_only,
-        ticker_substitutions=ticker_substitutions,
     )
 
     env = build_env_for_range(

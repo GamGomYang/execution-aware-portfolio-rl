@@ -39,16 +39,21 @@ def test_short_train_and_eval_pipeline(tmp_path, fake_download):
             "raw_dir": str(tmp_path / "data" / "raw"),
             "processed_dir": str(tmp_path / "data" / "processed"),
             "source": "yfinance_only",
+            "universe_policy": "availability_filtered",
+            "min_assets": 2,
             "force_refresh": True,
             "offline": False,
             "require_cache": False,
             "paper_mode": False,
+            "history_tolerance_days": 0,
             "min_history_days": 50,
             "quality_params": {
                 "min_vol_std": 0.0,
                 "min_max_abs_return": 0.0,
                 "max_missing_fraction": 1.0,
+                "max_flat_fraction": 1.0,
             },
+            "ticker_substitutions": {},
         },
         "env": {"L": 5, "Lv": 5, "c_tc": 0.0001},
         "prl": {
@@ -89,20 +94,13 @@ def test_short_train_and_eval_pipeline(tmp_path, fake_download):
     assert model_path.exists()
 
     market, features = prepare_market_and_features(
-        start_date=config["dates"]["train_start"],
-        end_date=config["dates"]["test_end"],
-        train_start=config["dates"]["train_start"],
-        train_end=config["dates"]["train_end"],
+        config=config,
         lv=config["env"]["Lv"],
-        raw_dir=raw_dir,
-        processed_dir=processed_dir,
         force_refresh=False,
-        min_history_days=config["data"]["min_history_days"],
-        quality_params=config["data"]["quality_params"],
-        source=config["data"]["source"],
         offline=False,
         require_cache=False,
         paper_mode=False,
+        cache_only=False,
     )
 
     env = build_env_for_range(

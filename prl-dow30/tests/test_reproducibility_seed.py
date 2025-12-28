@@ -27,7 +27,7 @@ def test_reproducible_training_with_seed(tmp_path, monkeypatch):
     stats_path.write_bytes(b"stub")
 
     def _fake_load_market(*args, **kwargs):
-        return market
+        return market.prices, market.returns, {"kept_tickers": list(market.returns.columns)}, pd.DataFrame()
 
     def _fake_compute_volatility_features(*args, **kwargs):
         return _FakeVolFeatures(volatility=vol, stats_path=stats_path)
@@ -43,7 +43,6 @@ def test_reproducible_training_with_seed(tmp_path, monkeypatch):
             "test_start": str(market.returns.index.min().date()),
             "test_end": str(market.returns.index.max().date()),
         },
-        "data": {"raw_dir": "data/raw", "processed_dir": "data/processed"},
         "env": {"L": 5, "Lv": 5, "c_tc": 0.0},
         "prl": {
             "alpha0": 0.2,
@@ -61,6 +60,26 @@ def test_reproducible_training_with_seed(tmp_path, monkeypatch):
             "buffer_size": 1000,
             "total_timesteps": 20,
             "ent_coef": 0.2,
+        },
+        "data": {
+            "raw_dir": "data/raw",
+            "processed_dir": "data/processed",
+            "source": "yfinance_only",
+            "universe_policy": "availability_filtered",
+            "min_assets": 1,
+            "history_tolerance_days": 0,
+            "min_history_days": 5,
+            "quality_params": {
+                "min_vol_std": 0.0,
+                "min_max_abs_return": 0.0,
+                "max_missing_fraction": 1.0,
+                "max_flat_fraction": 1.0,
+            },
+            "ticker_substitutions": {},
+            "paper_mode": False,
+            "require_cache": False,
+            "offline": False,
+            "force_refresh": False,
         },
     }
 

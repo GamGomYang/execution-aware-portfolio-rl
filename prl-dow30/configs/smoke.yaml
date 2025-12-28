@@ -10,14 +10,15 @@ data:
   raw_dir: data/raw
   processed_dir: data/processed
   source: yfinance_only
+  universe_policy: availability_filtered
+  min_assets: 25
   force_refresh: false
   offline: false
   require_cache: false
   paper_mode: false
   min_history_days: 30
-  ticker_substitutions:
-    WBA: CVS
-    DOW: DD
+  history_tolerance_days: 30
+  ticker_substitutions: {}
   quality_params:
     min_vol_std: 0.0
     min_max_abs_return: 0.0

@@ -52,36 +52,23 @@ def main():
         raise ValueError("paper_mode=true requires require_cache=true.")
     raw_dir = data_cfg.get("raw_dir", "data/raw")
     processed_dir = data_cfg.get("processed_dir", "data/processed")
-    min_history_days = data_cfg.get("min_history_days", 500)
-    quality_params = data_cfg.get("quality_params", None)
-    source = data_cfg.get("source", "yfinance_only")
     paper_mode = data_cfg.get("paper_mode", False)
     require_cache_cfg = data_cfg.get("require_cache", False)
-    require_cache = require_cache_cfg or paper_mode
-    offline = args.offline or data_cfg.get("offline", False) or paper_mode or require_cache
-    cache_only = paper_mode or require_cache or offline
-    require_cache = require_cache or offline
+    offline_cfg = data_cfg.get("offline", False)
+    offline = args.offline or offline_cfg or paper_mode or require_cache_cfg
+    require_cache = require_cache_cfg or paper_mode or offline
+    cache_only = paper_mode or require_cache_cfg or offline_cfg or args.offline
     session_opts = data_cfg.get("session_opts", None)
-    ticker_substitutions = data_cfg.get("ticker_substitutions")
 
     market, features = prepare_market_and_features(
-        start_date=dates["train_start"],
-        end_date=dates["test_end"],
-        train_start=dates["train_start"],
-        train_end=dates["train_end"],
+        config=cfg,
         lv=env_cfg["Lv"],
-        raw_dir=raw_dir,
-        processed_dir=processed_dir,
         force_refresh=data_cfg.get("force_refresh", True),
-        min_history_days=min_history_days,
-        quality_params=quality_params,
-        source=source,
         offline=offline,
         require_cache=require_cache,
         paper_mode=paper_mode,
         session_opts=session_opts,
         cache_only=cache_only,
-        ticker_substitutions=ticker_substitutions,
     )
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
