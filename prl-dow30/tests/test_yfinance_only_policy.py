@@ -25,6 +25,7 @@ def _make_cfg(processed_dir, data_overrides=None):
         "universe_policy": "availability_filtered",
         "quality_params": {"min_vol_std": 0.0, "min_max_abs_return": 0.0, "max_missing_fraction": 1.0, "max_flat_fraction": 1.0},
         "ticker_substitutions": {},
+        "tickers": ["AAA"],
     }
     if data_overrides:
         data_cfg.update(data_overrides)
@@ -38,7 +39,7 @@ def _make_cfg(processed_dir, data_overrides=None):
 def test_build_cache_yfinance_success(tmp_path, monkeypatch):
     monkeypatch.setattr("prl.data.fetch_yfinance", _fake_fetch_success)
     processed_dir = tmp_path / "processed"
-    cfg = _make_cfg(processed_dir)
+    cfg = _make_cfg(processed_dir, data_overrides={"tickers": ["AAA", "BBB"]})
     prices, returns, manifest, quality_summary = load_market_data(
         cfg,
         offline=False,
@@ -53,10 +54,10 @@ def test_build_cache_yfinance_success(tmp_path, monkeypatch):
     assert manifest["price_type"] == "adj_close"
     assert manifest["start"] == "2020-01-01"
     assert manifest["end"] == "2020-01-10"
-    assert manifest["kept_tickers"] == ["AAA"]
+    assert manifest["kept_tickers"] == ["AAA", "BBB"]
     assert manifest["dropped_tickers"] == []
-    assert prices.shape[1] == 1
-    assert returns.shape[1] == 1
+    assert prices.shape[1] == 2
+    assert returns.shape[1] == 2
     assert not quality_summary.empty
 
 
@@ -70,7 +71,7 @@ def test_yfinance_partial_failure_records_drop(tmp_path, monkeypatch):
 
     monkeypatch.setattr("prl.data.fetch_yfinance", _fake_fetch)
     processed_dir = tmp_path / "processed"
-    cfg = _make_cfg(processed_dir)
+    cfg = _make_cfg(processed_dir, data_overrides={"tickers": ["AAA", "BBB"]})
     prices, returns, manifest, _ = load_market_data(
         cfg,
         offline=False,
@@ -80,6 +81,6 @@ def test_yfinance_partial_failure_records_drop(tmp_path, monkeypatch):
     )
     assert manifest["kept_tickers"] == ["AAA"]
     assert manifest["dropped_tickers"] == ["BBB"]
-    assert manifest["dropped_reasons"]["BBB"] == "YFINANCE_EMPTY"
+    assert manifest["dropped_reasons"]["BBB"] == "DOWNLOAD_FAILED"
     assert "BBB" not in prices.columns
     assert "BBB" not in returns.columns

@@ -55,7 +55,7 @@ def test_short_train_and_eval_pipeline(tmp_path, fake_download):
             },
             "ticker_substitutions": {},
         },
-        "env": {"L": 5, "Lv": 5, "c_tc": 0.0001},
+        "env": {"L": 5, "Lv": 5, "c_tc": 0.0001, "logit_scale": 1.0},
         "prl": {
             "alpha0": 0.2,
             "beta": 1.0,
@@ -111,6 +111,7 @@ def test_short_train_and_eval_pipeline(tmp_path, fake_download):
         window_size=config["env"]["L"],
         c_tc=config["env"]["c_tc"],
         seed=0,
+        logit_scale=config["env"]["logit_scale"],
     )
 
     model = load_model(model_path, "baseline", env, scheduler=None)

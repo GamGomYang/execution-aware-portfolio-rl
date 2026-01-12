@@ -6,6 +6,11 @@ from typing import Iterable, List
 import numpy as np
 
 
+def turnover_l1(prev_weights: np.ndarray, weights: np.ndarray) -> float:
+    """Full L1 turnover: sum(|w_t - w_{t-1}|)."""
+    return float(np.abs(weights - prev_weights).sum())
+
+
 @dataclass
 class PortfolioMetrics:
     total_reward: float

@@ -43,7 +43,7 @@ def test_reproducible_training_with_seed(tmp_path, monkeypatch):
             "test_start": str(market.returns.index.min().date()),
             "test_end": str(market.returns.index.max().date()),
         },
-        "env": {"L": 5, "Lv": 5, "c_tc": 0.0},
+        "env": {"L": 5, "Lv": 5, "c_tc": 0.0, "logit_scale": 1.0},
         "prl": {
             "alpha0": 0.2,
             "beta": 1.0,
@@ -97,6 +97,7 @@ def test_reproducible_training_with_seed(tmp_path, monkeypatch):
         window_size=base_cfg["env"]["L"],
         c_tc=base_cfg["env"]["c_tc"],
         seed=123,
+        logit_scale=base_cfg["env"]["logit_scale"],
     )
 
     model1 = SAC.load(path1, env=env)

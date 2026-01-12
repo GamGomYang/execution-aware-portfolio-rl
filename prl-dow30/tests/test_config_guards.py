@@ -13,7 +13,7 @@ def _base_config():
             "test_end": "2010-03-01",
         },
         "data": {"raw_dir": "data/raw", "processed_dir": "data/processed", "paper_mode": True, "require_cache": True},
-        "env": {"L": 5, "Lv": 5, "c_tc": 0.0},
+        "env": {"L": 5, "Lv": 5, "c_tc": 0.0, "logit_scale": 1.0},
         "prl": {
             "alpha0": 0.2,
             "beta": 1.0,

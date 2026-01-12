@@ -35,16 +35,26 @@ def _align_frames(returns: pd.DataFrame, volatility: pd.DataFrame) -> Tuple[pd.D
     return returns_aligned, vol_aligned
 
 
-def build_vec_env(returns: pd.DataFrame, volatility: pd.DataFrame, window_size: int, c_tc: float, seed: int) -> DummyVecEnv:
+def build_vec_env(
+    returns: pd.DataFrame,
+    volatility: pd.DataFrame,
+    window_size: int,
+    c_tc: float,
+    seed: int,
+    logit_scale: float | None = None,
+) -> DummyVecEnv:
     returns_aligned, vol_aligned = _align_frames(returns, volatility)
     if len(returns_aligned) <= window_size + 1:
         raise ValueError("Not enough data after alignment to build environment.")
+    if logit_scale is None:
+        logit_scale = EnvConfig.logit_scale
 
     cfg = EnvConfig(
         returns=returns_aligned,
         volatility=vol_aligned,
         window_size=window_size,
         transaction_cost=c_tc,
+        logit_scale=float(logit_scale),
     )
 
     def _init():
@@ -254,10 +264,13 @@ def build_env_for_range(
     window_size: int,
     c_tc: float,
     seed: int,
+    logit_scale: float | None = None,
 ) -> DummyVecEnv:
     returns_slice = slice_frame(market.returns, start, end)
     vol_slice = slice_frame(features.volatility, start, end)
-    return build_vec_env(returns_slice, vol_slice, window_size, c_tc, seed)
+    if logit_scale is None:
+        logit_scale = EnvConfig.logit_scale
+    return build_vec_env(returns_slice, vol_slice, window_size, c_tc, seed, logit_scale)
 
 
 def run_training(
@@ -320,6 +333,9 @@ def run_training(
         cache_only=cache_only,
     )
 
+    if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
+        raise ValueError("env.logit_scale is required for training.")
+    logit_scale = float(env_cfg["logit_scale"])
     env = build_env_for_range(
         market=market,
         features=features,
@@ -328,6 +344,7 @@ def run_training(
         window_size=env_cfg["L"],
         c_tc=env_cfg["c_tc"],
         seed=seed,
+        logit_scale=logit_scale,
     )
     num_assets = market.returns.shape[1]
     log_dir = Path("outputs/logs")

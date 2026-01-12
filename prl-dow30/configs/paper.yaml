@@ -11,7 +11,7 @@ data:
   processed_dir: data/processed
   source: yfinance_only
   universe_policy: availability_filtered
-  min_assets: 25
+  min_assets: 20
   force_refresh: true
   offline: false
   require_cache: true

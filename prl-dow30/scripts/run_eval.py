@@ -69,6 +69,8 @@ def main():
         session_opts=session_opts,
     )
 
+    if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
+        raise ValueError("env.logit_scale is required for evaluation.")
     env = build_env_for_range(
         market=market,
         features=features,
@@ -77,6 +79,7 @@ def main():
         window_size=env_cfg["L"],
         c_tc=env_cfg["c_tc"],
         seed=args.seed,
+        logit_scale=env_cfg["logit_scale"],
     )
 
     model_path = (

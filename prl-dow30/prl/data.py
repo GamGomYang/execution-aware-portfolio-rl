@@ -108,7 +108,7 @@ def _download_single_series(
             except Exception as sub_exc:
                 LOGGER.warning("Substitution ticker %s for %s failed: %s", alt, ticker, sub_exc)
         LOGGER.warning("Download failed for %s: %s", ticker, exc)
-        return None, "YFINANCE_EMPTY", None
+        return None, "DOWNLOAD_FAILED", None
 
 
 def _download_all_series(
@@ -151,14 +151,39 @@ def _align_raw_prices(
     return frame
 
 
-def _compute_raw_metrics(raw_prices: pd.DataFrame) -> Dict[str, Dict]:
+def _align_prices_raw_then_fill(
+    raw_prices: pd.DataFrame,
+    *,
+    ffill: bool = True,
+    bfill: bool = True,
+) -> tuple[pd.DataFrame, Dict[str, float]]:
+    raw_missing_fraction = raw_prices.isna().mean().to_dict()
+    filled = raw_prices.copy()
+    if ffill:
+        filled = filled.ffill()
+    if bfill:
+        filled = filled.bfill()
+    prices = filled.dropna(how="any")
+    return prices, raw_missing_fraction
+
+
+def _compute_raw_metrics(
+    raw_prices: pd.DataFrame, raw_missing_fraction: Dict[str, float] | None = None
+) -> Dict[str, Dict]:
     metrics: Dict[str, Dict] = {}
+    missing_fraction = raw_missing_fraction or {}
     for ticker in raw_prices.columns:
         ser = raw_prices[ticker]
         valid = ser.dropna()
         first_valid_date = pd.NaT if valid.empty else valid.index[0]
+        if len(ser):
+            miss = float(missing_fraction.get(ticker, ser.isna().mean()))
+            if pd.isna(miss):
+                miss = 1.0
+        else:
+            miss = 1.0
         metrics[ticker] = {
-            "missing_fraction": float(ser.isna().mean()) if len(ser) else 1.0,
+            "missing_fraction": miss,
             "valid_obs_count": int(len(valid)),
             "first_valid_date": None if pd.isna(first_valid_date) else pd.to_datetime(first_valid_date),
         }
@@ -185,15 +210,15 @@ def _select_universe(
             continue
         first_valid = metrics.get("first_valid_date")
         if first_valid is None:
-            drop_reasons[ticker] = "YFINANCE_EMPTY"
+            drop_reasons[ticker] = "DOWNLOAD_FAILED"
             dropped.append(ticker)
             continue
         if first_valid > tolerance_cutoff:
-            drop_reasons[ticker] = "INSUFFICIENT_HISTORY"
+            drop_reasons[ticker] = "FIRST_DATE_TOO_LATE"
             dropped.append(ticker)
             continue
         if metrics.get("valid_obs_count", 0) < min_history_days:
-            drop_reasons[ticker] = "INSUFFICIENT_HISTORY"
+            drop_reasons[ticker] = "INSUFFICIENT_VALID_DAYS"
             dropped.append(ticker)
             continue
         if metrics.get("missing_fraction", 1.0) > max_missing_fraction:
@@ -269,7 +294,7 @@ def _load_processed_cache(processed_dir: Path) -> tuple[pd.DataFrame, pd.DataFra
     return prices, returns, manifest, quality_summary
 
 
-def _write_manifest(
+def _manifest_payload(
     processed_dir: Path,
     start: str,
     end: str,
@@ -306,8 +331,11 @@ def _write_manifest(
     }
     if substitutions_used:
         manifest["substitutions_used"] = substitutions_used
-    manifest_path = processed_dir / "data_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2))
+    return manifest
+
+
+def _write_manifest(path: Path, manifest: Dict) -> Dict:
+    path.write_text(json.dumps(manifest, indent=2))
     return manifest
 
 
@@ -322,18 +350,123 @@ def _save_artifacts(
     prices_path = processed_dir / "prices.parquet"
     returns_path = processed_dir / "returns.parquet"
     quality_path = processed_dir / "quality_summary.csv"
-    prices.to_parquet(prices_path)
-    returns.to_parquet(returns_path)
-    quality_summary.to_csv(quality_path, index=False)
     reports_dir = Path("outputs/reports")
     reports_dir.mkdir(parents=True, exist_ok=True)
-    quality_summary.to_csv(reports_dir / "data_quality_summary.csv", index=False)
-    processed_hashes = {
-        "prices.parquet": hash_file(prices_path),
-        "returns.parquet": hash_file(returns_path),
+    report_quality_path = reports_dir / "data_quality_summary.csv"
+    prices_tmp = prices_path.with_suffix(prices_path.suffix + ".tmp")
+    returns_tmp = returns_path.with_suffix(returns_path.suffix + ".tmp")
+    quality_tmp = quality_path.with_suffix(quality_path.suffix + ".tmp")
+    report_quality_tmp = report_quality_path.with_suffix(report_quality_path.suffix + ".tmp")
+    manifest_path = processed_dir / "data_manifest.json"
+    manifest_tmp = manifest_path.with_suffix(manifest_path.suffix + ".tmp")
+
+    try:
+        prices.to_parquet(prices_tmp)
+        returns.to_parquet(returns_tmp)
+        quality_summary.to_csv(quality_tmp, index=False)
+        quality_summary.to_csv(report_quality_tmp, index=False)
+        processed_hashes = {
+            "prices.parquet": hash_file(prices_tmp),
+            "returns.parquet": hash_file(returns_tmp),
+        }
+        manifest_payload = _manifest_payload(processed_dir, processed_hashes=processed_hashes, **manifest_kwargs)
+        _write_manifest(manifest_tmp, manifest_payload)
+    except Exception:
+        for tmp in [prices_tmp, returns_tmp, quality_tmp, report_quality_tmp, manifest_tmp]:
+            if tmp.exists():
+                tmp.unlink()
+        raise
+
+    prices_tmp.replace(prices_path)
+    returns_tmp.replace(returns_path)
+    quality_tmp.replace(quality_path)
+    report_quality_tmp.replace(report_quality_path)
+    manifest_tmp.replace(manifest_path)
+    return manifest_payload, quality_summary
+
+
+def _build_failed_quality_summary(
+    raw_prices: pd.DataFrame,
+    raw_metrics: Dict[str, Dict],
+    kept: list[str],
+    drop_reasons: Dict[str, str],
+) -> pd.DataFrame:
+    rows = []
+    kept_set = set(kept)
+    for ticker in raw_prices.columns:
+        metrics = raw_metrics.get(ticker, {})
+        first_valid = metrics.get("first_valid_date")
+        rows.append(
+            {
+                "ticker": ticker,
+                "kept": ticker in kept_set,
+                "drop_reason": drop_reasons.get(ticker, ""),
+                "missing_fraction_raw": metrics.get("missing_fraction", 1.0),
+                "valid_obs_count": metrics.get("valid_obs_count", 0),
+                "first_valid_date": None if first_valid is None else pd.to_datetime(first_valid).date().isoformat(),
+                "return_std": np.nan,
+                "max_abs_return": np.nan,
+                "flat_fraction": np.nan,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _write_failed_artifacts(
+    processed_dir: Path,
+    *,
+    start: str,
+    end: str,
+    requested_tickers: list[str],
+    kept_tickers: list[str],
+    drop_reasons: Dict[str, str],
+    raw_metrics: Dict[str, Dict],
+    min_assets: int,
+    error_code: str,
+    raw_prices: pd.DataFrame,
+) -> None:
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    failed_manifest = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "start": start,
+        "end": end,
+        "requested_tickers": requested_tickers,
+        "kept_tickers": kept_tickers,
+        "dropped_tickers": [t for t in requested_tickers if t in drop_reasons],
+        "dropped_reasons": drop_reasons,
+        "N_assets_final": len(kept_tickers),
+        "min_assets": min_assets,
+        "error_code": error_code,
     }
-    manifest = _write_manifest(processed_dir, processed_hashes=processed_hashes, **manifest_kwargs)
-    return manifest, quality_summary
+    (processed_dir / "data_manifest_failed.json").write_text(json.dumps(failed_manifest, indent=2))
+    failed_quality = _build_failed_quality_summary(raw_prices, raw_metrics, kept_tickers, drop_reasons)
+    failed_quality_path = processed_dir / "data_quality_failed.csv"
+    failed_quality.to_csv(failed_quality_path, index=False)
+    reports_dir = Path("outputs/reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    failed_quality.to_csv(reports_dir / "data_quality_failed.csv", index=False)
+
+
+def _write_drop_report(raw_metrics: Dict[str, Dict], drop_reasons: Dict[str, str]) -> None:
+    if not drop_reasons:
+        return
+    rows = []
+    for ticker, reason in drop_reasons.items():
+        metrics = raw_metrics.get(ticker, {})
+        first_valid = metrics.get("first_valid_date")
+        rows.append(
+            {
+                "ticker": ticker,
+                "reason": reason,
+                "first_valid_date": None if first_valid is None else pd.to_datetime(first_valid).date().isoformat(),
+                "valid_days": metrics.get("valid_obs_count", 0),
+                "raw_missing_fraction": metrics.get("missing_fraction", 1.0),
+            }
+        )
+    drop_report = pd.DataFrame(rows)
+    reports_dir = Path("outputs/reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    drop_report.to_csv(reports_dir / "universe_drop_report.csv", index=False)
 
 
 def load_market_data(
@@ -396,73 +529,112 @@ def load_market_data(
         return prices, returns, manifest, quality_summary
 
     allow_subs = not (paper_mode or require_cache_flag)
-    series_map, drop_reasons, subs_used = _download_all_series(
-        tickers,
-        start,
-        end,
-        session_opts=session_opts,
-        ticker_substitutions=ticker_substitutions,
-        allow_subs=allow_subs,
-    )
-    raw_prices = _align_raw_prices(tickers, series_map, start, end)
-    raw_metrics = _compute_raw_metrics(raw_prices)
-    kept, _, drop_reasons = _select_universe(
-        tickers,
-        raw_metrics,
-        drop_reasons,
-        start,
-        min_history_days,
-        history_tolerance_days,
-        max_missing_fraction,
-    )
+    raw_prices = pd.DataFrame()
+    raw_metrics: Dict[str, Dict] = {}
+    raw_missing_fraction: Dict[str, float] = {}
+    kept: list[str] = []
+    drop_reasons: Dict[str, str] = {}
+    subs_used: Dict[str, str] = {}
 
-    if len(kept) < min_assets:
-        raise RuntimeError("DATA_UNIVERSE_TOO_SMALL")
+    try:
+        series_map, drop_reasons, subs_used = _download_all_series(
+            tickers,
+            start,
+            end,
+            session_opts=session_opts,
+            ticker_substitutions=ticker_substitutions,
+            allow_subs=allow_subs,
+        )
+        raw_prices = _align_raw_prices(tickers, series_map, start, end)
+        raw_missing_fraction = raw_prices.isna().mean().to_dict()
+        raw_metrics = _compute_raw_metrics(raw_prices, raw_missing_fraction=raw_missing_fraction)
+        kept, _, drop_reasons = _select_universe(
+            tickers,
+            raw_metrics,
+            drop_reasons,
+            start,
+            min_history_days,
+            history_tolerance_days,
+            max_missing_fraction,
+        )
+        _write_drop_report(raw_metrics, drop_reasons)
 
-    filled_prices = raw_prices[kept].ffill().bfill()
-    cleaned_prices = filled_prices.dropna(how="any")
-    returns = _compute_log_returns(cleaned_prices)
-    data_quality_check(
-        cleaned_prices,
-        returns,
-        min_days=min_history_days,
-        min_vol_std=quality_params.get("min_vol_std", DEFAULT_QUALITY_PARAMS["min_vol_std"]),
-        min_max_abs_return=quality_params.get("min_max_abs_return", DEFAULT_QUALITY_PARAMS["min_max_abs_return"]),
-        max_flat_fraction=quality_params.get("max_flat_fraction", DEFAULT_QUALITY_PARAMS["max_flat_fraction"]),
-        missing_fraction={t: raw_metrics[t]["missing_fraction"] for t in kept},
-        max_missing_fraction=max_missing_fraction,
-    )
+        if len(kept) < min_assets:
+            raise RuntimeError("DATA_UNIVERSE_TOO_SMALL")
 
-    quality_summary = _build_quality_summary(raw_prices, cleaned_prices, returns, raw_metrics, kept, drop_reasons)
+        cleaned_prices, kept_missing_fraction = _align_prices_raw_then_fill(raw_prices[kept], ffill=True, bfill=True)
+        returns = _compute_log_returns(cleaned_prices)
+        try:
+            data_quality_check(
+                cleaned_prices,
+                returns,
+                min_days=min_history_days,
+                min_vol_std=quality_params.get("min_vol_std", DEFAULT_QUALITY_PARAMS["min_vol_std"]),
+                min_max_abs_return=quality_params.get(
+                    "min_max_abs_return", DEFAULT_QUALITY_PARAMS["min_max_abs_return"]
+                ),
+                max_flat_fraction=quality_params.get("max_flat_fraction", DEFAULT_QUALITY_PARAMS["max_flat_fraction"]),
+                missing_fraction=kept_missing_fraction,
+                max_missing_fraction=max_missing_fraction,
+            )
+        except RuntimeError:
+            for ticker in kept:
+                drop_reasons.setdefault(ticker, "QUALITY_GATE_FAILED")
+            _write_drop_report(raw_metrics, drop_reasons)
+            raise
 
-    manifest_kwargs = {
-        "start": start,
-        "end": end,
-        "requested_tickers": tickers,
-        "kept_tickers": kept,
-        "dropped_reasons": drop_reasons,
-        "quality_params": quality_params,
-        "min_history_days": min_history_days,
-        "min_assets": min_assets,
-        "history_tolerance_days": history_tolerance_days,
-        "universe_policy": universe_policy,
-        "substitutions_used": subs_used,
-    }
-    manifest, quality_summary = _save_artifacts(processed_dir, cleaned_prices, returns, quality_summary, manifest_kwargs)
-    if debug_return_intermediates:
-        raw_missing = {ticker: metrics.get("missing_fraction", 1.0) for ticker, metrics in raw_metrics.items()}
-        drop_decisions = {ticker: drop_reasons.get(ticker) for ticker in tickers}
-        return (
+        quality_summary = _build_quality_summary(raw_prices, cleaned_prices, returns, raw_metrics, kept, drop_reasons)
+
+        manifest_kwargs = {
+            "start": start,
+            "end": end,
+            "requested_tickers": tickers,
+            "kept_tickers": kept,
+            "dropped_reasons": drop_reasons,
+            "quality_params": quality_params,
+            "min_history_days": min_history_days,
+            "min_assets": min_assets,
+            "history_tolerance_days": history_tolerance_days,
+            "universe_policy": universe_policy,
+            "substitutions_used": subs_used,
+        }
+        manifest, quality_summary = _save_artifacts(
+            processed_dir,
             cleaned_prices,
             returns,
-            manifest,
             quality_summary,
-            raw_prices,
-            filled_prices,
-            raw_missing,
-            drop_decisions,
+            manifest_kwargs,
         )
-    return cleaned_prices, returns, manifest, quality_summary
+        if debug_return_intermediates:
+            filled_prices = raw_prices[kept].ffill().bfill()
+            raw_missing = {ticker: raw_missing_fraction.get(ticker, 1.0) for ticker in tickers}
+            drop_decisions = {ticker: drop_reasons.get(ticker) for ticker in tickers}
+            return (
+                cleaned_prices,
+                returns,
+                manifest,
+                quality_summary,
+                raw_prices,
+                filled_prices,
+                raw_missing,
+                drop_decisions,
+            )
+        return cleaned_prices, returns, manifest, quality_summary
+    except Exception as exc:
+        _write_drop_report(raw_metrics, drop_reasons)
+        _write_failed_artifacts(
+            processed_dir,
+            start=start,
+            end=end,
+            requested_tickers=tickers,
+            kept_tickers=kept,
+            drop_reasons=drop_reasons,
+            raw_metrics=raw_metrics,
+            min_assets=min_assets,
+            error_code=str(exc),
+            raw_prices=raw_prices,
+        )
+        raise
 
 
 def build_cache_snapshot(cfg: Dict, *, force_refresh: bool = True) -> Dict:

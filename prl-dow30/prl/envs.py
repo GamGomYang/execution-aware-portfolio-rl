@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from gymnasium import Env, spaces
 
+from .metrics import turnover_l1
+
 
 def stable_softmax(logits: np.ndarray, scale: float = 1.0) -> np.ndarray:
     logits = np.asarray(logits, dtype=np.float64) * float(scale)
@@ -61,6 +63,7 @@ class Dow30PortfolioEnv(Env):
         assert self.observation_space.shape[0] == obs_dim, "Observation dimension mismatch"
         assert self.window_size > 0, "window_size must be > 0"
         assert cfg.transaction_cost >= 0, "transaction cost must be non-negative"
+        assert cfg.logit_scale is not None, "logit_scale must be set"
 
     def seed(self, seed: Optional[int] = None) -> None:  # pragma: no cover - gymnasium compatibility
         np.random.seed(seed)
@@ -96,7 +99,7 @@ class Dow30PortfolioEnv(Env):
         return float(np.dot(self.prev_weights, arithmetic_returns))
 
     def _turnover(self, weights: np.ndarray) -> float:
-        return float(np.abs(weights - self.prev_weights).sum())
+        return turnover_l1(self.prev_weights, weights)
 
     def step(self, action: np.ndarray):
         z = np.clip(action, self.action_space.low, self.action_space.high)

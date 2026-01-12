@@ -3,6 +3,7 @@ import csv
 import logging
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
 from prl.eval import load_model, run_backtest_episode
@@ -29,7 +30,51 @@ def parse_args():
     return parser.parse_args()
 
 
-def write_summary(path: Path, rows: list[dict]):
+def write_metrics(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "model_type",
+        "seed",
+        "total_reward",
+        "avg_reward",
+        "cumulative_return",
+        "avg_turnover",
+        "sharpe",
+        "max_drawdown",
+        "steps",
+    ]
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def summarize_metrics(rows: list[dict]) -> list[dict]:
+    if not rows:
+        return []
+    df = pd.DataFrame(rows)
+    summary_rows = []
+    metric_cols = [
+        "total_reward",
+        "avg_reward",
+        "cumulative_return",
+        "avg_turnover",
+        "sharpe",
+        "max_drawdown",
+        "steps",
+    ]
+    for model_type, group in df.groupby("model_type"):
+        row = {"model_type": model_type}
+        for col in metric_cols:
+            row[f"{col}_mean"] = float(group[col].mean())
+            row[f"{col}_std"] = float(group[col].std(ddof=0))
+        summary_rows.append(row)
+    return summary_rows
+
+
+def write_summary(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -71,8 +116,11 @@ def main():
         cache_only=cache_only,
     )
 
+    if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
+        raise ValueError("env.logit_scale is required for training/evaluation.")
+
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
-    summary_rows = []
+    metrics_rows = []
     for model_type in args.model_types:
         for seed in seeds:
             model_path = run_training(
@@ -95,6 +143,7 @@ def main():
                 window_size=env_cfg["L"],
                 c_tc=env_cfg["c_tc"],
                 seed=seed,
+                logit_scale=env_cfg["logit_scale"],
             )
 
             scheduler = None
@@ -104,15 +153,18 @@ def main():
 
             model = load_model(model_path, model_type, env, scheduler=scheduler)
             metrics = run_backtest_episode(model, env)
-            row = {
-                "model_type": model_type,
-                "seed": seed,
-                "model_path": str(model_path),
-                **metrics.to_dict(),
-            }
-            summary_rows.append(row)
+            metrics_rows.append(
+                {
+                    "model_type": model_type,
+                    "seed": seed,
+                    **metrics.to_dict(),
+                }
+            )
 
-    write_summary(Path("outputs/reports/summary.csv"), summary_rows)
+    reports_dir = Path("outputs/reports")
+    write_metrics(reports_dir / "metrics.csv", metrics_rows)
+    summary_rows = summarize_metrics(metrics_rows)
+    write_summary(reports_dir / "summary.csv", summary_rows)
     print("Completed run_all workflow.")
 
 
