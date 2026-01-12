@@ -1,30 +1,30 @@
-## Test Report (Stage 2.1-B)
+## Test Report (Stage 2.1 Paper-Gate)
 
 - Commands run:
-  - `pytest -q` (41 passed)
+  - `pytest -q` (42 passed)
   - `PYTHONPATH=. python3 scripts/build_cache.py --config configs/paper.yaml` → SUCCESS (27 tickers, 4023 rows)
-  - `PYTHONPATH=. python3 scripts/run_all.py --config configs/smoke.yaml --seeds 0 --offline` → SUCCESS
-  - `PYTHONPATH=. python3 scripts/run_all.py --config configs/paper.yaml --seeds 0 --offline` → TIMEOUT (180s, 420s; not completed)
+  - `PYTHONPATH=. python3 scripts/run_all.py --config configs/paper_gate.yaml --seeds 0 --offline` → SUCCESS (cache-only; no download logs)
 
-- G1 build_cache (paper.yaml):
-  - manifest: `universe_policy=availability_filtered`, `N_assets_final=27`, `min_assets=20`, `kept_tickers=27`, `substitutions_used=None`
-  - outputs: prices/returns/manifest/quality_summary produced
+- GATE-G0 build_cache (paper.yaml):
+  - manifest: `universe_policy=availability_filtered`, `N_assets_final=27`, `min_assets=20`
+  - kept_tickers: `AAPL, AMGN, AXP, BA, CAT, CRM, CSCO, CVX, DIS, GS, HD, HON, IBM, INTC, JNJ, JPM, KO, MCD, MMM, MRK, MSFT, NKE, PG, UNH, V, VZ, WMT`
+  - outputs: `data/processed/prices.parquet`, `data/processed/returns.parquet`, `data/processed/data_manifest.json`, `outputs/reports/data_quality_summary.csv`
 
-- G2 smoke offline (smoke.yaml):
-  - no download logs observed; cache-only load used
-  - `outputs/reports/metrics.csv` rows=2 (baseline/prl), turnover non-zero:
-    - baseline avg_turnover=0.212996, total_turnover=11.288813
-    - prl avg_turnover=0.209125, total_turnover=11.083638
-  - `outputs/models/*_final.zip` created
-
-- G3 paper offline (paper.yaml):
-  - run did not finish within 180s or 420s; only partial training progress logged
-  - final artifacts not confirmed (no pass)
+- GATE-G1 paper_gate offline (paper_gate.yaml):
+  - cache-only evidence: `Loading processed cache from data/processed` logs only; no yfinance fetch lines
+  - artifacts:
+    - `outputs/reports/metrics.csv`
+    - `outputs/reports/summary.csv`
+    - `outputs/models/baseline_seed0_final.zip`
+    - `outputs/models/prl_seed0_final.zip`
+    - `outputs/logs/baseline_seed0_train_log.csv`
+    - `outputs/logs/prl_seed0_train_log.csv`
+    - `outputs/reports/run_metadata_*.json`
+  - turnover (metrics.csv):
+    - baseline avg_turnover=0.803929, total_turnover=781.419201
+    - prl avg_turnover=1.122940, total_turnover=1091.497964
 
 - Exit criteria status:
   - pytest: PASS
-  - G1/G2: PASS
-  - G3: NOT COMPLETED (timeout)
-  - turnover definition unified & tested: PASS (`test_turnover_definition.py`)
-  - logit_scale wiring test: PASS (`test_env_logit_scale_applied.py`)
-  - missing_fraction raw gate test: PASS (`test_missing_fraction_gate.py`)
+  - build_cache (paper.yaml): PASS (Option B manifest populated)
+  - paper_gate offline: PASS (metrics/summary/models/logs/metadata present; turnover non-zero)

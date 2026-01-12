@@ -192,6 +192,9 @@ def _write_run_metadata(
         "config_hash": config_hash_val,
         "git_commit": _git_commit(),
         "python_version": sys.version,
+        "torch_version": torch.__version__,
+        "yfinance_version": yf.__version__,
+        "sb3_version": sb3_version,
         "packages": {
             "torch": torch.__version__,
             "pandas": pd.__version__,
@@ -201,6 +204,10 @@ def _write_run_metadata(
         "created_at": created_at,
         "data_manifest_hash": manifest_hash,
         "artifacts": {
+            "model_path": str(model_path),
+            "train_log_path": str(log_path),
+        },
+        "artifact_paths": {
             "model_path": str(model_path),
             "train_log_path": str(log_path),
         },
