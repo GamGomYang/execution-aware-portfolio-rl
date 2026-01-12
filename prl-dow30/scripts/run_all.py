@@ -3,10 +3,14 @@ import csv
 import logging
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
-from prl.eval import load_model, run_backtest_episode
+from prl.analysis import compute_regime_metrics
+from prl.baselines import buy_and_hold_equal_weight, daily_rebalanced_equal_weight, inverse_vol_risk_parity
+from prl.eval import load_model, run_backtest_timeseries
+from prl.metrics import compute_portfolio_metrics
 from prl.train import (
     build_env_for_range,
     create_scheduler,
@@ -117,12 +121,15 @@ def main():
         session_opts=session_opts,
         cache_only=cache_only,
     )
+    kept_tickers = market.manifest.get("kept_tickers") if market.manifest else None
 
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for training/evaluation.")
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
     metrics_rows = []
+    regime_rows = []
+    rl_timeseries = []
     for model_type in args.model_types:
         for seed in seeds:
             model_path = run_training(
@@ -154,7 +161,7 @@ def main():
                 scheduler = create_scheduler(prl_cfg, env_cfg["L"], num_assets, features.stats_path)
 
             model = load_model(model_path, model_type, env, scheduler=scheduler)
-            metrics = run_backtest_episode(model, env)
+            metrics, ts = run_backtest_timeseries(model, env)
             metrics_rows.append(
                 {
                     "model_type": model_type,
@@ -162,11 +169,65 @@ def main():
                     **metrics.to_dict(),
                 }
             )
+            if seed == 0:
+                rl_timeseries.append((model_type, ts))
+
+    test_returns = market.returns.loc[dates["test_start"] : dates["test_end"]]
+    test_vol = features.volatility.loc[dates["test_start"] : dates["test_end"]]
+    if kept_tickers:
+        test_returns = test_returns[kept_tickers]
+        test_vol = test_vol[kept_tickers]
+    vol_clean = test_vol.dropna()
+    idx = test_returns.index.intersection(vol_clean.index)
+    test_returns = test_returns.loc[idx]
+    test_vol = vol_clean.loc[idx]
+    lookback = env_cfg["L"]
+
+    baselines = [
+        buy_and_hold_equal_weight(returns=test_returns, volatility=test_vol, lookback=lookback),
+        daily_rebalanced_equal_weight(returns=test_returns, volatility=test_vol, lookback=lookback),
+        inverse_vol_risk_parity(returns=test_returns, volatility=test_vol, lookback=lookback),
+    ]
+    for ts in baselines:
+        metrics = compute_portfolio_metrics(ts.portfolio_return, ts.turnover)
+        metrics_rows.append(
+            {
+                "model_type": ts.model_type,
+                "seed": -1,
+                **metrics.to_dict(),
+            }
+        )
+
+    for model_type, ts in rl_timeseries:
+        regime_rows.append(
+            compute_regime_metrics(
+                model_type=model_type,
+                dates=pd.DatetimeIndex(ts["dates"]),
+                portfolio_return=np.array(ts["portfolio_return"], dtype=float),
+                turnover=np.array(ts["turnover"], dtype=float),
+                vol_portfolio=np.array(ts["vol_portfolio"], dtype=float),
+            )
+        )
+    for ts in baselines:
+        if ts.vol_portfolio is None:
+            continue
+        regime_rows.append(
+            compute_regime_metrics(
+                model_type=ts.model_type,
+                dates=ts.dates,
+                portfolio_return=ts.portfolio_return,
+                turnover=ts.turnover,
+                vol_portfolio=ts.vol_portfolio,
+            )
+        )
 
     reports_dir = Path("outputs/reports")
     write_metrics(reports_dir / "metrics.csv", metrics_rows)
     summary_rows = summarize_metrics(metrics_rows)
     write_summary(reports_dir / "summary.csv", summary_rows)
+    if regime_rows:
+        regime_df = pd.concat(regime_rows, ignore_index=True)
+        regime_df.to_csv(reports_dir / "regime_metrics.csv", index=False)
     print("Completed run_all workflow.")
 
 

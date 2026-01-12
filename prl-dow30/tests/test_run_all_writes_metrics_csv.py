@@ -6,6 +6,7 @@ import yaml
 
 from prl.data import MarketData
 from prl.features import VolatilityFeatures
+from prl.baselines import BaselineTimeseries
 from prl.metrics import PortfolioMetrics
 
 
@@ -100,14 +101,57 @@ def test_run_all_writes_metrics_csv(tmp_path, monkeypatch):
     def _fake_load_model(*args, **kwargs):
         return object()
 
-    def _fake_run_backtest_episode(*args, **kwargs):
-        return metrics
+    def _fake_run_backtest_timeseries(*args, **kwargs):
+        dates_ts = pd.date_range("2020-01-01", periods=4, freq="B")
+        ts = {
+            "dates": dates_ts,
+            "portfolio_return": [0.01, 0.0, -0.005, 0.002],
+            "turnover": [0.1, 0.2, 0.1, 0.0],
+            "vol_portfolio": [0.2, 0.21, 0.22, 0.23],
+        }
+        return metrics, ts
+
+    def _make_baseline_ts(model_type: str) -> BaselineTimeseries:
+        return BaselineTimeseries(
+            model_type=model_type,
+            dates=pd.date_range("2020-01-01", periods=4, freq="B"),
+            portfolio_return=np.array([0.01, 0.01, 0.01, 0.01]),
+            turnover=np.array([0.0, 0.0, 0.0, 0.0]),
+            vol_portfolio=np.array([0.2, 0.2, 0.2, 0.2]),
+            weights_max=np.array([0.5, 0.5, 0.5, 0.5]),
+        )
 
     monkeypatch.setattr("scripts.run_all.prepare_market_and_features", _fake_prepare_market_and_features)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
     monkeypatch.setattr("scripts.run_all.build_env_for_range", _fake_build_env_for_range)
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
-    monkeypatch.setattr("scripts.run_all.run_backtest_episode", _fake_run_backtest_episode)
+    monkeypatch.setattr("scripts.run_all.run_backtest_timeseries", _fake_run_backtest_timeseries)
+    monkeypatch.setattr("scripts.run_all.buy_and_hold_equal_weight", lambda **kwargs: _make_baseline_ts("buy_and_hold_equal_weight"))
+    monkeypatch.setattr(
+        "scripts.run_all.daily_rebalanced_equal_weight",
+        lambda **kwargs: _make_baseline_ts("daily_rebalanced_equal_weight"),
+    )
+    monkeypatch.setattr(
+        "scripts.run_all.inverse_vol_risk_parity",
+        lambda **kwargs: _make_baseline_ts("inverse_vol_risk_parity"),
+    )
+    monkeypatch.setattr(
+        "scripts.run_all.compute_regime_metrics",
+        lambda **kwargs: pd.DataFrame(
+            [
+                {
+                    "model_type": kwargs["model_type"],
+                    "regime": "low",
+                    "n_obs": 4,
+                    "cumulative_return": 0.01,
+                    "sharpe": 0.1,
+                    "max_drawdown": -0.01,
+                    "avg_turnover": 0.1,
+                    "total_turnover": 0.2,
+                }
+            ]
+        ),
+    )
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
 
     monkeypatch.setenv("PYTHONPATH", str(tmp_path))
@@ -123,4 +167,12 @@ def test_run_all_writes_metrics_csv(tmp_path, monkeypatch):
     metrics_path = Path("outputs/reports/metrics.csv")
     assert metrics_path.exists()
     df = pd.read_csv(metrics_path)
-    assert len(df) >= 2
+    assert set(df["model_type"]) == {
+        "baseline",
+        "prl",
+        "buy_and_hold_equal_weight",
+        "daily_rebalanced_equal_weight",
+        "inverse_vol_risk_parity",
+    }
+    regime_path = Path("outputs/reports/regime_metrics.csv")
+    assert regime_path.exists()

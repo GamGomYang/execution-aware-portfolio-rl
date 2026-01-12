@@ -105,8 +105,8 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
     def _fake_load_model(*args, **kwargs):
         return object()
 
-    def _fake_run_backtest_episode(*args, **kwargs):
-        return PortfolioMetrics(
+    def _fake_run_backtest_timeseries(*args, **kwargs):
+        metrics = PortfolioMetrics(
             total_reward=1.0,
             avg_reward=0.1,
             cumulative_return=0.05,
@@ -116,6 +116,14 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
             max_drawdown=-0.1,
             steps=10,
         )
+        dates_ts = pd.date_range("2020-01-01", periods=3, freq="B")
+        ts = {
+            "dates": dates_ts,
+            "portfolio_return": [0.01, 0.0, -0.005],
+            "turnover": [0.1, 0.2, 0.1],
+            "vol_portfolio": [0.2, 0.21, 0.22],
+        }
+        return metrics, ts
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("scripts.run_all.prepare_market_and_features", _fake_prepare_market_and_features)
@@ -123,7 +131,7 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
-    monkeypatch.setattr("scripts.run_all.run_backtest_episode", _fake_run_backtest_episode)
+    monkeypatch.setattr("scripts.run_all.run_backtest_timeseries", _fake_run_backtest_timeseries)
 
     import scripts.run_all as run_all
 
@@ -141,11 +149,18 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
 
     metrics_df = pd.read_csv(metrics_path)
     assert {"avg_turnover", "total_turnover"}.issubset(metrics_df.columns)
-    assert set(metrics_df["model_type"]) == {"baseline", "prl"}
+    assert set(metrics_df["model_type"]) == {
+        "baseline",
+        "prl",
+        "buy_and_hold_equal_weight",
+        "daily_rebalanced_equal_weight",
+        "inverse_vol_risk_parity",
+    }
 
     summary_df = pd.read_csv(summary_path)
     assert "avg_turnover_mean" in summary_df.columns
     assert "total_turnover_mean" in summary_df.columns
+    assert (reports_dir / "regime_metrics.csv").exists()
 
     assert (tmp_path / "outputs" / "models" / "baseline_seed0_final.zip").exists()
     assert (tmp_path / "outputs" / "models" / "prl_seed0_final.zip").exists()

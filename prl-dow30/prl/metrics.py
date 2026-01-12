@@ -65,3 +65,11 @@ def compute_metrics(
         max_drawdown=max_drawdown,
         steps=int(rewards_arr.size),
     )
+
+
+def compute_portfolio_metrics(
+    portfolio_returns: Iterable[float],
+    turnovers: Iterable[float],
+) -> PortfolioMetrics:
+    returns_list = list(portfolio_returns)
+    return compute_metrics(returns_list, returns_list, turnovers)

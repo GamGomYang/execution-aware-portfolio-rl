@@ -35,3 +35,36 @@ def run_backtest_episode(model, env: DummyVecEnv) -> PortfolioMetrics:
         portfolio_returns.append(info.get("portfolio_return", 0.0))
         turnovers.append(info.get("turnover", 0.0))
     return compute_metrics(rewards, portfolio_returns, turnovers)
+
+
+def run_backtest_timeseries(model, env: DummyVecEnv) -> tuple[PortfolioMetrics, dict]:
+    obs = env.reset()
+    if isinstance(obs, tuple):
+        obs = obs[0]
+    done = False
+    rewards = []
+    portfolio_returns = []
+    turnovers = []
+    dates = []
+    vol_portfolio = []
+    base_env = env.envs[0]
+    while not done:
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward_vec, done_vec, info_list = env.step(action)
+        reward = float(reward_vec[0])
+        done = bool(done_vec[0])
+        rewards.append(reward)
+        info = info_list[0]
+        portfolio_returns.append(info.get("portfolio_return", 0.0))
+        turnovers.append(info.get("turnover", 0.0))
+        idx = base_env.current_step - 1
+        dates.append(base_env.returns.index[idx])
+        vol_portfolio.append(float(base_env.volatility.iloc[idx].mean()))
+    metrics = compute_metrics(rewards, portfolio_returns, turnovers)
+    ts = {
+        "dates": dates,
+        "portfolio_return": portfolio_returns,
+        "turnover": turnovers,
+        "vol_portfolio": vol_portfolio,
+    }
+    return metrics, ts
