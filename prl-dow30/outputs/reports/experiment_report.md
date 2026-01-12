@@ -3,7 +3,7 @@
 ## Dataset & Setup
 - Universe: Dow30 (30 equities), yfinance Adjusted Close daily bars cached via `scripts/build_cache.py` for reproducibility. Business-day alignment covers 2010-01-01 to 2025-12-31.
 - Train range: 2010-01-01 to 2021-12-31. Test/backtest range: 2022-01-01 to 2025-12-31.
-- Rolling windows: L=30 for returns, Lv=30 for volatility. Transaction cost coefficient c_tc=0.0005 (turnover = sum |w_t - w_{t-1}|).
+- Rolling windows: L=30 for returns, Lv=30 for volatility. Transaction cost coefficient c_tc=0.0005 (turnover = sum |w_t - w_{t-1}|, no 0.5 multiplier).
 - Anti-lookahead enforced by using w_{t-1} * r_t in rewards; actions converted to weights via softmax inside the environment.
 
 ## Hyperparameters

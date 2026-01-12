@@ -17,6 +17,7 @@ class PortfolioMetrics:
     avg_reward: float
     cumulative_return: float
     avg_turnover: float
+    total_turnover: float
     sharpe: float
     max_drawdown: float
     steps: int
@@ -39,6 +40,7 @@ def compute_metrics(
 
     cumulative_return = float(np.prod(1.0 + returns_arr) - 1.0)
     avg_turnover = float(turnovers_arr.mean()) if turnovers_arr.size else 0.0
+    total_turnover = float(turnovers_arr.sum())
 
     return_std = returns_arr.std(ddof=0)
     sharpe = 0.0
@@ -58,6 +60,7 @@ def compute_metrics(
         avg_reward=avg_reward,
         cumulative_return=cumulative_return,
         avg_turnover=avg_turnover,
+        total_turnover=total_turnover,
         sharpe=sharpe,
         max_drawdown=max_drawdown,
         steps=int(rewards_arr.size),

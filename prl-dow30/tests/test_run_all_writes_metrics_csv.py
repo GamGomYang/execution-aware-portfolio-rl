@@ -77,6 +77,7 @@ def test_run_all_writes_metrics_csv(tmp_path, monkeypatch):
         avg_reward=0.01,
         cumulative_return=0.02,
         avg_turnover=0.03,
+        total_turnover=0.3,
         sharpe=0.5,
         max_drawdown=-0.1,
         steps=10,

@@ -196,6 +196,7 @@ def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
             avg_reward=0.0,
             cumulative_return=0.0,
             avg_turnover=0.0,
+            total_turnover=0.0,
             sharpe=0.0,
             max_drawdown=0.0,
             steps=0,

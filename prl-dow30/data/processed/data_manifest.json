@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-01-12T10:50:18.929731+00:00",
+  "created_at": "2026-01-12T11:13:26.819484+00:00",
   "start": "2010-01-01",
   "end": "2025-12-31",
   "universe_policy": "availability_filtered",
@@ -64,25 +64,26 @@
     "NKE",
     "PG",
     "TRV",
-    "UNH",
     "V",
     "VZ",
     "WMT"
   ],
   "dropped_tickers": [
+    "UNH",
     "WBA",
     "DOW"
   ],
   "dropped_reasons": {
+    "UNH": "DOWNLOAD_FAILED",
     "WBA": "DOWNLOAD_FAILED",
     "DOW": "FIRST_DATE_TOO_LATE"
   },
-  "N_assets_final": 28,
+  "N_assets_final": 27,
   "source": "yfinance_only",
   "price_type": "adj_close",
   "processed_hashes": {
-    "prices.parquet": "8e165937c771d0e7304cbb3e55a8dfa546f9ffa0d67a75bd67a5af9216ada44c",
-    "returns.parquet": "cce450ddd79a106bed67ea237930d8cf5b6be9ea880c59554e5a1564dafb4829"
+    "prices.parquet": "fca415992381240e5e73b04b31dba2b56d30f393ba868328d42f2c670eec8843",
+    "returns.parquet": "4f6f342963dd6d4a18ed658c3195ff36053b8a54fb75a265d589f45f0a046f8f"
   },
   "quality_params": {
     "min_vol_std": 0.005,

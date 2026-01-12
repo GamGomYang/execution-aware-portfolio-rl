@@ -28,6 +28,7 @@ def write_metrics(path: Path, row: dict):
         "avg_reward",
         "cumulative_return",
         "avg_turnover",
+        "total_turnover",
         "sharpe",
         "max_drawdown",
         "steps",
