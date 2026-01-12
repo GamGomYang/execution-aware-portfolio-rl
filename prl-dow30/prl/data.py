@@ -151,6 +151,22 @@ def _align_raw_prices(
     return frame
 
 
+def _drop_market_closed_days(raw_prices: pd.DataFrame) -> tuple[pd.DataFrame, int, float]:
+    """
+    Drop rows where ALL tickers are NaN (market-wide closure days under freq='B').
+    Returns: (filtered_raw_prices, removed_days_count, removed_fraction)
+    """
+    if raw_prices.empty:
+        return raw_prices, 0, 0.0
+    total = len(raw_prices)
+    mask = raw_prices.isna().all(axis=1)
+    removed = int(mask.sum())
+    if removed:
+        raw_prices = raw_prices.loc[~mask].copy()
+    frac = (removed / total) if total > 0 else 0.0
+    return raw_prices, removed, frac
+
+
 def _align_prices_raw_then_fill(
     raw_prices: pd.DataFrame,
     *,
@@ -308,12 +324,18 @@ def _manifest_payload(
     history_tolerance_days: int,
     universe_policy: str,
     substitutions_used: Dict[str, str],
+    market_closed_days_removed: int,
+    market_closed_fraction_removed: float,
 ) -> Dict:
     manifest = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "start": start,
         "end": end,
         "universe_policy": universe_policy,
+        "calendar_freq": "B",
+        "market_closed_days_removed": market_closed_days_removed,
+        "market_closed_fraction_removed": market_closed_fraction_removed,
+        "market_closed_rule": "drop_all_nan_rows_before_missing_fraction",
         "requested_tickers": requested_tickers,
         "kept_tickers": kept_tickers,
         "dropped_tickers": [t for t in requested_tickers if t in dropped_reasons],
@@ -517,7 +539,7 @@ def load_market_data(
     if cache_only_flag:
         prices, returns, manifest, quality_summary = _load_processed_cache(processed_dir)
         if debug_return_intermediates:
-            return prices, returns, manifest, quality_summary, pd.DataFrame(), pd.DataFrame(), {}, {}
+            return prices, returns, manifest, quality_summary, pd.DataFrame(), pd.DataFrame(), {}, {}, 0, 0.0
         return prices, returns, manifest, quality_summary
 
     cache_exists = processed_dir.joinpath("prices.parquet").exists() and processed_dir.joinpath("returns.parquet").exists()
@@ -525,7 +547,7 @@ def load_market_data(
         LOGGER.info("Using existing processed cache (force_refresh=False).")
         prices, returns, manifest, quality_summary = _load_processed_cache(processed_dir)
         if debug_return_intermediates:
-            return prices, returns, manifest, quality_summary, pd.DataFrame(), pd.DataFrame(), {}, {}
+            return prices, returns, manifest, quality_summary, pd.DataFrame(), pd.DataFrame(), {}, {}, 0, 0.0
         return prices, returns, manifest, quality_summary
 
     allow_subs = not (paper_mode or require_cache_flag)
@@ -535,6 +557,8 @@ def load_market_data(
     kept: list[str] = []
     drop_reasons: Dict[str, str] = {}
     subs_used: Dict[str, str] = {}
+    market_closed_days_removed = 0
+    market_closed_fraction_removed = 0.0
 
     try:
         series_map, drop_reasons, subs_used = _download_all_series(
@@ -546,6 +570,7 @@ def load_market_data(
             allow_subs=allow_subs,
         )
         raw_prices = _align_raw_prices(tickers, series_map, start, end)
+        raw_prices, market_closed_days_removed, market_closed_fraction_removed = _drop_market_closed_days(raw_prices)
         raw_missing_fraction = raw_prices.isna().mean().to_dict()
         raw_metrics = _compute_raw_metrics(raw_prices, raw_missing_fraction=raw_missing_fraction)
         kept, _, drop_reasons = _select_universe(
@@ -584,6 +609,8 @@ def load_market_data(
             raise
 
         quality_summary = _build_quality_summary(raw_prices, cleaned_prices, returns, raw_metrics, kept, drop_reasons)
+        quality_summary["market_closed_days_removed"] = market_closed_days_removed
+        quality_summary["market_closed_fraction_removed"] = market_closed_fraction_removed
 
         manifest_kwargs = {
             "start": start,
@@ -597,6 +624,8 @@ def load_market_data(
             "history_tolerance_days": history_tolerance_days,
             "universe_policy": universe_policy,
             "substitutions_used": subs_used,
+            "market_closed_days_removed": market_closed_days_removed,
+            "market_closed_fraction_removed": market_closed_fraction_removed,
         }
         manifest, quality_summary = _save_artifacts(
             processed_dir,
@@ -618,6 +647,8 @@ def load_market_data(
                 filled_prices,
                 raw_missing,
                 drop_decisions,
+                market_closed_days_removed,
+                market_closed_fraction_removed,
             )
         return cleaned_prices, returns, manifest, quality_summary
     except Exception as exc:

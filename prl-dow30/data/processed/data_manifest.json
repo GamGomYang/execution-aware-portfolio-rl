@@ -1,8 +1,13 @@
 {
-  "created_at": "2025-12-24T15:40:27.539271+00:00",
-  "start_date": "2010-01-01",
-  "end_date": "2025-12-31",
-  "tickers": [
+  "created_at": "2026-01-12T10:50:18.929731+00:00",
+  "start": "2010-01-01",
+  "end": "2025-12-31",
+  "universe_policy": "availability_filtered",
+  "calendar_freq": "B",
+  "market_closed_days_removed": 151,
+  "market_closed_fraction_removed": 0.03617632965979876,
+  "market_closed_rule": "drop_all_nan_rows_before_missing_fraction",
+  "requested_tickers": [
     "AAPL",
     "AMGN",
     "AXP",
@@ -34,13 +39,51 @@
     "WMT",
     "DOW"
   ],
+  "kept_tickers": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "TRV",
+    "UNH",
+    "V",
+    "VZ",
+    "WMT"
+  ],
+  "dropped_tickers": [
+    "WBA",
+    "DOW"
+  ],
+  "dropped_reasons": {
+    "WBA": "DOWNLOAD_FAILED",
+    "DOW": "FIRST_DATE_TOO_LATE"
+  },
+  "N_assets_final": 28,
   "source": "yfinance_only",
   "price_type": "adj_close",
   "processed_hashes": {
-    "prices": "529e130aee696b627874e9216e3d50148f3757dc31a227a6d2f7a4367b579eb7",
-    "returns": "95ba44db16c48873cb28b2c15d53664a05c1b22ced3cbb4e4ec301eecee490fb"
+    "prices.parquet": "8e165937c771d0e7304cbb3e55a8dfa546f9ffa0d67a75bd67a5af9216ada44c",
+    "returns.parquet": "cce450ddd79a106bed67ea237930d8cf5b6be9ea880c59554e5a1564dafb4829"
   },
-  "yfinance_version": "1.0",
   "quality_params": {
     "min_vol_std": 0.005,
     "min_max_abs_return": 0.02,
@@ -48,9 +91,8 @@
     "max_missing_fraction": 0.01
   },
   "min_history_days": 500,
+  "min_assets": 20,
+  "history_tolerance_days": 30,
   "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
-  "substitutions": {
-    "WBA": "CVS",
-    "DOW": "DD"
-  }
+  "yfinance_version": "1.0"
 }

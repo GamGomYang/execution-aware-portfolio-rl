@@ -50,6 +50,8 @@ def test_drop_decisions_use_raw_aligned(tmp_path, monkeypatch):
         filled_prices,
         raw_missing_fraction,
         drop_decisions,
+        _market_closed_days_removed,
+        _market_closed_fraction_removed,
     ) = load_market_data(
         cfg,
         offline=False,

@@ -1,0 +1,21 @@
+{
+  "run_id": "20260112T104947Z_106939b2_seed0_baseline",
+  "seed": 0,
+  "mode": "smoke",
+  "model_type": "baseline",
+  "config_hash": "106939b28212e58e3c9f78bc375bd1547482db979157953f03b891d93ad1aedb",
+  "git_commit": "67d45e333bb4c7a5f2707caeb91a34a54ac968d7",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "packages": {
+    "torch": "2.9.1+cu128",
+    "pandas": "2.3.3",
+    "yfinance": "1.0",
+    "stable_baselines3": "2.7.1"
+  },
+  "created_at": "2026-01-12T10:49:47.832178+00:00",
+  "data_manifest_hash": "",
+  "artifacts": {
+    "model_path": "/tmp/pytest-of-root/pytest-7/test_run_metadata_written0/models/baseline_seed0_final.zip",
+    "train_log_path": "outputs/logs/baseline_seed0_train_log.csv"
+  }
+}
