@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-01-12T11:13:26.819484+00:00",
+  "created_at": "2026-01-12T13:45:37.817841+00:00",
   "start": "2010-01-01",
   "end": "2025-12-31",
   "universe_policy": "availability_filtered",
@@ -7,6 +7,8 @@
   "market_closed_days_removed": 151,
   "market_closed_fraction_removed": 0.03617632965979876,
   "market_closed_rule": "drop_all_nan_rows_before_missing_fraction",
+  "total_days_before_drop": 4174,
+  "total_days_after_drop": 4023,
   "requested_tickers": [
     "AAPL",
     "AMGN",
@@ -64,26 +66,25 @@
     "NKE",
     "PG",
     "TRV",
+    "UNH",
     "V",
     "VZ",
     "WMT"
   ],
   "dropped_tickers": [
-    "UNH",
     "WBA",
     "DOW"
   ],
   "dropped_reasons": {
-    "UNH": "DOWNLOAD_FAILED",
     "WBA": "DOWNLOAD_FAILED",
     "DOW": "FIRST_DATE_TOO_LATE"
   },
-  "N_assets_final": 27,
+  "N_assets_final": 28,
   "source": "yfinance_only",
   "price_type": "adj_close",
   "processed_hashes": {
-    "prices.parquet": "fca415992381240e5e73b04b31dba2b56d30f393ba868328d42f2c670eec8843",
-    "returns.parquet": "4f6f342963dd6d4a18ed658c3195ff36053b8a54fb75a265d589f45f0a046f8f"
+    "prices.parquet": "e0588243c01c4d0147452c4f864fba6f6caae643ca46d14435cdb10bc7f5cd13",
+    "returns.parquet": "8356baa8733a12a22b14b516f6f1b4da8857d77ed91b33576d2048f343aef36b"
   },
   "quality_params": {
     "min_vol_std": 0.005,

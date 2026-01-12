@@ -1,4 +1,3 @@
 ticker,reason,first_valid_date,valid_days,raw_missing_fraction
-UNH,DOWNLOAD_FAILED,,0,1.0
 WBA,DOWNLOAD_FAILED,,0,1.0
 DOW,FIRST_DATE_TOO_LATE,2019-03-20,1706,0.5759383544618444

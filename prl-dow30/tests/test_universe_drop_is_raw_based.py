@@ -46,12 +46,12 @@ def test_drop_decisions_use_raw_aligned(tmp_path, monkeypatch):
         returns,
         manifest,
         _quality_summary,
-        raw_aligned,
+        _raw_prices_clean,
         filled_prices,
         raw_missing_fraction,
         drop_decisions,
-        _market_closed_days_removed,
-        _market_closed_fraction_removed,
+        _market_closed_info,
+        debug_info,
     ) = load_market_data(
         cfg,
         offline=False,
@@ -69,4 +69,5 @@ def test_drop_decisions_use_raw_aligned(tmp_path, monkeypatch):
     assert "BBB" not in filled_prices.columns  # drop 결정 후 유지되지 않음
 
     # 채워진 값으로 결측이 사라져도 drop 결정은 바뀌지 않음을 보장
+    raw_aligned = debug_info["raw_aligned"]
     assert raw_aligned["BBB"].isna().mean() > 0.2

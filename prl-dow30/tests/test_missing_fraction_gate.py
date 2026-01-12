@@ -75,8 +75,8 @@ def test_raw_missing_fraction_detected(tmp_path, monkeypatch):
         _filled_prices,
         raw_missing_fraction,
         _drop_decisions,
-        _market_closed_days_removed,
-        _market_closed_fraction_removed,
+        _market_closed_info,
+        _debug_info,
     ) = load_market_data(
         cfg,
         offline=False,
