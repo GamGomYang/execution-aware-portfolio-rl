@@ -121,8 +121,10 @@ def test_short_train_and_eval_pipeline(tmp_path, fake_download):
     run_eval_script.write_metrics(
         metrics_path,
         {
+            "run_id": "run_stub",
             "model_type": "baseline",
             "seed": 0,
+            "period": "test",
             **metrics.to_dict(),
         },
     )

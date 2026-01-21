@@ -1,0 +1,71 @@
+{
+  "run_id": "20260121T113433Z_8581a9e8_seed123_baseline_50b6",
+  "seed": 123,
+  "mode": "smoke",
+  "model_type": "baseline",
+  "config_path": "",
+  "config_hash": "8581a9e8f4d7b56dbab51d599d75d0c96bae6a036fb069f54462b24b2e99e1aa",
+  "git_commit": "1c0ac8360ebc9aef9587917f07af2b39f99c890f",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_version": "2.9.1+cu128",
+  "yfinance_version": "1.0",
+  "sb3_version": "2.7.1",
+  "packages": {
+    "torch": "2.9.1+cu128",
+    "pandas": "2.3.3",
+    "yfinance": "1.0",
+    "stable_baselines3": "2.7.1"
+  },
+  "created_at": "2026-01-21T11:34:33.506920+00:00",
+  "data_manifest_path": "data/processed/data_manifest.json",
+  "data_manifest_hash": "77c02ef36d8d7efb7203e07739d514565e772f837ea223e84913712ffd0efec6",
+  "asset_list": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "UNH",
+    "V",
+    "VZ",
+    "WMT"
+  ],
+  "num_assets": 27,
+  "L": 5,
+  "Lv": 5,
+  "obs_dim_expected": 189,
+  "env_signature_hash": "a61a0decc5013d82871e50414af29962105737618912259aa9c4d3c18d2d61af",
+  "artifacts": {
+    "model_path": "/tmp/pytest-of-root/pytest-15/test_reproducible_training_wit0/out2/20260121T113433Z_8581a9e8_seed123_baseline_50b6_final.zip",
+    "train_log_path": "outputs/logs/train_20260121T113433Z_8581a9e8_seed123_baseline_50b6.csv"
+  },
+  "artifact_paths": {
+    "model_path": "/tmp/pytest-of-root/pytest-15/test_reproducible_training_wit0/out2/20260121T113433Z_8581a9e8_seed123_baseline_50b6_final.zip",
+    "train_log_path": "outputs/logs/train_20260121T113433Z_8581a9e8_seed123_baseline_50b6.csv"
+  },
+  "report_paths": {
+    "trace_path": "outputs/reports/trace_20260121T113433Z_8581a9e8_seed123_baseline_50b6.parquet",
+    "regime_thresholds_path": "outputs/reports/regime_thresholds_20260121T113433Z_8581a9e8_seed123_baseline_50b6.json",
+    "step4_report_path": "outputs/reports/step4_report_20260121T113433Z_8581a9e8_seed123_baseline_50b6.md",
+    "regime_metrics_path": "outputs/reports/regime_metrics.csv",
+    "figures_dir": "outputs/figures/20260121T113433Z_8581a9e8_seed123_baseline_50b6"
+  }
+}

@@ -1,8 +1,13 @@
 import argparse
+import logging
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def bootstrap_ci(values: np.ndarray, *, n_boot: int = 2000, alpha: float = 0.05, seed: int = 0) -> tuple[float, float]:
@@ -107,6 +112,121 @@ def _build_table(
     return "\n".join(lines)
 
 
+def _validate_regime_labels(regime_df: pd.DataFrame) -> None:
+    regimes_required = {"low", "mid", "high"}
+    missing = []
+    for (model_type, seed), group in regime_df.groupby(["model_type", "seed"]):
+        regimes = set(group["regime"].tolist())
+        if not regimes_required.issubset(regimes):
+            missing.append((model_type, seed, sorted(regimes_required - regimes)))
+    if missing:
+        raise ValueError(f"REGIME_LABELS_MISSING: {missing}")
+
+
+def compute_regime_seed_summary(regime_df: pd.DataFrame, *, n_boot: int = 2000) -> pd.DataFrame:
+    df = regime_df.copy()
+    df = df[df["regime"].isin(["low", "mid", "high"])]
+    _validate_regime_labels(df)
+    metric_map = {
+        "sharpe": "sharpe",
+        "mdd": "max_drawdown",
+        "turnover": "avg_turnover",
+        "cumret": "cumulative_return",
+    }
+    rows = []
+    for (model_type, regime), group in df.groupby(["model_type", "regime"]):
+        row = {"model_type": model_type, "regime": regime, "n_seeds": int(group["seed"].nunique())}
+        for label, col in metric_map.items():
+            values = group[col].to_numpy(dtype=np.float64)
+            row[f"{label}_mean"] = float(np.mean(values)) if values.size else float("nan")
+            row[f"{label}_std"] = float(np.std(values, ddof=0)) if values.size else float("nan")
+            ci_low, ci_high = bootstrap_ci(values, n_boot=n_boot)
+            row[f"{label}_ci_low"] = ci_low
+            row[f"{label}_ci_high"] = ci_high
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def compute_regime_paired_diffs(
+    regime_df: pd.DataFrame,
+    *,
+    baseline_model_type: str,
+    prl_model_type: str,
+) -> pd.DataFrame:
+    df = regime_df.copy()
+    df = df[df["regime"].isin(["low", "mid", "high"])]
+    _validate_regime_labels(df)
+    base = df[df["model_type"] == baseline_model_type]
+    prl = df[df["model_type"] == prl_model_type]
+    rows = []
+    for regime in ["low", "mid", "high"]:
+        base_r = base[base["regime"] == regime].set_index("seed")
+        prl_r = prl[prl["regime"] == regime].set_index("seed")
+        seeds = sorted(set(base_r.index.tolist()) & set(prl_r.index.tolist()))
+        if not seeds:
+            continue
+        for seed in seeds:
+            rows.append(
+                {
+                    "seed": int(seed),
+                    "regime": regime,
+                    "delta_sharpe": float(prl_r.loc[seed, "sharpe"] - base_r.loc[seed, "sharpe"]),
+                    "delta_mdd": float(prl_r.loc[seed, "max_drawdown"] - base_r.loc[seed, "max_drawdown"]),
+                    "delta_turnover": float(prl_r.loc[seed, "avg_turnover"] - base_r.loc[seed, "avg_turnover"]),
+                    "delta_cumret": float(prl_r.loc[seed, "cumulative_return"] - base_r.loc[seed, "cumulative_return"]),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _boxplot_by_regime(
+    df: pd.DataFrame,
+    metric: str,
+    output_path: Path,
+    title: str,
+    model_types: list[str],
+) -> None:
+    regimes = ["low", "mid", "high"]
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+    for idx, regime in enumerate(regimes):
+        ax = axes[idx]
+        data = []
+        labels = []
+        for model_type in model_types:
+            vals = df[(df["model_type"] == model_type) & (df["regime"] == regime)][metric].to_numpy(dtype=np.float64)
+            if vals.size:
+                data.append(vals)
+                labels.append(model_type)
+        if data:
+            ax.boxplot(data, labels=labels, showfliers=False)
+        ax.axhline(0.0, color="black", linewidth=0.5)
+        ax.set_title(regime)
+        ax.tick_params(axis="x", rotation=30)
+    fig.suptitle(title)
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path)
+    plt.close(fig)
+
+
+def _plot_regime_delta_sharpe(diffs: pd.DataFrame, output_path: Path) -> None:
+    regimes = ["low", "mid", "high"]
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+    for idx, regime in enumerate(regimes):
+        ax = axes[idx]
+        data = diffs[diffs["regime"] == regime]
+        ax.axhline(0.0, color="black", linewidth=0.5)
+        if not data.empty:
+            ax.scatter(data["seed"], data["delta_sharpe"], color="tab:blue")
+        ax.set_title(regime)
+        ax.set_xlabel("seed")
+    axes[0].set_ylabel("delta_sharpe")
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path)
+    plt.close(fig)
+
+
 def analyze_metrics(
     metrics_path: Path,
     *,
@@ -163,13 +283,53 @@ def analyze_metrics(
     (output_dir / "table_main.tex").write_text(table_tex)
 
 
+def analyze_regimes(
+    regime_metrics_path: Path,
+    *,
+    output_dir: Path,
+    baseline_model_type: str,
+    prl_model_type: str,
+    n_boot: int,
+    plot: bool,
+) -> None:
+    if not regime_metrics_path.exists():
+        logging.warning("regime_metrics.csv not found; skipping regime analysis.")
+        return
+    df = pd.read_csv(regime_metrics_path)
+    summary = compute_regime_seed_summary(df, n_boot=n_boot)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(output_dir / "regime_seed_summary.csv", index=False)
+
+    diffs = compute_regime_paired_diffs(
+        df,
+        baseline_model_type=baseline_model_type,
+        prl_model_type=prl_model_type,
+    )
+    if not diffs.empty:
+        diffs.to_csv(output_dir / "regime_paired_diffs.csv", index=False)
+
+    if plot:
+        model_types = sorted(df["model_type"].unique().tolist())
+        if baseline_model_type in model_types and prl_model_type in model_types:
+            model_types = [baseline_model_type, prl_model_type]
+
+        figures_dir = Path("outputs/figures/summary")
+        _boxplot_by_regime(df, "sharpe", figures_dir / "regime_sharpe_boxplot.png", "Sharpe by Regime", model_types)
+        _boxplot_by_regime(df, "max_drawdown", figures_dir / "regime_mdd_boxplot.png", "Max Drawdown by Regime", model_types)
+        _boxplot_by_regime(df, "avg_turnover", figures_dir / "turnover_by_regime.png", "Avg Turnover by Regime", model_types)
+        if not diffs.empty:
+            _plot_regime_delta_sharpe(diffs, figures_dir / "regime_delta_sharpe_by_seed.png")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Analyze paper metrics and compute paired seed stats.")
     parser.add_argument("--metrics", type=str, default="outputs/reports/metrics.csv")
+    parser.add_argument("--regime-metrics", type=str, default="outputs/reports/regime_metrics.csv")
     parser.add_argument("--output-dir", type=str, default="outputs/reports")
     parser.add_argument("--baseline-model-type", type=str, default="baseline_sac")
     parser.add_argument("--prl-model-type", type=str, default="prl_sac")
     parser.add_argument("--bootstrap", type=int, default=2000)
+    parser.add_argument("--no-plots", action="store_true")
     return parser.parse_args()
 
 
@@ -181,6 +341,14 @@ def main():
         baseline_model_type=args.baseline_model_type,
         prl_model_type=args.prl_model_type,
         n_boot=args.bootstrap,
+    )
+    analyze_regimes(
+        Path(args.regime_metrics),
+        output_dir=Path(args.output_dir),
+        baseline_model_type=args.baseline_model_type,
+        prl_model_type=args.prl_model_type,
+        n_boot=args.bootstrap,
+        plot=not args.no_plots,
     )
     print("Analysis complete.")
 
