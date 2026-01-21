@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,15 @@ from prl.train import _generate_run_id, _write_run_metadata
 def test_paper_gate_artifacts(tmp_path, monkeypatch):
     processed_dir = tmp_path / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
-    (processed_dir / "data_manifest.json").write_text(json.dumps({"dummy": True}))
+    manifest = {
+        "asset_list": ["AAA", "BBB"],
+        "num_assets": 2,
+        "L": 2,
+        "Lv": 2,
+        "obs_dim_expected": 8,
+        "env_schema_version": "v1",
+    }
+    (processed_dir / "data_manifest.json").write_text(json.dumps(manifest))
 
     cfg = {
         "mode": "paper_gate",
@@ -76,7 +85,13 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
 
     def _fake_build_env_for_range(*args, **kwargs):
         class DummyEnv:
-            observation_space = None
+            def __init__(self):
+                dates = pd.date_range("2020-01-01", periods=5, freq="B")
+                self.returns = pd.DataFrame(0.001, index=dates, columns=["AAA", "BBB"])
+                self.num_assets = self.returns.shape[1]
+                self.window_size = 2
+                self.observation_space = SimpleNamespace(shape=(self.num_assets * (self.window_size + 2),))
+                self.cfg = SimpleNamespace(transaction_cost=0.0)
 
         return DummyEnv()
 

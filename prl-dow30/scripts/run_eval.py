@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from prl.eval import load_model, run_backtest_episode
+from prl.eval import assert_env_compatible, load_model, run_backtest_episode
 from prl.train import build_env_for_range, create_scheduler, prepare_market_and_features
 
 
@@ -23,8 +23,10 @@ def parse_args():
 def write_metrics(path: Path, row: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
+        "run_id",
         "model_type",
         "seed",
+        "period",
         "total_reward",
         "avg_reward",
         "cumulative_return",
@@ -63,6 +65,16 @@ def _load_latest_run_metadata(model_type: str, seed: int, reports_dir: Path) -> 
         return None
     candidates.sort(key=lambda item: item[0], reverse=True)
     return candidates[0][1]
+
+
+def _load_run_metadata_for_model(model_path: Path, reports_dir: Path) -> dict | None:
+    run_id = model_path.stem
+    if run_id.endswith("_final"):
+        run_id = run_id[: -len("_final")]
+    meta_path = reports_dir / f"run_metadata_{run_id}.json"
+    if not meta_path.exists():
+        return None
+    return json.loads(meta_path.read_text())
 
 
 def main():
@@ -107,11 +119,7 @@ def main():
         logit_scale=env_cfg["logit_scale"],
     )
 
-    model_path = (
-        Path(args.model_path)
-        if args.model_path
-        else None
-    )
+    model_path = Path(args.model_path) if args.model_path else None
     if model_path is None:
         meta = _load_latest_run_metadata(args.model_type, args.seed, Path("outputs/reports"))
         if meta:
@@ -121,6 +129,10 @@ def main():
                 model_path = Path(model_path_value)
         if not meta or model_path is None:
             model_path = Path("outputs/models") / f"{args.model_type}_seed{args.seed}_final.zip"
+    reports_dir = Path("outputs/reports")
+    meta = _load_run_metadata_for_model(model_path, reports_dir)
+    if meta is None:
+        raise ValueError(f"RUN_METADATA_NOT_FOUND for model_path={model_path}")
 
     scheduler = None
     if args.model_type == "prl":
@@ -131,11 +143,17 @@ def main():
         raise FileNotFoundError(
             f"Model not found at {model_path}. Run training first or provide --model-path to an existing *_final.zip."
         )
+    assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
     model = load_model(model_path, args.model_type, env, scheduler=scheduler)
     metrics = run_backtest_episode(model, env)
+    run_id = meta.get("run_id") or model_path.stem
+    if run_id.endswith("_final"):
+        run_id = run_id[: -len("_final")]
     row = {
+        "run_id": run_id,
         "model_type": args.model_type,
         "seed": args.seed,
+        "period": "test",
         **metrics.to_dict(),
     }
     write_metrics(Path("outputs/reports/metrics.csv"), row)

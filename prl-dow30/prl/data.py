@@ -13,8 +13,10 @@ import pandas as pd
 import yfinance as yf
 
 from .data_sources import data_quality_check, fetch_yfinance, hash_file
+from .utils.signature import canonical_json, compute_env_signature, sha256_bytes
 
 LOGGER = logging.getLogger(__name__)
+ENV_SCHEMA_VERSION = "v1"
 
 DOW30_TICKERS: Sequence[str] = (
     "AAPL",
@@ -320,6 +322,12 @@ def _load_processed_cache(processed_dir: Path) -> tuple[pd.DataFrame, pd.DataFra
             else:
                 prices = prices[kept]
                 returns = returns[kept]
+        if "asset_list" not in manifest and kept:
+            manifest["asset_list"] = kept
+        if "num_assets" not in manifest and kept:
+            manifest["num_assets"] = len(kept)
+        if "data_manifest_hash" not in manifest:
+            manifest["data_manifest_hash"] = _compute_data_manifest_hash(manifest)
     if quality_path.exists():
         quality_summary = pd.read_csv(quality_path)
     return prices, returns, manifest, quality_summary
@@ -343,7 +351,24 @@ def _manifest_payload(
     market_closed_fraction_removed: float,
     total_days_before_drop: int,
     total_days_after_drop: int,
+    L: int | None,
+    Lv: int | None,
+    feature_flags: Dict,
+    cost_params: Dict,
+    schema_version: str,
 ) -> Dict:
+    num_assets = len(kept_tickers)
+    obs_dim_expected = num_assets * (int(L) + 2) if L is not None else None
+    env_signature_hash = None
+    if L is not None and Lv is not None:
+        env_signature_hash = compute_env_signature(
+            kept_tickers,
+            int(L),
+            int(Lv),
+            feature_flags=feature_flags,
+            cost_params=cost_params,
+            schema_version=schema_version,
+        )
     manifest = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "start": start,
@@ -360,6 +385,15 @@ def _manifest_payload(
         "dropped_tickers": [t for t in requested_tickers if t in dropped_reasons],
         "dropped_reasons": dropped_reasons,
         "N_assets_final": len(kept_tickers),
+        "asset_list": kept_tickers,
+        "num_assets": num_assets,
+        "L": L,
+        "Lv": Lv,
+        "obs_dim_expected": obs_dim_expected,
+        "env_signature_hash": env_signature_hash,
+        "env_schema_version": schema_version,
+        "feature_flags": feature_flags,
+        "cost_params": cost_params,
         "source": "yfinance_only",
         "price_type": "adj_close",
         "processed_hashes": processed_hashes,
@@ -375,9 +409,55 @@ def _manifest_payload(
     return manifest
 
 
+def _compute_data_manifest_hash(manifest: Dict) -> str:
+    payload = {key: value for key, value in manifest.items() if key != "data_manifest_hash"}
+    return sha256_bytes(canonical_json(payload))
+
+
 def _write_manifest(path: Path, manifest: Dict) -> Dict:
-    path.write_text(json.dumps(manifest, indent=2))
-    return manifest
+    manifest_with_hash = dict(manifest)
+    manifest_with_hash["data_manifest_hash"] = _compute_data_manifest_hash(manifest_with_hash)
+    path.write_text(json.dumps(manifest_with_hash, indent=2))
+    return manifest_with_hash
+
+
+def _ensure_manifest_env_fields(
+    manifest: Dict,
+    asset_list: list[str],
+    L: int | None,
+    Lv: int | None,
+    feature_flags: Dict,
+    cost_params: Dict,
+) -> Dict:
+    updated = dict(manifest)
+    if "asset_list" not in updated:
+        updated["asset_list"] = asset_list
+    if "num_assets" not in updated:
+        updated["num_assets"] = len(asset_list)
+    if "L" not in updated:
+        updated["L"] = L
+    if "Lv" not in updated:
+        updated["Lv"] = Lv
+    if "obs_dim_expected" not in updated and L is not None:
+        updated["obs_dim_expected"] = len(asset_list) * (int(L) + 2)
+    if "env_schema_version" not in updated:
+        updated["env_schema_version"] = ENV_SCHEMA_VERSION
+    if "feature_flags" not in updated:
+        updated["feature_flags"] = feature_flags
+    if "cost_params" not in updated:
+        updated["cost_params"] = cost_params
+    if "env_signature_hash" not in updated and L is not None and Lv is not None:
+        updated["env_signature_hash"] = compute_env_signature(
+            asset_list,
+            int(L),
+            int(Lv),
+            feature_flags=feature_flags,
+            cost_params=cost_params,
+            schema_version=updated.get("env_schema_version", ENV_SCHEMA_VERSION),
+        )
+    if "data_manifest_hash" not in updated:
+        updated["data_manifest_hash"] = _compute_data_manifest_hash(updated)
+    return updated
 
 
 def _save_artifacts(
@@ -411,7 +491,7 @@ def _save_artifacts(
             "returns.parquet": hash_file(returns_tmp),
         }
         manifest_payload = _manifest_payload(processed_dir, processed_hashes=processed_hashes, **manifest_kwargs)
-        _write_manifest(manifest_tmp, manifest_payload)
+        manifest_payload = _write_manifest(manifest_tmp, manifest_payload)
     except Exception:
         for tmp in [prices_tmp, returns_tmp, quality_tmp, report_quality_tmp, manifest_tmp]:
             if tmp.exists():
@@ -520,16 +600,17 @@ def load_market_data(
     debug_return_intermediates: bool = False,
 ) -> tuple:
     data_cfg = cfg.get("data", {})
+    env_cfg = cfg.get("env", {})
+    universe_cfg = cfg.get("universe", {})
     dates = cfg["dates"]
     start = dates["train_start"]
     end = dates["test_end"]
     source = data_cfg.get("source", "yfinance_only")
     if source != "yfinance_only":
         raise ValueError("Unsupported data source; only yfinance_only is permitted.")
-
-    universe_policy = data_cfg.get("universe_policy", "availability_filtered")
-    if universe_policy != "availability_filtered":
-        raise ValueError("Only availability_filtered universe_policy is supported.")
+    universe_policy = universe_cfg.get("policy", data_cfg.get("universe_policy", "availability_filtered"))
+    if universe_policy not in {"availability_filtered", "quality_gate", "fixed_list"}:
+        raise ValueError(f"Unsupported universe_policy={universe_policy}.")
 
     paper_mode = data_cfg.get("paper_mode", False)
     require_cache_cfg = data_cfg.get("require_cache", False)
@@ -545,12 +626,29 @@ def load_market_data(
     quality_params = {**DEFAULT_QUALITY_PARAMS, **(data_cfg.get("quality_params") or {})}
     max_missing_fraction = float(quality_params.get("max_missing_fraction", DEFAULT_QUALITY_PARAMS["max_missing_fraction"]))
     min_history_days = int(data_cfg.get("min_history_days", 500))
-    min_assets = int(data_cfg.get("min_assets", 25))
+    min_assets = int(universe_cfg.get("min_assets", data_cfg.get("min_assets", 25)))
     history_tolerance_days = int(data_cfg.get("history_tolerance_days", 0))
 
-    tickers = list(data_cfg.get("tickers", DOW30_TICKERS))
+    fixed_asset_list = universe_cfg.get("fixed_asset_list")
+    if fixed_asset_list is not None:
+        if not isinstance(fixed_asset_list, list) or not fixed_asset_list:
+            raise ValueError("universe.fixed_asset_list must be a non-empty list when provided.")
+        tickers = list(fixed_asset_list)
+    else:
+        tickers = list(data_cfg.get("tickers", DOW30_TICKERS))
     if len(tickers) != len(set(tickers)):
         raise ValueError("Ticker universe contains duplicates.")
+
+    feature_flags = {
+        "returns_window": True,
+        "volatility": True,
+        "prev_weights": True,
+    }
+    cost_params = {
+        "transaction_cost": env_cfg.get("c_tc"),
+    }
+    L = env_cfg.get("L")
+    Lv = env_cfg.get("Lv")
 
     processed_dir = Path(data_cfg.get("processed_dir", "data/processed"))
     session_opts = data_cfg.get("session_opts", None)
@@ -565,6 +663,14 @@ def load_market_data(
 
     if cache_only_flag:
         prices, returns, manifest, quality_summary = _load_processed_cache(processed_dir)
+        manifest = _ensure_manifest_env_fields(
+            manifest,
+            asset_list=list(returns.columns),
+            L=L,
+            Lv=Lv,
+            feature_flags=feature_flags,
+            cost_params=cost_params,
+        )
         if debug_return_intermediates:
             debug_info = {
                 "raw_aligned": pd.DataFrame(),
@@ -578,6 +684,14 @@ def load_market_data(
     if cache_exists and not force_refresh:
         LOGGER.info("Using existing processed cache (force_refresh=False).")
         prices, returns, manifest, quality_summary = _load_processed_cache(processed_dir)
+        manifest = _ensure_manifest_env_fields(
+            manifest,
+            asset_list=list(returns.columns),
+            L=L,
+            Lv=Lv,
+            feature_flags=feature_flags,
+            cost_params=cost_params,
+        )
         if debug_return_intermediates:
             debug_info = {
                 "raw_aligned": pd.DataFrame(),
@@ -609,15 +723,21 @@ def load_market_data(
         raw_prices_clean, market_closed_info = _drop_market_closed_days(raw_prices_aligned)
         raw_missing_fraction = raw_prices_clean.isna().mean().to_dict()
         raw_metrics = _compute_raw_metrics(raw_prices_clean, raw_missing_fraction=raw_missing_fraction)
-        kept, _, drop_reasons = _select_universe(
-            tickers,
-            raw_metrics,
-            drop_reasons,
-            start,
-            min_history_days,
-            history_tolerance_days,
-            max_missing_fraction,
-        )
+        if universe_policy == "fixed_list":
+            if drop_reasons:
+                _write_drop_report(raw_metrics, drop_reasons)
+                raise RuntimeError("FIXED_LIST_DOWNLOAD_FAILED")
+            kept = tickers
+        else:
+            kept, _, drop_reasons = _select_universe(
+                tickers,
+                raw_metrics,
+                drop_reasons,
+                start,
+                min_history_days,
+                history_tolerance_days,
+                max_missing_fraction,
+            )
         _write_drop_report(raw_metrics, drop_reasons)
 
         if len(kept) < min_assets:
@@ -668,6 +788,11 @@ def load_market_data(
             "market_closed_fraction_removed": market_closed_info["market_closed_fraction_removed"],
             "total_days_before_drop": market_closed_info["total_days_before_drop"],
             "total_days_after_drop": market_closed_info["total_days_after_drop"],
+            "L": L,
+            "Lv": Lv,
+            "feature_flags": feature_flags,
+            "cost_params": cost_params,
+            "schema_version": ENV_SCHEMA_VERSION,
         }
         manifest, quality_summary = _save_artifacts(
             processed_dir,

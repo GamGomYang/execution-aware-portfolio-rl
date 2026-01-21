@@ -24,6 +24,7 @@ from .envs import Dow30PortfolioEnv, EnvConfig
 from .features import VolatilityFeatures, compute_volatility_features, load_vol_stats
 from .prl import PRLAlphaScheduler, PRLConfig
 from .sb3_prl_sac import PRLSAC
+from .utils.signature import canonical_json, compute_env_signature, sha256_bytes
 
 LOGGER = logging.getLogger(__name__)
 
@@ -209,13 +210,40 @@ def _write_run_metadata(
     model_path: Path,
     log_path: Path,
 ) -> Path:
-    manifest_hash = ""
     manifest_path = Path(config.get("data", {}).get("processed_dir", "data/processed")) / "data_manifest.json"
+    manifest = {}
     if manifest_path.exists():
-        manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        manifest = json.loads(manifest_path.read_text())
+    if "data_manifest_hash" not in manifest and manifest:
+        payload = {key: value for key, value in manifest.items() if key != "data_manifest_hash"}
+        manifest["data_manifest_hash"] = sha256_bytes(canonical_json(payload))
+    manifest_hash = manifest.get("data_manifest_hash", "")
     now = datetime.now(timezone.utc)
     config_hash_val = _config_hash(config)
+    config_path = config.get("config_path", "")
     created_at = now.isoformat()
+    asset_list = manifest.get("asset_list") or manifest.get("kept_tickers") or []
+    num_assets = int(manifest.get("num_assets", len(asset_list) if asset_list else 0))
+    L = manifest.get("L", config.get("env", {}).get("L"))
+    Lv = manifest.get("Lv", config.get("env", {}).get("Lv"))
+    obs_dim_expected = manifest.get("obs_dim_expected")
+    if obs_dim_expected is None and L is not None and num_assets:
+        obs_dim_expected = int(num_assets) * (int(L) + 2)
+    env_signature_hash = manifest.get("env_signature_hash")
+    if env_signature_hash is None and asset_list and L is not None and Lv is not None:
+        feature_flags = manifest.get(
+            "feature_flags",
+            {"returns_window": True, "volatility": True, "prev_weights": True},
+        )
+        cost_params = manifest.get("cost_params", {"transaction_cost": config.get("env", {}).get("c_tc")})
+        env_signature_hash = compute_env_signature(
+            asset_list,
+            int(L),
+            int(Lv),
+            feature_flags=feature_flags,
+            cost_params=cost_params,
+            schema_version=manifest.get("env_schema_version", "v1"),
+        )
     report_paths = {
         "trace_path": str(base_dir / f"trace_{run_id}.parquet"),
         "regime_thresholds_path": str(base_dir / f"regime_thresholds_{run_id}.json"),
@@ -228,6 +256,7 @@ def _write_run_metadata(
         "seed": seed,
         "mode": mode,
         "model_type": model_type,
+        "config_path": config_path,
         "config_hash": config_hash_val,
         "git_commit": _git_commit(),
         "python_version": sys.version,
@@ -241,7 +270,14 @@ def _write_run_metadata(
             "stable_baselines3": sb3_version,
         },
         "created_at": created_at,
+        "data_manifest_path": str(manifest_path),
         "data_manifest_hash": manifest_hash,
+        "asset_list": asset_list,
+        "num_assets": num_assets,
+        "L": L,
+        "Lv": Lv,
+        "obs_dim_expected": obs_dim_expected,
+        "env_signature_hash": env_signature_hash,
         "artifacts": {
             "model_path": str(model_path),
             "train_log_path": str(log_path),

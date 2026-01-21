@@ -9,6 +9,59 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from .metrics import PortfolioMetrics, compute_metrics
 from .prl import PRLAlphaScheduler
 from .sb3_prl_sac import PRLSAC
+from .utils.signature import compute_env_signature
+
+
+def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | None) -> None:
+    base_env = env.envs[0] if hasattr(env, "envs") else env
+    returns = getattr(base_env, "returns", None)
+    if returns is None:
+        raise ValueError("ENV_COMPATIBILITY_MISSING_RETURNS")
+    asset_list = list(returns.columns)
+    num_assets = int(getattr(base_env, "num_assets", len(asset_list)))
+    obs_dim = int(base_env.observation_space.shape[0])
+    window_size = int(getattr(base_env, "window_size", 0))
+    cost_params = {"transaction_cost": getattr(base_env.cfg, "transaction_cost", None)}
+    feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True}
+
+    expected_obs_dim = run_metadata.get("obs_dim_expected")
+    expected_num_assets = run_metadata.get("num_assets")
+    expected_assets = run_metadata.get("asset_list") or []
+    expected_env_signature = run_metadata.get("env_signature_hash")
+
+    current_signature = None
+    if Lv is not None:
+        current_signature = compute_env_signature(
+            asset_list,
+            window_size,
+            int(Lv),
+            feature_flags=feature_flags,
+            cost_params=cost_params,
+            schema_version="v1",
+        )
+
+    missing = [t for t in expected_assets if t not in asset_list]
+    extra = [t for t in asset_list if t not in expected_assets] if expected_assets else []
+    order_mismatch = bool(expected_assets) and not missing and not extra and expected_assets != asset_list
+
+    errors = []
+    if expected_obs_dim is not None and int(expected_obs_dim) != obs_dim:
+        errors.append(f"obs_dim_expected={expected_obs_dim} got={obs_dim}")
+    if expected_num_assets is not None and int(expected_num_assets) != num_assets:
+        errors.append(f"num_assets_expected={expected_num_assets} got={num_assets}")
+    if not expected_assets:
+        errors.append("expected_asset_list_missing=true")
+    if missing:
+        errors.append(f"asset_list_missing={missing}")
+    if extra:
+        errors.append(f"asset_list_extra={extra}")
+    if order_mismatch:
+        errors.append("asset_list_order_mismatch=true")
+    if expected_env_signature and current_signature and expected_env_signature != current_signature:
+        errors.append(f"env_signature_expected={expected_env_signature} got={current_signature}")
+
+    if errors:
+        raise ValueError("ENV_COMPATIBILITY_MISMATCH: " + " | ".join(errors))
 
 
 def load_model(model_path: Path, model_type: str, env: DummyVecEnv, scheduler: PRLAlphaScheduler | None = None):

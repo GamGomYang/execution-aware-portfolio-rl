@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+from types import SimpleNamespace
 
 from prl.train import run_training
 from prl.data import MarketData
@@ -11,6 +12,8 @@ import pandas as pd
 import numpy as np
 import json
 import yaml
+
+from prl.utils.signature import compute_env_signature
 
 
 def _tiny_config(tmp_path):
@@ -124,11 +127,26 @@ def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
     run_id = "20200101T000000Z_deadbeef_seed0_baseline_abcd"
     model_path = outputs_models / f"{run_id}_final.zip"
     model_path.write_text("stub")
+    asset_list = ["AAA", "BBB"]
+    env_signature = compute_env_signature(
+        asset_list,
+        2,
+        2,
+        {"returns_window": True, "volatility": True, "prev_weights": True},
+        {"transaction_cost": 0.0},
+        "v1",
+    )
     meta = {
         "run_id": run_id,
         "seed": 0,
         "model_type": "baseline",
         "created_at": "2020-01-01T00:00:00+00:00",
+        "asset_list": asset_list,
+        "num_assets": 2,
+        "L": 2,
+        "Lv": 2,
+        "obs_dim_expected": 8,
+        "env_signature_hash": env_signature,
         "artifact_paths": {"model_path": str(model_path), "train_log_path": "outputs/logs/train_stub.csv"},
     }
     (outputs_reports / f"run_metadata_{run_id}.json").write_text(json.dumps(meta))
@@ -216,7 +234,15 @@ def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr("scripts.run_eval.prepare_market_and_features", _fake_prepare_market_and_features)
-    monkeypatch.setattr("scripts.run_eval.build_env_for_range", lambda *args, **kwargs: "env")
+    class DummyEnv:
+        def __init__(self, returns):
+            self.returns = returns
+            self.num_assets = returns.shape[1]
+            self.window_size = 2
+            self.observation_space = SimpleNamespace(shape=(self.num_assets * (self.window_size + 2),))
+            self.cfg = SimpleNamespace(transaction_cost=0.0)
+
+    monkeypatch.setattr("scripts.run_eval.build_env_for_range", lambda *args, **kwargs: DummyEnv(returns=market.returns))
     monkeypatch.setattr("scripts.run_eval.create_scheduler", lambda *args, **kwargs: None)
     monkeypatch.setattr("scripts.run_eval.load_model", _fake_load_model)
     monkeypatch.setattr("scripts.run_eval.run_backtest_episode", _fake_run_backtest_episode)

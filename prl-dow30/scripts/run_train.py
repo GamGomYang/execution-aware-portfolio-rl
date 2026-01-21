@@ -25,6 +25,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
+    cfg["config_path"] = args.config
     data_cfg = cfg.get("data", {})
     paper_mode = data_cfg.get("paper_mode", False)
     require_cache_cfg = data_cfg.get("require_cache", False)

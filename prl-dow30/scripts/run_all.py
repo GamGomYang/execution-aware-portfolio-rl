@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,7 @@ import yaml
 
 from prl.baselines import run_all_baselines_detailed
 from prl.data import slice_frame
-from prl.eval import load_model, run_backtest_episode_detailed
+from prl.eval import assert_env_compatible, load_model, run_backtest_episode_detailed
 from prl.features import load_vol_stats
 from prl.metrics import compute_metrics
 from prl.train import (
@@ -41,8 +42,10 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
+        "run_id",
         "model_type",
         "seed",
+        "period",
         "total_reward",
         "avg_reward",
         "cumulative_return",
@@ -91,6 +94,48 @@ def write_summary(path: Path, rows: list[dict]) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _bootstrap_ci(values: np.ndarray, *, n_boot: int = 2000, alpha: float = 0.05, seed: int = 0) -> tuple[float, float]:
+    if values.size == 0:
+        return float("nan"), float("nan")
+    rng = np.random.default_rng(seed)
+    means = np.empty(n_boot, dtype=np.float64)
+    for i in range(n_boot):
+        sample = rng.choice(values, size=values.size, replace=True)
+        means[i] = float(np.mean(sample))
+    low = float(np.quantile(means, alpha / 2.0))
+    high = float(np.quantile(means, 1.0 - alpha / 2.0))
+    return low, high
+
+
+def summarize_seed_stats(rows: list[dict]) -> list[dict]:
+    if not rows:
+        return []
+    df = pd.DataFrame(rows)
+    df = df.drop_duplicates(subset=["model_type", "seed"])
+    metric_cols = [
+        "total_reward",
+        "avg_reward",
+        "cumulative_return",
+        "avg_turnover",
+        "total_turnover",
+        "sharpe",
+        "max_drawdown",
+        "steps",
+    ]
+    summary_rows: list[dict] = []
+    for model_type, group in df.groupby("model_type"):
+        row = {"model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+        for col in metric_cols:
+            values = group[col].to_numpy(dtype=np.float64)
+            row[f"{col}_mean"] = float(np.mean(values)) if values.size else float("nan")
+            row[f"{col}_std"] = float(np.std(values, ddof=0)) if values.size else float("nan")
+            ci_low, ci_high = _bootstrap_ci(values)
+            row[f"{col}_ci_low"] = ci_low
+            row[f"{col}_ci_high"] = ci_high
+        summary_rows.append(row)
+    return summary_rows
 
 
 def write_regime_metrics(path: Path, rows: list[dict]) -> None:
@@ -146,6 +191,21 @@ def _build_trace_df(run_id: str, model_type: str, seed: int, trace: dict) -> pd.
     return df
 
 
+def _load_run_metadata(run_id: str, reports_dir: Path) -> dict | None:
+    meta_path = reports_dir / f"run_metadata_{run_id}.json"
+    if not meta_path.exists():
+        return None
+    return json.loads(meta_path.read_text())
+
+
+def _update_run_metadata(path: Path, updates: dict) -> None:
+    if not path.exists():
+        return
+    data = json.loads(path.read_text())
+    data.update(updates)
+    path.write_text(json.dumps(data, indent=2))
+
+
 def _regime_metrics_from_trace(trace_df: pd.DataFrame, run_id: str, seed: int, include_all: bool = True) -> list[dict]:
     rows: list[dict] = []
     for model_type, group in trace_df.groupby("model_type"):
@@ -186,6 +246,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
+    cfg["config_path"] = args.config
     dates = cfg["dates"]
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
@@ -231,17 +292,14 @@ def main():
         transaction_cost=env_cfg["c_tc"],
     )
 
-    metrics_rows = []
-    regime_rows = []
+    metrics_rows: list[dict] = []
+    regime_rows: list[dict] = []
+    reports_dir = Path("outputs/reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
     for seed in seeds:
-        for name, (base_metrics, _) in baseline_results.items():
-            metrics_rows.append(
-                {
-                    "model_type": name,
-                    "seed": seed,
-                    **base_metrics.to_dict(),
-                }
-            )
+        baseline_meta = None
+        baseline_run_id = None
+        meta_by_type: dict[str, dict] = {}
         for model_type in args.model_types:
             model_path = run_training(
                 config=cfg,
@@ -271,19 +329,37 @@ def main():
                 num_assets = market.returns.shape[1]
                 scheduler = create_scheduler(prl_cfg, env_cfg["L"], num_assets, features.stats_path)
 
-            model = load_model(model_path, model_type, env, scheduler=scheduler)
-            metrics, trace = run_backtest_episode_detailed(model, env)
             label = f"{model_type}_sac"
             run_id = model_path.stem
             if run_id.endswith("_final"):
                 run_id = run_id[: -len("_final")]
+            meta = _load_run_metadata(run_id, reports_dir)
+            if meta is None:
+                raise ValueError(f"RUN_METADATA_NOT_FOUND for run_id={run_id}")
+            assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
+            meta_by_type[model_type] = meta
+            model = load_model(model_path, model_type, env, scheduler=scheduler)
+            metrics, trace = run_backtest_episode_detailed(model, env)
+            metrics_row_id = len(metrics_rows)
             metrics_rows.append(
                 {
+                    "run_id": run_id,
                     "model_type": label,
                     "seed": seed,
+                    "period": "test",
                     **metrics.to_dict(),
                 }
             )
+            if model_type == "baseline":
+                baseline_meta = meta
+                baseline_run_id = run_id
+            if "baseline" in meta_by_type and "prl" in meta_by_type:
+                base_meta = meta_by_type["baseline"]
+                prl_meta = meta_by_type["prl"]
+                if base_meta.get("data_manifest_hash") != prl_meta.get("data_manifest_hash"):
+                    raise ValueError("DATA_MANIFEST_HASH_MISMATCH")
+                if base_meta.get("env_signature_hash") != prl_meta.get("env_signature_hash"):
+                    raise ValueError("ENV_SIGNATURE_HASH_MISMATCH")
 
             trace_frames = [_build_trace_df(run_id, label, seed, trace)]
             for name, (_, base_trace) in baseline_results.items():
@@ -292,9 +368,8 @@ def main():
             trace_df = pd.concat(trace_frames, ignore_index=True)
             trace_df = trace_df.merge(regime_df, on="date", how="left")
             trace_df = trace_df.dropna(subset=["regime"])
+            trace_df["regime_label"] = trace_df["regime"]
 
-            reports_dir = Path("outputs/reports")
-            reports_dir.mkdir(parents=True, exist_ok=True)
             trace_path = reports_dir / f"trace_{run_id}.parquet"
             trace_df.to_parquet(trace_path, index=False)
 
@@ -307,12 +382,36 @@ def main():
             thresholds_path.write_text(json.dumps(thresholds, indent=2))
 
             regime_rows.extend(_regime_metrics_from_trace(trace_df, run_id, seed))
+            _update_run_metadata(
+                reports_dir / f"run_metadata_{run_id}.json",
+                {
+                    "evaluation": {
+                        "trace_path": str(trace_path),
+                        "regime_thresholds_path": str(thresholds_path),
+                        "metrics_row_id": metrics_row_id,
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                },
+            )
 
-    reports_dir = Path("outputs/reports")
+        baseline_run_id = baseline_run_id or f"baseline_strategies_seed{seed}"
+        for name, (base_metrics, _) in baseline_results.items():
+            metrics_rows.append(
+                {
+                    "run_id": baseline_run_id,
+                    "model_type": name,
+                    "seed": seed,
+                    "period": "test",
+                    **base_metrics.to_dict(),
+                }
+            )
+
     write_metrics(reports_dir / "metrics.csv", metrics_rows)
     summary_rows = summarize_metrics(metrics_rows)
     write_summary(reports_dir / "summary.csv", summary_rows)
     write_regime_metrics(reports_dir / "regime_metrics.csv", regime_rows)
+    summary_seed_rows = summarize_seed_stats(metrics_rows)
+    write_summary(reports_dir / "summary_seed_stats.csv", summary_seed_rows)
     print("Completed run_all workflow.")
 
 

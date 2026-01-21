@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ import yaml
 from prl.data import MarketData
 from prl.features import VolatilityFeatures
 from prl.metrics import PortfolioMetrics
+from prl.train import _write_run_metadata
 
 
 def test_regime_metrics_has_three_regimes(tmp_path, monkeypatch):
@@ -87,15 +89,41 @@ def test_regime_metrics_has_three_regimes(tmp_path, monkeypatch):
         return market, features
 
     def _fake_run_training(*args, **kwargs):
+        config = kwargs.get("config", cfg)
         model_type = kwargs.get("model_type", "baseline")
         seed = kwargs.get("seed", 0)
-        model_path = Path("outputs/models") / f"runid_{model_type}_seed{seed}_final.zip"
+        processed_dir = Path(config["data"]["processed_dir"])
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "asset_list": ["AAA", "BBB"],
+            "num_assets": 2,
+            "L": config["env"]["L"],
+            "Lv": config["env"]["Lv"],
+            "obs_dim_expected": 2 * (config["env"]["L"] + 2),
+            "env_schema_version": "v1",
+        }
+        (processed_dir / "data_manifest.json").write_text(json.dumps(manifest))
+        run_id = f"runid_{model_type}_seed{seed}"
+        model_path = Path("outputs/models") / f"{run_id}_final.zip"
         model_path.parent.mkdir(parents=True, exist_ok=True)
         model_path.write_text("stub")
+        log_dir = Path("outputs/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / f"train_{run_id}.csv"
+        log_path.write_text("schema_version,run_id,model_type,seed,timesteps\n1.1,run,baseline,0,1\n")
+        _write_run_metadata(Path("outputs/reports"), config, seed, config.get("mode", ""), model_type, run_id, model_path, log_path)
         return model_path
 
     def _fake_build_env_for_range(*args, **kwargs):
-        return "env"
+        class DummyEnv:
+            def __init__(self, returns):
+                self.returns = returns
+                self.num_assets = returns.shape[1]
+                self.window_size = 2
+                self.observation_space = SimpleNamespace(shape=(self.num_assets * (self.window_size + 2),))
+                self.cfg = SimpleNamespace(transaction_cost=0.0)
+
+        return DummyEnv(returns=market.returns)
 
     def _fake_load_model(*args, **kwargs):
         return object()
