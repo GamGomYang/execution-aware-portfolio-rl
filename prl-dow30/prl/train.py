@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timezone
 import random
+import secrets
 import subprocess
 import sys
 from pathlib import Path
@@ -74,6 +75,8 @@ def create_scheduler(prl_cfg: Dict[str, float], window_size: int, num_assets: in
         bias=prl_cfg["bias"],
         alpha_min=prl_cfg["alpha_min"],
         alpha_max=prl_cfg["alpha_max"],
+        emergency_mode=prl_cfg.get("emergency_mode", "clamp"),
+        emergency_vz_threshold=prl_cfg.get("emergency_vz_threshold", 2.0),
         vol_mean=mean,
         vol_std=std,
         window_size=window_size,
@@ -134,19 +137,49 @@ def _git_commit() -> str:
 
 
 class TrainLoggingCallback(BaseCallback):
-    def __init__(self, log_path: Path, log_interval: int = 1000, verbose: int = 0):
+    schema_version = "1.1"
+
+    def __init__(
+        self,
+        log_path: Path,
+        run_id: str,
+        model_type: str,
+        seed: int,
+        log_interval: int = 1000,
+        verbose: int = 0,
+    ):
         super().__init__(verbose)
         self.log_path = log_path
+        self.run_id = run_id
+        self.model_type = model_type
+        self.seed = seed
         self.log_interval = max(1, log_interval)
         self.buffer: List[Dict] = []
 
     def _on_step(self) -> bool:
         logger_vals = self.model.logger.name_to_value
+        entropy_loss = logger_vals.get("train/entropy_loss")
+        if entropy_loss is None:
+            entropy_loss = logger_vals.get("train/ent_coef_loss", logger_vals.get("train/ent_coef"))
         record = {
+            "schema_version": self.schema_version,
+            "run_id": self.run_id,
+            "model_type": self.model_type,
+            "seed": self.seed,
             "timesteps": self.num_timesteps,
             "actor_loss": logger_vals.get("train/actor_loss"),
             "critic_loss": logger_vals.get("train/critic_loss"),
-            "entropy_loss": logger_vals.get("train/entropy_loss"),
+            "entropy_loss": entropy_loss,
+            "ent_coef": logger_vals.get("train/ent_coef"),
+            "ent_coef_loss": logger_vals.get("train/ent_coef_loss"),
+            "alpha_obs_mean": logger_vals.get("train/alpha_obs_mean"),
+            "alpha_next_mean": logger_vals.get("train/alpha_next_mean"),
+            "prl_prob_mean": logger_vals.get("train/prl_prob_mean"),
+            "vz_mean": logger_vals.get("train/vz_mean"),
+            "alpha_raw_mean": logger_vals.get("train/alpha_raw_mean"),
+            "alpha_clamped_mean": logger_vals.get("train/alpha_clamped_mean"),
+            "emergency_rate": logger_vals.get("train/emergency_rate"),
+            "beta_effective_mean": logger_vals.get("train/beta_effective_mean"),
         }
         self.buffer.append(record)
         if len(self.buffer) >= self.log_interval:
@@ -172,6 +205,7 @@ def _write_run_metadata(
     seed: int,
     mode: str,
     model_type: str,
+    run_id: str,
     model_path: Path,
     log_path: Path,
 ) -> Path:
@@ -182,8 +216,13 @@ def _write_run_metadata(
     now = datetime.now(timezone.utc)
     config_hash_val = _config_hash(config)
     created_at = now.isoformat()
-    run_id_ts = now.strftime("%Y%m%dT%H%M%SZ")
-    run_id = f"{run_id_ts}_{config_hash_val[:8]}_seed{seed}_{model_type}"
+    report_paths = {
+        "trace_path": str(base_dir / f"trace_{run_id}.parquet"),
+        "regime_thresholds_path": str(base_dir / f"regime_thresholds_{run_id}.json"),
+        "step4_report_path": str(base_dir / f"step4_report_{run_id}.md"),
+        "regime_metrics_path": str(base_dir / "regime_metrics.csv"),
+        "figures_dir": str(Path("outputs/figures") / run_id),
+    }
     meta = {
         "run_id": run_id,
         "seed": seed,
@@ -211,11 +250,20 @@ def _write_run_metadata(
             "model_path": str(model_path),
             "train_log_path": str(log_path),
         },
+        "report_paths": report_paths,
     }
     base_dir.mkdir(parents=True, exist_ok=True)
     out_path = base_dir / f"run_metadata_{run_id}.json"
     out_path.write_text(json.dumps(meta, indent=2))
     return out_path
+
+
+def _generate_run_id(config: Dict, seed: int, model_type: str) -> str:
+    now = datetime.now(timezone.utc)
+    config_hash_val = _config_hash(config)
+    run_id_ts = now.strftime("%Y%m%dT%H%M%SZ")
+    suffix = secrets.token_hex(2)
+    return f"{run_id_ts}_{config_hash_val[:8]}_seed{seed}_{model_type}_{suffix}"
 
 
 def prepare_market_and_features(
@@ -328,6 +376,7 @@ def run_training(
         raise ValueError("ent_coef auto tuning is disabled; provide a fixed float.")
 
     _set_global_seeds(seed)
+    run_id = _generate_run_id(config, seed, model_type)
 
     market, features = prepare_market_and_features(
         config=config,
@@ -355,8 +404,8 @@ def run_training(
     )
     num_assets = market.returns.shape[1]
     log_dir = Path("outputs/logs")
-    log_path = log_dir / f"{model_type}_seed{seed}_train_log.csv"
-    callbacks = [TrainLoggingCallback(log_path, log_interval=log_interval)]
+    log_path = log_dir / f"train_{run_id}.csv"
+    callbacks = [TrainLoggingCallback(log_path, run_id, model_type, seed, log_interval=log_interval)]
     if mode == "paper" and checkpoint_interval:
         callbacks.append(
             CheckpointCallback(
@@ -380,7 +429,7 @@ def run_training(
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    model_path = output_path / f"{model_type}_seed{seed}_final.zip"
+    model_path = output_path / f"{run_id}_final.zip"
     model.save(model_path)
-    _write_run_metadata(Path("outputs/reports"), config, seed, mode, model_type, model_path, log_path)
+    _write_run_metadata(Path("outputs/reports"), config, seed, mode, model_type, run_id, model_path, log_path)
     return model_path

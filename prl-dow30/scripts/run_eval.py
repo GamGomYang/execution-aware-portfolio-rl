@@ -1,6 +1,7 @@
 import argparse
 import csv
 import logging
+import json
 from pathlib import Path
 
 import yaml
@@ -39,6 +40,29 @@ def write_metrics(path: Path, row: dict):
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
+
+
+def _load_latest_run_metadata(model_type: str, seed: int, reports_dir: Path) -> dict | None:
+    if not reports_dir.exists():
+        return None
+    candidates = []
+    for path in reports_dir.glob("run_metadata_*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            continue
+        if data.get("model_type") != model_type or int(data.get("seed", -1)) != seed:
+            continue
+        created_at = data.get("created_at")
+        try:
+            created_ts = created_at or ""
+        except Exception:
+            created_ts = ""
+        candidates.append((created_ts, data))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
 
 
 def main():
@@ -86,8 +110,17 @@ def main():
     model_path = (
         Path(args.model_path)
         if args.model_path
-        else Path("outputs/models") / f"{args.model_type}_seed{args.seed}_final.zip"
+        else None
     )
+    if model_path is None:
+        meta = _load_latest_run_metadata(args.model_type, args.seed, Path("outputs/reports"))
+        if meta:
+            artifact_paths = meta.get("artifact_paths") or meta.get("artifacts") or {}
+            model_path_value = artifact_paths.get("model_path")
+            if model_path_value:
+                model_path = Path(model_path_value)
+        if not meta or model_path is None:
+            model_path = Path("outputs/models") / f"{args.model_type}_seed{args.seed}_final.zip"
 
     scheduler = None
     if args.model_type == "prl":

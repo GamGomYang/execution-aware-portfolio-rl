@@ -40,6 +40,26 @@ def run_baseline_strategy(
     log_clip: float = 1e-8,
     eps: float = 1e-12,
 ) -> PortfolioMetrics:
+    metrics, _ = run_baseline_strategy_detailed(
+        returns,
+        volatility,
+        strategy,
+        transaction_cost=transaction_cost,
+        log_clip=log_clip,
+        eps=eps,
+    )
+    return metrics
+
+
+def run_baseline_strategy_detailed(
+    returns: pd.DataFrame,
+    volatility: pd.DataFrame,
+    strategy: str,
+    *,
+    transaction_cost: float = 0.0,
+    log_clip: float = 1e-8,
+    eps: float = 1e-12,
+) -> tuple[PortfolioMetrics, dict]:
     if returns.shape != volatility.shape:
         raise ValueError("returns and volatility must have matching shapes")
     if not returns.index.equals(volatility.index):
@@ -57,6 +77,7 @@ def run_baseline_strategy(
     rewards = []
     portfolio_returns = []
     turnovers = []
+    dates = []
     for i in range(returns_arr.shape[0]):
         r_arith = np.expm1(returns_arr[i])
         port_ret = float(np.dot(w_prev, r_arith))
@@ -77,9 +98,17 @@ def run_baseline_strategy(
         rewards.append(reward)
         portfolio_returns.append(port_ret)
         turnovers.append(turnover)
+        dates.append(returns.index[i])
         w_prev = w_target
 
-    return compute_metrics(rewards, portfolio_returns, turnovers)
+    metrics = compute_metrics(rewards, portfolio_returns, turnovers)
+    trace = {
+        "dates": dates,
+        "rewards": rewards,
+        "portfolio_returns": portfolio_returns,
+        "turnovers": turnovers,
+    }
+    return metrics, trace
 
 
 def run_all_baselines(
@@ -93,6 +122,27 @@ def run_all_baselines(
     results: Dict[str, PortfolioMetrics] = {}
     for name in BASELINE_NAMES:
         results[name] = run_baseline_strategy(
+            returns,
+            volatility,
+            name,
+            transaction_cost=transaction_cost,
+            log_clip=log_clip,
+            eps=eps,
+        )
+    return results
+
+
+def run_all_baselines_detailed(
+    returns: pd.DataFrame,
+    volatility: pd.DataFrame,
+    *,
+    transaction_cost: float = 0.0,
+    log_clip: float = 1e-8,
+    eps: float = 1e-12,
+) -> Dict[str, tuple[PortfolioMetrics, dict]]:
+    results: Dict[str, tuple[PortfolioMetrics, dict]] = {}
+    for name in BASELINE_NAMES:
+        results[name] = run_baseline_strategy_detailed(
             returns,
             volatility,
             name,

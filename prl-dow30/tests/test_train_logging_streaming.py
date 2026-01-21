@@ -1,14 +1,12 @@
 import pandas as pd
-import numpy as np
 from types import SimpleNamespace
-from pathlib import Path
 
 from prl.train import TrainLoggingCallback
 
 
 def test_train_logging_streams_to_csv(tmp_path):
     log_path = tmp_path / "log.csv"
-    cb = TrainLoggingCallback(log_path, log_interval=2)
+    cb = TrainLoggingCallback(log_path, run_id="run123", model_type="baseline", seed=0, log_interval=2)
 
     class DummyLogger:
         def __init__(self):
@@ -30,6 +28,26 @@ def test_train_logging_streams_to_csv(tmp_path):
     df = pd.read_csv(log_path)
     # Expect multiple flushes: rows should be present and not all buffered
     assert len(df) == 5
-    assert "actor_loss" in df.columns
+    for col in [
+        "schema_version",
+        "run_id",
+        "model_type",
+        "seed",
+        "timesteps",
+        "actor_loss",
+        "critic_loss",
+        "entropy_loss",
+        "ent_coef",
+        "ent_coef_loss",
+        "alpha_obs_mean",
+        "alpha_next_mean",
+        "prl_prob_mean",
+        "vz_mean",
+        "alpha_raw_mean",
+        "alpha_clamped_mean",
+        "emergency_rate",
+        "beta_effective_mean",
+    ]:
+        assert col in df.columns
     # Ensure buffer cleared
     assert cb.buffer == []

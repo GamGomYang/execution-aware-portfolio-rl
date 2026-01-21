@@ -63,7 +63,8 @@ class PRLSAC(SAC):
             assert log_prob.shape[1] == 1, "log_prob must be [B,1]"
             q_pi = self.critic(replay_data.observations, actions_pi)
             min_q_pi = th.min(th.cat(q_pi, dim=1), dim=1, keepdim=True)[0]
-            alpha_obs = self.scheduler.alpha_from_obs(replay_data.observations).detach()
+            alpha_obs, diagnostics = self.scheduler.alpha_from_obs(replay_data.observations, return_diagnostics=True)
+            alpha_obs = alpha_obs.detach()
             assert alpha_obs.shape == log_prob.shape, "alpha_obs shape mismatch"
             actor_loss = (alpha_obs * log_prob - min_q_pi).mean()
 
@@ -78,4 +79,10 @@ class PRLSAC(SAC):
             self.logger.record("train/actor_loss", actor_loss.item())
             self.logger.record("train/alpha_obs_mean", alpha_obs.mean().item())
             self.logger.record("train/alpha_next_mean", alpha_next.mean().item())
+            self.logger.record("train/prl_prob_mean", diagnostics.prl_prob.mean().item())
+            self.logger.record("train/vz_mean", diagnostics.vz.mean().item())
+            self.logger.record("train/alpha_raw_mean", diagnostics.alpha_raw.mean().item())
+            self.logger.record("train/alpha_clamped_mean", diagnostics.alpha_clamped.mean().item())
+            self.logger.record("train/emergency_rate", diagnostics.emergency.float().mean().item())
+            self.logger.record("train/beta_effective_mean", diagnostics.beta_effective.mean().item())
             self.logger.record("train/entropy_loss", float((alpha_obs * log_prob).mean().item()))

@@ -7,7 +7,7 @@ import yaml
 
 from prl.data import MarketData
 from prl.metrics import PortfolioMetrics
-from prl.train import _write_run_metadata
+from prl.train import _generate_run_id, _write_run_metadata
 
 
 def test_paper_gate_artifacts(tmp_path, monkeypatch):
@@ -63,12 +63,14 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
         prices = pd.DataFrame(np.exp(returns.cumsum()), index=dates, columns=["AAA", "BBB"])
         from prl.features import VolatilityFeatures
 
+        stats_path = tmp_path / "stats.json"
+        stats_path.write_text(json.dumps({"mean": 0.0, "std": 1.0}))
         vf = VolatilityFeatures(
             volatility=pd.DataFrame(0.02, index=dates, columns=["AAA", "BBB"]),
             portfolio_scalar=pd.Series(0.0, index=dates),
             mean=pd.Series(0.0, index=["AAA", "BBB"]),
             std=pd.Series(1.0, index=["AAA", "BBB"]),
-            stats_path=Path("stats.npz"),
+            stats_path=stats_path,
         )
         return MarketData(prices=prices, returns=returns), vf
 
@@ -91,22 +93,35 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
     ):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        model_path = output_dir / f"{model_type}_seed{seed}_final.zip"
+        run_id = _generate_run_id(config, seed, model_type)
+        model_path = output_dir / f"{run_id}_final.zip"
         model_path.write_bytes(b"dummy")
 
         log_dir = Path("outputs/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"{model_type}_seed{seed}_train_log.csv"
-        log_path.write_text("timesteps,actor_loss\n1,0.0\n2,0.0\n")
+        log_path = log_dir / f"train_{run_id}.csv"
+        log_path.write_text(
+            "schema_version,run_id,model_type,seed,timesteps,actor_loss,critic_loss,entropy_loss,ent_coef,ent_coef_loss,alpha_obs_mean,alpha_next_mean\n"
+            "1.1,run,baseline,0,1,0.0,0.0,,0.2,,,\n"
+        )
 
-        _write_run_metadata(Path("outputs/reports"), config, seed, config.get("mode", ""), model_type, model_path, log_path)
+        _write_run_metadata(
+            Path("outputs/reports"),
+            config,
+            seed,
+            config.get("mode", ""),
+            model_type,
+            run_id,
+            model_path,
+            log_path,
+        )
         return model_path
 
     def _fake_load_model(*args, **kwargs):
         return object()
 
-    def _fake_run_backtest_episode(*args, **kwargs):
-        return PortfolioMetrics(
+    def _fake_run_backtest_episode_detailed(*args, **kwargs):
+        metrics = PortfolioMetrics(
             total_reward=1.0,
             avg_reward=0.1,
             cumulative_return=0.05,
@@ -116,6 +131,14 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
             max_drawdown=-0.1,
             steps=10,
         )
+        trace = {
+            "dates": list(pd.date_range("2020-01-01", periods=3, freq="B")),
+            "rewards": [0.1, 0.1, 0.1],
+            "portfolio_returns": [0.01, 0.01, 0.01],
+            "turnovers": [0.1, 0.1, 0.1],
+            "turnover_target_changes": [0.05, 0.05, 0.05],
+        }
+        return metrics, trace
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("scripts.run_all.prepare_market_and_features", _fake_prepare_market_and_features)
@@ -123,7 +146,7 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
-    monkeypatch.setattr("scripts.run_all.run_backtest_episode", _fake_run_backtest_episode)
+    monkeypatch.setattr("scripts.run_all.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
 
     import scripts.run_all as run_all
 
@@ -153,15 +176,6 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
     assert "avg_turnover_mean" in summary_df.columns
     assert "total_turnover_mean" in summary_df.columns
 
-    assert (tmp_path / "outputs" / "models" / "baseline_seed0_final.zip").exists()
-    assert (tmp_path / "outputs" / "models" / "prl_seed0_final.zip").exists()
-
-    log_base = tmp_path / "outputs" / "logs"
-    baseline_log = log_base / "baseline_seed0_train_log.csv"
-    prl_log = log_base / "prl_seed0_train_log.csv"
-    assert baseline_log.exists() and baseline_log.stat().st_size > 0
-    assert prl_log.exists() and prl_log.stat().st_size > 0
-
     meta_files = sorted(reports_dir.glob("run_metadata_*.json"))
     assert meta_files
     meta = json.loads(meta_files[-1].read_text())
@@ -181,3 +195,5 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
         assert key in meta
     assert "model_path" in meta["artifact_paths"]
     assert "train_log_path" in meta["artifact_paths"]
+    assert Path(meta["artifact_paths"]["model_path"]).exists()
+    assert Path(meta["artifact_paths"]["train_log_path"]).exists()

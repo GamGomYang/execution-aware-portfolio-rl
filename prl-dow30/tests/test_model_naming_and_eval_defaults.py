@@ -9,6 +9,7 @@ from prl.features import VolatilityFeatures
 from prl.metrics import PortfolioMetrics
 import pandas as pd
 import numpy as np
+import json
 import yaml
 
 
@@ -103,7 +104,8 @@ def test_model_naming_and_run_eval_default(tmp_path, monkeypatch):
     out_dir = tmp_path / "models"
     model_path = run_training(cfg, "baseline", seed=0, raw_dir="data/raw", processed_dir="data/processed", output_dir=out_dir, force_refresh=False)
 
-    assert model_path.name == "baseline_seed0_final.zip"
+    assert model_path.name.endswith("_final.zip")
+    assert "_seed0_baseline_" in model_path.name
     assert model_path.exists()
 
     env = _build_env(market)
@@ -116,9 +118,20 @@ def test_model_naming_and_run_eval_default(tmp_path, monkeypatch):
 def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     outputs_models = tmp_path / "outputs" / "models"
+    outputs_reports = tmp_path / "outputs" / "reports"
     outputs_models.mkdir(parents=True, exist_ok=True)
-    default_model = outputs_models / "baseline_seed0_final.zip"
-    default_model.write_text("stub")
+    outputs_reports.mkdir(parents=True, exist_ok=True)
+    run_id = "20200101T000000Z_deadbeef_seed0_baseline_abcd"
+    model_path = outputs_models / f"{run_id}_final.zip"
+    model_path.write_text("stub")
+    meta = {
+        "run_id": run_id,
+        "seed": 0,
+        "model_type": "baseline",
+        "created_at": "2020-01-01T00:00:00+00:00",
+        "artifact_paths": {"model_path": str(model_path), "train_log_path": "outputs/logs/train_stub.csv"},
+    }
+    (outputs_reports / f"run_metadata_{run_id}.json").write_text(json.dumps(meta))
 
     # Build minimal config file
     cfg = {
@@ -216,5 +229,5 @@ def test_run_eval_default_path_resolution(tmp_path, monkeypatch):
     run_eval_script.main()
 
     assert calls.get("prepare_called", False)
-    assert calls["model_path"].name == "baseline_seed0_final.zip"
+    assert calls["model_path"] == model_path
     assert calls.get("backtest_called", False)

@@ -16,6 +16,8 @@ class DummyModel:
 
     def save(self, path):
         self.saved_path = path
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text("stub")
 
     def learn(self, total_timesteps, callback=None):
         callbacks = callback if isinstance(callback, list) else ([callback] if callback else [])
@@ -108,3 +110,5 @@ def test_run_metadata_written(tmp_path, monkeypatch):
         assert key in data
     assert "model_path" in data["artifacts"]
     assert "train_log_path" in data["artifacts"]
+    assert Path(data["artifacts"]["model_path"]).exists()
+    assert Path(data["artifacts"]["train_log_path"]).exists()

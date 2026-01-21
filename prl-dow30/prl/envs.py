@@ -110,10 +110,13 @@ class Dow30PortfolioEnv(Env):
             raise RuntimeError("Environment step beyond data length.")
 
         returns_t = self.returns.iloc[self.current_step].to_numpy(copy=False)
+        step_date = self.returns.index[self.current_step]
         arithmetic_returns = np.expm1(returns_t)
         assert self.prev_weights.shape == arithmetic_returns.shape == weights.shape == (self.num_assets,)
-        portfolio_return = float(np.dot(self.prev_weights, arithmetic_returns))
+        prev_weights = self.prev_weights.copy()
+        portfolio_return = float(np.dot(prev_weights, arithmetic_returns))
         turnover = self._turnover(weights, arithmetic_returns)
+        turnover_target_change = turnover_l1(weights, prev_weights)
         cost = self.cfg.transaction_cost * turnover
 
         log_argument = max(1.0 + portfolio_return, self.cfg.log_clip)
@@ -129,7 +132,8 @@ class Dow30PortfolioEnv(Env):
             "portfolio_return": portfolio_return,
             "turnover": turnover,
             "turnover_rebalance": turnover,
-            "turnover_target_change": turnover_l1(weights, self.prev_weights),
+            "turnover_target_change": turnover_target_change,
+            "date": step_date,
             "log_argument": log_argument,
         }
         return obs, reward, terminated, truncated, info
