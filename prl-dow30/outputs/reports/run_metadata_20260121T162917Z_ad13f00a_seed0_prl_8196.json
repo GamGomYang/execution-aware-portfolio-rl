@@ -1,0 +1,77 @@
+{
+  "run_id": "20260121T162917Z_ad13f00a_seed0_prl_8196",
+  "seed": 0,
+  "mode": "paper",
+  "model_type": "prl",
+  "config_path": "configs/prl_100k.yaml",
+  "config_hash": "ad13f00a422e37efcc852929e9c1ed9a9b4666dcb438b89cbb54f01f5dc129c4",
+  "git_commit": "d6516b466ef7bdee4a896d09e619aecfb04faf30",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_version": "2.9.1+cu128",
+  "yfinance_version": "1.0",
+  "sb3_version": "2.7.1",
+  "packages": {
+    "torch": "2.9.1+cu128",
+    "pandas": "2.3.3",
+    "yfinance": "1.0",
+    "stable_baselines3": "2.7.1"
+  },
+  "created_at": "2026-01-21T17:15:25.698801+00:00",
+  "data_manifest_path": "data/processed/data_manifest.json",
+  "data_manifest_hash": "77c02ef36d8d7efb7203e07739d514565e772f837ea223e84913712ffd0efec6",
+  "asset_list": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "UNH",
+    "V",
+    "VZ",
+    "WMT"
+  ],
+  "num_assets": 27,
+  "L": 30,
+  "Lv": 30,
+  "obs_dim_expected": 864,
+  "env_signature_hash": "0f7a92425293ecbc56e7522456169385be67f27a5190f495e18d0fc6cb64411e",
+  "artifacts": {
+    "model_path": "outputs/models/20260121T162917Z_ad13f00a_seed0_prl_8196_final.zip",
+    "train_log_path": "outputs/logs/train_20260121T162917Z_ad13f00a_seed0_prl_8196.csv"
+  },
+  "artifact_paths": {
+    "model_path": "outputs/models/20260121T162917Z_ad13f00a_seed0_prl_8196_final.zip",
+    "train_log_path": "outputs/logs/train_20260121T162917Z_ad13f00a_seed0_prl_8196.csv"
+  },
+  "report_paths": {
+    "trace_path": "outputs/reports/trace_20260121T162917Z_ad13f00a_seed0_prl_8196.parquet",
+    "regime_thresholds_path": "outputs/reports/regime_thresholds_20260121T162917Z_ad13f00a_seed0_prl_8196.json",
+    "step4_report_path": "outputs/reports/step4_report_20260121T162917Z_ad13f00a_seed0_prl_8196.md",
+    "regime_metrics_path": "outputs/reports/regime_metrics.csv",
+    "figures_dir": "outputs/figures/20260121T162917Z_ad13f00a_seed0_prl_8196"
+  },
+  "evaluation": {
+    "trace_path": "outputs/reports/trace_20260121T162917Z_ad13f00a_seed0_prl_8196.parquet",
+    "regime_thresholds_path": "outputs/reports/regime_thresholds_20260121T162917Z_ad13f00a_seed0_prl_8196.json",
+    "metrics_row_id": 0,
+    "completed_at": "2026-01-21T17:15:26.978712+00:00"
+  }
+}
