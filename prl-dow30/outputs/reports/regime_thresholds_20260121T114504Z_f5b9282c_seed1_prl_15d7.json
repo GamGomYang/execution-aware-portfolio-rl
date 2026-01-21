@@ -1,0 +1,5 @@
+{
+  "q33": 0.032972005576091624,
+  "q66": 0.4086296448646704,
+  "regime_policy": "Vz quantile split on test period"
+}

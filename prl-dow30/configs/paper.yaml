@@ -11,7 +11,7 @@ data:
   processed_dir: data/processed
   source: yfinance_only
   universe_policy: fixed_list
-  min_assets: 30
+  min_assets: 27
   force_refresh: true
   offline: false
   require_cache: true
@@ -26,7 +26,7 @@ data:
     max_missing_fraction: 0.01
 
 universe:
-  min_assets: 30
+  min_assets: 27
   policy: fixed_list
   fixed_asset_list:
     - AAPL
@@ -52,13 +52,10 @@ universe:
     - MSFT
     - NKE
     - PG
-    - TRV
     - UNH
     - V
     - VZ
-    - WBA
     - WMT
-    - DOW
 
 env:
   L: 30
