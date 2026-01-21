@@ -11,6 +11,28 @@ def turnover_l1(prev_weights: np.ndarray, weights: np.ndarray) -> float:
     return float(np.abs(weights - prev_weights).sum())
 
 
+def post_return_weights(
+    w_prev: np.ndarray, r_arith: np.ndarray, eps: float = 1e-12
+) -> np.ndarray:
+    w_prev = np.asarray(w_prev, dtype=np.float64)
+    r_arith = np.asarray(r_arith, dtype=np.float64)
+    if w_prev.shape != r_arith.shape:
+        raise ValueError("w_prev and r_arith must have matching shapes")
+
+    numer = w_prev * (1.0 + r_arith)
+    denom = float(numer.sum())
+    if denom <= eps:
+        denom = float(np.clip(w_prev.sum(), eps, None))
+        return (w_prev / denom).astype(np.float64)
+    w_post = numer / denom
+    return w_post.astype(np.float64)
+
+
+def turnover_rebalance_l1(w_target: np.ndarray, w_post: np.ndarray) -> float:
+    """Rebalance turnover: sum(|w_target - w_post|)."""
+    return float(turnover_l1(w_target, w_post))
+
+
 @dataclass
 class PortfolioMetrics:
     total_reward: float

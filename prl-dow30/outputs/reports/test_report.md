@@ -28,3 +28,35 @@
   - pytest: PASS
   - build_cache (paper.yaml): PASS (Option B manifest populated)
   - paper_gate offline: PASS (metrics/summary/models/logs/metadata present; turnover non-zero)
+
+## Test Report (Stage 3 Step 2 Smoke)
+
+- Commands run:
+  - `pytest -q` (45 passed)
+  - `python scripts/run_all.py --config configs/smoke.yaml --seeds 0 --offline` → FAILED (`python` not found)
+  - `PYTHONPATH=. python3 scripts/run_all.py --config configs/smoke.yaml --seeds 0 --offline` → SUCCESS (cache-only; no download logs)
+
+- Smoke outputs:
+  - `outputs/reports/metrics.csv` present
+  - metrics.csv rows:
+    - baseline avg_turnover=0.2139756441, total_turnover=11.3407091383
+    - prl avg_turnover=0.2311949085, total_turnover=12.2533301513
+  - `daily_rebalanced_equal_weight` row: NOT FOUND
+  - `buy_and_hold_equal_weight` row: NOT FOUND
+
+## Test Report (Stage 3 Step 3 Baselines)
+
+- Commands run:
+  - `pytest -q` (47 passed)
+  - `PYTHONPATH=. python scripts/run_all.py --config configs/smoke.yaml --seeds 0 --offline` → SUCCESS (cache-only; no download logs)
+
+- Smoke outputs:
+  - `outputs/reports/metrics.csv` present
+  - `outputs/reports/summary.csv` present
+  - `outputs/reports/regime_metrics.csv` present
+  - metrics.csv rows:
+    - baseline_sac avg_turnover=0.2139756441, total_turnover=11.3407091383
+    - prl_sac avg_turnover=0.2311949085, total_turnover=12.2533301513
+    - buy_and_hold_equal_weight avg_turnover=0.0, total_turnover=0.0
+    - daily_rebalanced_equal_weight avg_turnover=0.0092573079, total_turnover=0.5832103986
+    - inverse_vol_risk_parity avg_turnover=0.0789984104, total_turnover=4.9768998547

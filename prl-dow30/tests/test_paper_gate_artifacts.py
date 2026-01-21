@@ -141,7 +141,13 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
 
     metrics_df = pd.read_csv(metrics_path)
     assert {"avg_turnover", "total_turnover"}.issubset(metrics_df.columns)
-    assert set(metrics_df["model_type"]) == {"baseline", "prl"}
+    assert set(metrics_df["model_type"]) == {
+        "baseline_sac",
+        "prl_sac",
+        "buy_and_hold_equal_weight",
+        "daily_rebalanced_equal_weight",
+        "inverse_vol_risk_parity",
+    }
 
     summary_df = pd.read_csv(summary_path)
     assert "avg_turnover_mean" in summary_df.columns

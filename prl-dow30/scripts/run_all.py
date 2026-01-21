@@ -6,6 +6,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from prl.baselines import run_all_baselines
+from prl.data import slice_frame
 from prl.eval import load_model, run_backtest_episode
 from prl.train import (
     build_env_for_range,
@@ -76,7 +78,41 @@ def summarize_metrics(rows: list[dict]) -> list[dict]:
     return summary_rows
 
 
+def summarize_regime_metrics(rows: list[dict], regime: str = "all") -> list[dict]:
+    if not rows:
+        return []
+    df = pd.DataFrame(rows)
+    metric_cols = [
+        "total_reward",
+        "avg_reward",
+        "cumulative_return",
+        "avg_turnover",
+        "total_turnover",
+        "sharpe",
+        "max_drawdown",
+        "steps",
+    ]
+    regime_rows = []
+    for model_type, group in df.groupby("model_type"):
+        row = {"model_type": model_type, "regime": regime}
+        for col in metric_cols:
+            row[col] = float(group[col].mean())
+        regime_rows.append(row)
+    return regime_rows
+
+
 def write_summary(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = list(rows[0].keys())
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_regime_metrics(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -122,9 +158,17 @@ def main():
         raise ValueError("env.logit_scale is required for training/evaluation.")
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
+    returns_slice = slice_frame(market.returns, dates["test_start"], dates["test_end"])
+    vol_slice = slice_frame(features.volatility, dates["test_start"], dates["test_end"])
+    baseline_metrics = run_all_baselines(
+        returns_slice,
+        vol_slice,
+        transaction_cost=env_cfg["c_tc"],
+    )
+
     metrics_rows = []
-    for model_type in args.model_types:
-        for seed in seeds:
+    for seed in seeds:
+        for model_type in args.model_types:
             model_path = run_training(
                 config=cfg,
                 model_type=model_type,
@@ -155,9 +199,19 @@ def main():
 
             model = load_model(model_path, model_type, env, scheduler=scheduler)
             metrics = run_backtest_episode(model, env)
+            label = f"{model_type}_sac"
             metrics_rows.append(
                 {
-                    "model_type": model_type,
+                    "model_type": label,
+                    "seed": seed,
+                    **metrics.to_dict(),
+                }
+            )
+
+        for name, metrics in baseline_metrics.items():
+            metrics_rows.append(
+                {
+                    "model_type": name,
                     "seed": seed,
                     **metrics.to_dict(),
                 }
@@ -167,6 +221,8 @@ def main():
     write_metrics(reports_dir / "metrics.csv", metrics_rows)
     summary_rows = summarize_metrics(metrics_rows)
     write_summary(reports_dir / "summary.csv", summary_rows)
+    regime_rows = summarize_regime_metrics(metrics_rows)
+    write_regime_metrics(reports_dir / "regime_metrics.csv", regime_rows)
     print("Completed run_all workflow.")
 
 

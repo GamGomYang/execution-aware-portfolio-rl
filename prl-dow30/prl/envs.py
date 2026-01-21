@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from gymnasium import Env, spaces
 
-from .metrics import turnover_l1
+from .metrics import post_return_weights, turnover_l1, turnover_rebalance_l1
 
 
 def stable_softmax(logits: np.ndarray, scale: float = 1.0) -> np.ndarray:
@@ -98,8 +98,9 @@ class Dow30PortfolioEnv(Env):
         arithmetic_returns = np.expm1(returns_t)
         return float(np.dot(self.prev_weights, arithmetic_returns))
 
-    def _turnover(self, weights: np.ndarray) -> float:
-        return turnover_l1(self.prev_weights, weights)
+    def _turnover(self, weights: np.ndarray, arithmetic_returns: np.ndarray) -> float:
+        w_post = post_return_weights(self.prev_weights, arithmetic_returns)
+        return turnover_rebalance_l1(weights, w_post)
 
     def step(self, action: np.ndarray):
         z = np.clip(action, self.action_space.low, self.action_space.high)
@@ -109,11 +110,14 @@ class Dow30PortfolioEnv(Env):
             raise RuntimeError("Environment step beyond data length.")
 
         returns_t = self.returns.iloc[self.current_step].to_numpy(copy=False)
-        portfolio_return = self._portfolio_return(returns_t)
-        turnover = self._turnover(weights)
+        arithmetic_returns = np.expm1(returns_t)
+        assert self.prev_weights.shape == arithmetic_returns.shape == weights.shape == (self.num_assets,)
+        portfolio_return = float(np.dot(self.prev_weights, arithmetic_returns))
+        turnover = self._turnover(weights, arithmetic_returns)
+        cost = self.cfg.transaction_cost * turnover
 
         log_argument = max(1.0 + portfolio_return, self.cfg.log_clip)
-        reward = math.log(log_argument) - self.cfg.transaction_cost * turnover
+        reward = math.log(log_argument) - cost
 
         self.prev_weights = weights
         self.current_step += 1
@@ -124,6 +128,8 @@ class Dow30PortfolioEnv(Env):
         info = {
             "portfolio_return": portfolio_return,
             "turnover": turnover,
+            "turnover_rebalance": turnover,
+            "turnover_target_change": turnover_l1(weights, self.prev_weights),
             "log_argument": log_argument,
         }
         return obs, reward, terminated, truncated, info

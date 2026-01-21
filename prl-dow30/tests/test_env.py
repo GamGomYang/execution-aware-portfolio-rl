@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from prl.envs import Dow30PortfolioEnv, EnvConfig
+from prl.metrics import post_return_weights
 
 
 def build_toy_env(window_size: int = 2) -> Dow30PortfolioEnv:
@@ -63,7 +64,8 @@ def test_reward_uses_previous_weights_with_turnover_penalty():
     returns_t = env.returns.iloc[step_idx].to_numpy()
     arithmetic_returns = np.expm1(returns_t)
     portfolio_return = float(np.dot(old_weights, arithmetic_returns))
-    turnover = np.abs(new_weights - old_weights).sum()
+    w_post = post_return_weights(old_weights, arithmetic_returns)
+    turnover = np.abs(new_weights - w_post).sum()
     expected = math.log(max(1.0 + portfolio_return, env.cfg.log_clip)) - env.cfg.transaction_cost * turnover
 
     wrong_portfolio = float(np.dot(new_weights, arithmetic_returns))
@@ -74,11 +76,15 @@ def test_reward_uses_previous_weights_with_turnover_penalty():
     assert info["portfolio_return"] == pytest.approx(portfolio_return)
 
 
-def test_turnover_matches_half_l1_distance():
+def test_turnover_matches_rebalance_distance():
     env = build_toy_env()
     env.prev_weights = np.array([0.6, 0.4], dtype=np.float32)
     action = np.array([-2.0, 2.0], dtype=np.float32)
     _, _, _, _, info = env.step(action)
     new_weights = env.prev_weights
-    expected_turnover = np.abs(new_weights - np.array([0.6, 0.4], dtype=np.float32)).sum()
+    step_idx = env.current_step - 1
+    returns_t = env.returns.iloc[step_idx].to_numpy()
+    arithmetic_returns = np.expm1(returns_t)
+    w_post = post_return_weights(np.array([0.6, 0.4], dtype=np.float32), arithmetic_returns)
+    expected_turnover = np.abs(new_weights - w_post).sum()
     assert info["turnover"] == pytest.approx(expected_turnover)
