@@ -18,6 +18,7 @@ class PRLConfig:
     vol_std: float
     window_size: int
     num_assets: int
+    center_prob: bool = True
     emergency_mode: str = "clamp"
     emergency_vz_threshold: float = 2.0
 
@@ -63,7 +64,12 @@ class PRLAlphaScheduler:
         eps = 1e-8
         Vz = self._compute_vz(obs)
         P = th.sigmoid(self.cfg.lambdav * Vz + self.cfg.bias)
-        alpha_raw = self.cfg.alpha0 * (1 + self.cfg.beta * P)
+        if self.cfg.center_prob:
+            p0 = th.sigmoid(th.tensor(self.cfg.bias, dtype=P.dtype, device=P.device))
+            P_centered = P - p0
+        else:
+            P_centered = P
+        alpha_raw = self.cfg.alpha0 * (1 + self.cfg.beta * P_centered)
         alpha_clamped = th.clamp(alpha_raw, min=self.cfg.alpha_min, max=self.cfg.alpha_max)
 
         if self.cfg.emergency_mode == "vz":
@@ -74,9 +80,9 @@ class PRLAlphaScheduler:
             raise ValueError(f"Unknown emergency_mode: {self.cfg.emergency_mode}")
 
         beta_effective = th.zeros_like(P)
-        mask = P >= eps
+        mask = th.abs(P_centered) >= eps
         if mask.any():
-            beta_effective[mask] = (alpha_clamped[mask] / self.cfg.alpha0 - 1.0) / P[mask]
+            beta_effective[mask] = (alpha_clamped[mask] / self.cfg.alpha0 - 1.0) / P_centered[mask]
 
         if return_diagnostics:
             diagnostics = AlphaDiagnostics(

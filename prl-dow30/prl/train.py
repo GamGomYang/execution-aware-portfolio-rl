@@ -76,6 +76,7 @@ def create_scheduler(prl_cfg: Dict[str, float], window_size: int, num_assets: in
         bias=prl_cfg["bias"],
         alpha_min=prl_cfg["alpha_min"],
         alpha_max=prl_cfg["alpha_max"],
+        center_prob=prl_cfg.get("center_prob", True),
         emergency_mode=prl_cfg.get("emergency_mode", "clamp"),
         emergency_vz_threshold=prl_cfg.get("emergency_vz_threshold", 2.0),
         vol_mean=mean,

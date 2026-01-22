@@ -12,10 +12,10 @@ from prl.metrics import PortfolioMetrics
 from prl.train import _write_run_metadata
 
 
-def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
+def test_eval_dates_in_metadata(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cfg = {
-        "mode": "paper_gate",
+        "mode": "smoke",
         "dates": {
             "train_start": "2020-01-01",
             "train_end": "2020-01-10",
@@ -59,20 +59,20 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
             "total_timesteps": 5,
             "ent_coef": 0.2,
         },
-        "seeds": [0, 1],
+        "seeds": [0],
     }
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg))
 
-    dates = pd.date_range("2020-01-01", periods=6, freq="B")
-    market = MarketData(
-        prices=pd.DataFrame(1.0, index=dates, columns=["AAA", "BBB"]),
-        returns=pd.DataFrame(0.001, index=dates, columns=["AAA", "BBB"]),
-    )
+    dates = pd.date_range("2020-01-01", periods=5, freq="B")
+    returns = pd.DataFrame(0.0, index=dates, columns=["AAA", "BBB"])
+    volatility = pd.DataFrame(0.1, index=dates, columns=["AAA", "BBB"])
+    market = MarketData(prices=pd.DataFrame(1.0, index=dates, columns=["AAA", "BBB"]), returns=returns)
+
     stats_path = tmp_path / "stats.json"
     stats_path.write_text(json.dumps({"mean": 0.0, "std": 1.0}))
     features = VolatilityFeatures(
-        volatility=pd.DataFrame(0.02, index=dates, columns=["AAA", "BBB"]),
+        volatility=volatility,
         portfolio_scalar=pd.Series(0.0, index=dates),
         mean=0.0,
         std=1.0,
@@ -84,7 +84,7 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
 
     def _fake_run_training(*args, **kwargs):
         config = kwargs.get("config", cfg)
-        model_type = kwargs.get("model_type", "baseline")
+        model_type = kwargs.get("model_type", "prl")
         seed = kwargs.get("seed", 0)
         processed_dir = Path(config["data"]["processed_dir"])
         processed_dir.mkdir(parents=True, exist_ok=True)
@@ -104,7 +104,7 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
         log_dir = Path("outputs/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"train_{run_id}.csv"
-        log_path.write_text("schema_version,run_id,model_type,seed,timesteps\n1.1,run,baseline,0,1\n")
+        log_path.write_text("schema_version,run_id,model_type,seed,timesteps\n1.1,run,prl,0,1\n")
         _write_run_metadata(Path("outputs/reports"), config, seed, config.get("mode", ""), model_type, run_id, model_path, log_path)
         return model_path
 
@@ -120,55 +120,29 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
         return DummyEnv(returns=market.returns)
 
     def _fake_load_model(*args, **kwargs):
-        class DummyModel:
-            def predict(self, obs, deterministic=True):
-                return np.zeros((1, market.returns.shape[1])), None
+        return object()
 
-        return DummyModel()
+    eval_dates = list(dates[1:4])
 
     def _fake_run_backtest_episode_detailed(*args, **kwargs):
         metrics = PortfolioMetrics(
-            total_reward=0.1,
-            avg_reward=0.01,
-            cumulative_return=0.02,
-            avg_turnover=0.03,
-            total_turnover=0.3,
-            sharpe=0.5,
-            max_drawdown=-0.1,
-            steps=len(dates),
-        )
-        trace = {
-            "dates": list(dates),
-            "rewards": [0.01] * len(dates),
-            "portfolio_returns": [0.001] * len(dates),
-            "turnovers": [0.1] * len(dates),
-            "turnover_target_changes": [0.05] * len(dates),
-        }
-        return metrics, trace
-
-    def _fake_baselines(*args, **kwargs):
-        metrics = PortfolioMetrics(
-            total_reward=0.05,
-            avg_reward=0.005,
-            cumulative_return=0.01,
+            total_reward=0.3,
+            avg_reward=0.1,
+            cumulative_return=0.0,
             avg_turnover=0.0,
             total_turnover=0.0,
-            sharpe=0.1,
-            max_drawdown=-0.05,
-            steps=len(dates),
+            sharpe=0.0,
+            max_drawdown=0.0,
+            steps=len(eval_dates),
         )
         trace = {
-            "dates": list(dates),
-            "rewards": [0.0] * len(dates),
-            "portfolio_returns": [0.0] * len(dates),
-            "turnovers": [0.0] * len(dates),
-            "turnover_target_changes": [0.0] * len(dates),
+            "dates": eval_dates,
+            "rewards": [0.1] * len(eval_dates),
+            "portfolio_returns": [0.0] * len(eval_dates),
+            "turnovers": [0.0] * len(eval_dates),
+            "turnover_target_changes": [0.0] * len(eval_dates),
         }
-        return {
-            "buy_and_hold_equal_weight": (metrics, trace),
-            "daily_rebalanced_equal_weight": (metrics, trace),
-            "inverse_vol_risk_parity": (metrics, trace),
-        }
+        return metrics, trace
 
     monkeypatch.setattr("scripts.run_all.prepare_market_and_features", _fake_prepare_market_and_features)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
@@ -176,26 +150,27 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
     monkeypatch.setattr("prl.eval.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
-    monkeypatch.setattr("prl.eval.run_all_baselines_detailed", _fake_baselines)
 
     monkeypatch.setenv("PYTHONPATH", str(tmp_path))
     monkeypatch.setattr(
         "sys.argv",
-        ["run_all.py", "--config", str(cfg_path), "--seeds", "0", "1", "--model-types", "baseline", "prl", "--offline"],
+        ["run_all.py", "--config", str(cfg_path), "--seeds", "0", "--model-types", "prl", "--offline"],
     )
 
     from scripts import run_all as run_all_script
 
     run_all_script.main()
 
-    metrics_path = Path("outputs/reports/metrics.csv")
-    assert metrics_path.exists()
-    metrics_df = pd.read_csv(metrics_path)
-    rl_rows = metrics_df[metrics_df["model_type"].isin(["baseline_sac", "prl_sac"])]
-    assert len(rl_rows) == 4
-
-    assert Path("outputs/reports/summary_seed_stats.csv").exists()
-
-    for run_id in rl_rows["run_id"].unique():
-        assert (Path("outputs/reports") / f"trace_{run_id}.parquet").exists()
-        assert (Path("outputs/reports") / f"regime_thresholds_{run_id}.json").exists()
+    run_id = "runid_prl_seed0"
+    meta_path = Path("outputs/reports") / f"run_metadata_{run_id}.json"
+    assert meta_path.exists()
+    data = json.loads(meta_path.read_text())
+    expected_start = eval_dates[0].date().isoformat()
+    expected_end = eval_dates[-1].date().isoformat()
+    assert data["eval_start_date"] == expected_start
+    assert data["eval_end_date"] == expected_end
+    assert data["eval_num_days"] == len(eval_dates)
+    evaluation = data.get("evaluation", {})
+    assert evaluation.get("eval_start_date") == expected_start
+    assert evaluation.get("eval_end_date") == expected_end
+    assert evaluation.get("eval_num_days") == len(eval_dates)

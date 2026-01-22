@@ -9,11 +9,16 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from prl.baselines import run_all_baselines_detailed
 from prl.data import slice_frame
-from prl.eval import assert_env_compatible, load_model, run_backtest_episode_detailed
+from prl.eval import (
+    assert_env_compatible,
+    compute_regime_labels,
+    eval_model_to_trace,
+    eval_strategies_to_trace,
+    load_model,
+    summarize_regime_metrics,
+)
 from prl.features import load_vol_stats
-from prl.metrics import compute_metrics
 from prl.train import (
     build_env_for_range,
     create_scheduler,
@@ -43,6 +48,7 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
         "run_id",
+        "eval_id",
         "model_type",
         "seed",
         "period",
@@ -162,33 +168,32 @@ def _compute_vz_series(volatility: pd.DataFrame, stats_path: Path) -> pd.Series:
     return vz.astype(np.float64)
 
 
-def _assign_regime(vz: pd.Series, q33: float, q66: float) -> pd.Series:
-    regimes = pd.Series(index=vz.index, dtype="object")
-    regimes[vz < q33] = "low"
-    regimes[(vz >= q33) & (vz < q66)] = "mid"
-    regimes[vz >= q66] = "high"
-    return regimes
+def _eval_window_from_trace(trace_df: pd.DataFrame) -> tuple[pd.Timestamp, pd.Timestamp, int]:
+    if trace_df.empty or "date" not in trace_df.columns:
+        raise ValueError("TRACE_DATES_MISSING")
+    dates = pd.to_datetime(trace_df["date"])
+    eval_start = dates.min()
+    eval_end = dates.max()
+    eval_num_days = int(dates.nunique())
+    return eval_start, eval_end, eval_num_days
 
 
-def _build_trace_df(run_id: str, model_type: str, seed: int, trace: dict) -> pd.DataFrame:
-    turnover_target_changes = trace.get("turnover_target_changes")
-    dates = trace.get("dates", [])
-    if turnover_target_changes is None or not turnover_target_changes:
-        turnover_target_changes = [np.nan] * len(dates)
-    df = pd.DataFrame(
-        {
-            "date": dates,
-            "portfolio_return": trace.get("portfolio_returns", []),
-            "reward": trace.get("rewards", []),
-            "turnover": trace.get("turnovers", []),
-            "turnover_target_change": turnover_target_changes,
-        }
-    )
-    df["run_id"] = run_id
-    df["model_type"] = model_type
-    df["seed"] = seed
-    df["date"] = pd.to_datetime(df["date"])
-    return df
+def _build_thresholds(
+    vz_series: pd.Series,
+    *,
+    eval_start: pd.Timestamp,
+    eval_end: pd.Timestamp,
+    eval_num_days: int,
+) -> dict:
+    q33, q66 = np.quantile(vz_series.values, [1.0 / 3.0, 2.0 / 3.0])
+    return {
+        "q33": float(q33),
+        "q66": float(q66),
+        "regime_policy": "Vz quantile split on aligned eval window",
+        "eval_start_date": eval_start.date().isoformat(),
+        "eval_end_date": eval_end.date().isoformat(),
+        "eval_num_days": int(eval_num_days),
+    }
 
 
 def _load_run_metadata(run_id: str, reports_dir: Path) -> dict | None:
@@ -204,42 +209,6 @@ def _update_run_metadata(path: Path, updates: dict) -> None:
     data = json.loads(path.read_text())
     data.update(updates)
     path.write_text(json.dumps(data, indent=2))
-
-
-def _regime_metrics_from_trace(trace_df: pd.DataFrame, run_id: str, seed: int, include_all: bool = True) -> list[dict]:
-    rows: list[dict] = []
-    for model_type, group in trace_df.groupby("model_type"):
-        for regime, regime_group in group.groupby("regime"):
-            metrics = compute_metrics(
-                regime_group["reward"].tolist(),
-                regime_group["portfolio_return"].tolist(),
-                regime_group["turnover"].tolist(),
-            )
-            rows.append(
-                {
-                    "run_id": run_id,
-                    "model_type": model_type,
-                    "seed": seed,
-                    "regime": regime,
-                    **metrics.to_dict(),
-                }
-            )
-        if include_all:
-            metrics = compute_metrics(
-                group["reward"].tolist(),
-                group["portfolio_return"].tolist(),
-                group["turnover"].tolist(),
-            )
-            rows.append(
-                {
-                    "run_id": run_id,
-                    "model_type": model_type,
-                    "seed": seed,
-                    "regime": "all",
-                    **metrics.to_dict(),
-                }
-            )
-    return rows
 
 
 def main():
@@ -281,24 +250,14 @@ def main():
     returns_slice = slice_frame(market.returns, dates["test_start"], dates["test_end"])
     vol_slice = slice_frame(features.volatility, dates["test_start"], dates["test_end"])
     returns_slice, vol_slice = _align_returns_vol(returns_slice, vol_slice)
-    vz_series = _compute_vz_series(vol_slice, features.stats_path)
-    q33, q66 = np.quantile(vz_series.values, [1.0 / 3.0, 2.0 / 3.0])
-    regime_series = _assign_regime(vz_series, q33, q66)
-    regime_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values, "regime": regime_series.values})
-
-    baseline_results = run_all_baselines_detailed(
-        returns_slice,
-        vol_slice,
-        transaction_cost=env_cfg["c_tc"],
-    )
 
     metrics_rows: list[dict] = []
     regime_rows: list[dict] = []
     reports_dir = Path("outputs/reports")
     reports_dir.mkdir(parents=True, exist_ok=True)
     for seed in seeds:
-        baseline_meta = None
-        baseline_run_id = None
+        baseline_strategy_run_id = f"baseline_strategies_seed{seed}"
+        baseline_emitted = False
         meta_by_type: dict[str, dict] = {}
         for model_type in args.model_types:
             model_path = run_training(
@@ -333,26 +292,46 @@ def main():
             run_id = model_path.stem
             if run_id.endswith("_final"):
                 run_id = run_id[: -len("_final")]
+            eval_id = run_id
             meta = _load_run_metadata(run_id, reports_dir)
             if meta is None:
                 raise ValueError(f"RUN_METADATA_NOT_FOUND for run_id={run_id}")
             assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
             meta_by_type[model_type] = meta
             model = load_model(model_path, model_type, env, scheduler=scheduler)
-            metrics, trace = run_backtest_episode_detailed(model, env)
+            metrics, trace_df = eval_model_to_trace(
+                model,
+                env,
+                eval_id=eval_id,
+                run_id=run_id,
+                model_type=label,
+                seed=seed,
+            )
             metrics_row_id = len(metrics_rows)
             metrics_rows.append(
                 {
                     "run_id": run_id,
+                    "eval_id": eval_id,
                     "model_type": label,
                     "seed": seed,
                     "period": "test",
                     **metrics.to_dict(),
                 }
             )
-            if model_type == "baseline":
-                baseline_meta = meta
-                baseline_run_id = run_id
+            eval_start, eval_end, eval_num_days = _eval_window_from_trace(trace_df)
+            aligned_returns = slice_frame(returns_slice, eval_start, eval_end)
+            aligned_vol = slice_frame(vol_slice, eval_start, eval_end)
+            aligned_returns, aligned_vol = _align_returns_vol(aligned_returns, aligned_vol)
+            vz_series = _compute_vz_series(aligned_vol, features.stats_path)
+            thresholds = _build_thresholds(
+                vz_series,
+                eval_start=eval_start,
+                eval_end=eval_end,
+                eval_num_days=eval_num_days,
+            )
+            vz_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values})
+            trace_df = trace_df.merge(vz_df, on="date", how="left")
+            trace_df = compute_regime_labels(trace_df, thresholds)
             if "baseline" in meta_by_type and "prl" in meta_by_type:
                 base_meta = meta_by_type["baseline"]
                 prl_meta = meta_by_type["prl"]
@@ -361,49 +340,63 @@ def main():
                 if base_meta.get("env_signature_hash") != prl_meta.get("env_signature_hash"):
                     raise ValueError("ENV_SIGNATURE_HASH_MISMATCH")
 
-            trace_frames = [_build_trace_df(run_id, label, seed, trace)]
-            for name, (_, base_trace) in baseline_results.items():
-                trace_frames.append(_build_trace_df(run_id, name, seed, base_trace))
-
-            trace_df = pd.concat(trace_frames, ignore_index=True)
-            trace_df = trace_df.merge(regime_df, on="date", how="left")
-            trace_df = trace_df.dropna(subset=["regime"])
-            trace_df["regime_label"] = trace_df["regime"]
+            include_baselines = False
+            if not baseline_emitted:
+                if model_type == "prl":
+                    include_baselines = True
+                elif model_type == "baseline" and "prl" not in args.model_types:
+                    include_baselines = True
+            if include_baselines:
+                baseline_emitted = True
+                strategy_metrics, strategy_trace_df = eval_strategies_to_trace(
+                    aligned_returns,
+                    aligned_vol,
+                    transaction_cost=env_cfg["c_tc"],
+                    eval_id=eval_id,
+                    run_id=baseline_strategy_run_id,
+                    seed=seed,
+                )
+                strategy_trace_df = strategy_trace_df.merge(vz_df, on="date", how="left")
+                strategy_trace_df = compute_regime_labels(strategy_trace_df, thresholds)
+                strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}.parquet"
+                strategy_trace_df.to_parquet(strategy_trace_path, index=False)
+                regime_rows.extend(summarize_regime_metrics(strategy_trace_df, period="test"))
+                for name, base_metrics in strategy_metrics.items():
+                    metrics_rows.append(
+                        {
+                            "run_id": baseline_strategy_run_id,
+                            "eval_id": eval_id,
+                            "model_type": name,
+                            "seed": seed,
+                            "period": "test",
+                            **base_metrics.to_dict(),
+                        }
+                    )
 
             trace_path = reports_dir / f"trace_{run_id}.parquet"
             trace_df.to_parquet(trace_path, index=False)
 
-            thresholds = {
-                "q33": float(q33),
-                "q66": float(q66),
-                "regime_policy": "Vz quantile split on test period",
-            }
             thresholds_path = reports_dir / f"regime_thresholds_{run_id}.json"
             thresholds_path.write_text(json.dumps(thresholds, indent=2))
 
-            regime_rows.extend(_regime_metrics_from_trace(trace_df, run_id, seed))
+            regime_rows.extend(summarize_regime_metrics(trace_df, period="test"))
+            eval_info = {
+                "eval_start_date": thresholds["eval_start_date"],
+                "eval_end_date": thresholds["eval_end_date"],
+                "eval_num_days": thresholds["eval_num_days"],
+            }
             _update_run_metadata(
                 reports_dir / f"run_metadata_{run_id}.json",
                 {
+                    **eval_info,
                     "evaluation": {
                         "trace_path": str(trace_path),
                         "regime_thresholds_path": str(thresholds_path),
                         "metrics_row_id": metrics_row_id,
                         "completed_at": datetime.now(timezone.utc).isoformat(),
+                        **eval_info,
                     }
                 },
-            )
-
-        baseline_run_id = baseline_run_id or f"baseline_strategies_seed{seed}"
-        for name, (base_metrics, _) in baseline_results.items():
-            metrics_rows.append(
-                {
-                    "run_id": baseline_run_id,
-                    "model_type": name,
-                    "seed": seed,
-                    "period": "test",
-                    **base_metrics.to_dict(),
-                }
             )
 
     write_metrics(reports_dir / "metrics.csv", metrics_rows)

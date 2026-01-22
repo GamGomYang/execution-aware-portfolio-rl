@@ -144,7 +144,7 @@ def test_run_all_writes_metrics_csv(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
     monkeypatch.setattr("scripts.run_all.build_env_for_range", _fake_build_env_for_range)
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
-    monkeypatch.setattr("scripts.run_all.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
+    monkeypatch.setattr("prl.eval.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
 
     monkeypatch.setenv("PYTHONPATH", str(tmp_path))

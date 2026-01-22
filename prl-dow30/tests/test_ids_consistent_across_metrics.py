@@ -6,16 +6,17 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from prl.baselines import BASELINE_NAMES
 from prl.data import MarketData
 from prl.features import VolatilityFeatures
 from prl.metrics import PortfolioMetrics
 from prl.train import _write_run_metadata
 
 
-def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
+def test_ids_consistent_across_metrics(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cfg = {
-        "mode": "paper_gate",
+        "mode": "smoke",
         "dates": {
             "train_start": "2020-01-01",
             "train_end": "2020-01-10",
@@ -59,20 +60,26 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
             "total_timesteps": 5,
             "ent_coef": 0.2,
         },
-        "seeds": [0, 1],
+        "seeds": [0],
     }
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg))
 
     dates = pd.date_range("2020-01-01", periods=6, freq="B")
-    market = MarketData(
-        prices=pd.DataFrame(1.0, index=dates, columns=["AAA", "BBB"]),
-        returns=pd.DataFrame(0.001, index=dates, columns=["AAA", "BBB"]),
+    log_returns = np.zeros((6, 2), dtype=np.float64)
+    returns = pd.DataFrame(log_returns, index=dates, columns=["AAA", "BBB"])
+    vol_values = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=np.float64)
+    volatility = pd.DataFrame(
+        np.column_stack([vol_values, vol_values]),
+        index=dates,
+        columns=["AAA", "BBB"],
     )
+    market = MarketData(prices=pd.DataFrame(1.0, index=dates, columns=["AAA", "BBB"]), returns=returns)
+
     stats_path = tmp_path / "stats.json"
     stats_path.write_text(json.dumps({"mean": 0.0, "std": 1.0}))
     features = VolatilityFeatures(
-        volatility=pd.DataFrame(0.02, index=dates, columns=["AAA", "BBB"]),
+        volatility=volatility,
         portfolio_scalar=pd.Series(0.0, index=dates),
         mean=0.0,
         std=1.0,
@@ -120,11 +127,7 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
         return DummyEnv(returns=market.returns)
 
     def _fake_load_model(*args, **kwargs):
-        class DummyModel:
-            def predict(self, obs, deterministic=True):
-                return np.zeros((1, market.returns.shape[1])), None
-
-        return DummyModel()
+        return object()
 
     def _fake_run_backtest_episode_detailed(*args, **kwargs):
         metrics = PortfolioMetrics(
@@ -162,13 +165,8 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
             "rewards": [0.0] * len(dates),
             "portfolio_returns": [0.0] * len(dates),
             "turnovers": [0.0] * len(dates),
-            "turnover_target_changes": [0.0] * len(dates),
         }
-        return {
-            "buy_and_hold_equal_weight": (metrics, trace),
-            "daily_rebalanced_equal_weight": (metrics, trace),
-            "inverse_vol_risk_parity": (metrics, trace),
-        }
+        return {name: (metrics, trace) for name in BASELINE_NAMES}
 
     monkeypatch.setattr("scripts.run_all.prepare_market_and_features", _fake_prepare_market_and_features)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
@@ -181,21 +179,29 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
     monkeypatch.setenv("PYTHONPATH", str(tmp_path))
     monkeypatch.setattr(
         "sys.argv",
-        ["run_all.py", "--config", str(cfg_path), "--seeds", "0", "1", "--model-types", "baseline", "prl", "--offline"],
+        ["run_all.py", "--config", str(cfg_path), "--seeds", "0", "--model-types", "baseline", "prl", "--offline"],
     )
 
     from scripts import run_all as run_all_script
 
     run_all_script.main()
 
-    metrics_path = Path("outputs/reports/metrics.csv")
-    assert metrics_path.exists()
-    metrics_df = pd.read_csv(metrics_path)
-    rl_rows = metrics_df[metrics_df["model_type"].isin(["baseline_sac", "prl_sac"])]
-    assert len(rl_rows) == 4
+    metrics_df = pd.read_csv("outputs/reports/metrics.csv")
+    regime_df = pd.read_csv("outputs/reports/regime_metrics.csv")
+    baseline_run_id = "baseline_strategies_seed0"
+    baseline_metrics = metrics_df[metrics_df["model_type"].isin(BASELINE_NAMES)]
+    baseline_regime = regime_df[regime_df["model_type"].isin(BASELINE_NAMES)]
 
-    assert Path("outputs/reports/summary_seed_stats.csv").exists()
+    assert not baseline_metrics.empty
+    assert not baseline_regime.empty
+    assert set(baseline_metrics["run_id"]) == {baseline_run_id}
+    assert set(baseline_regime["run_id"]) == {baseline_run_id}
 
-    for run_id in rl_rows["run_id"].unique():
-        assert (Path("outputs/reports") / f"trace_{run_id}.parquet").exists()
-        assert (Path("outputs/reports") / f"regime_thresholds_{run_id}.json").exists()
+    if "period" in baseline_regime.columns:
+        merged = baseline_regime.merge(
+            baseline_metrics[["run_id", "model_type", "seed", "period"]],
+            on=["run_id", "model_type", "seed", "period"],
+            how="left",
+            indicator=True,
+        )
+        assert (merged["_merge"] == "both").all()

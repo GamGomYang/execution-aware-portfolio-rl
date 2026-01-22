@@ -3,9 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import numpy as np
+import pandas as pd
 from stable_baselines3 import SAC
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+from .baselines import run_all_baselines_detailed
 from .metrics import PortfolioMetrics, compute_metrics
 from .prl import PRLAlphaScheduler
 from .sb3_prl_sac import PRLSAC
@@ -106,3 +109,159 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
 def run_backtest_episode(model, env: DummyVecEnv) -> PortfolioMetrics:
     metrics, _ = run_backtest_episode_detailed(model, env)
     return metrics
+
+
+def trace_dict_to_frame(
+    trace: Dict[str, List[float]],
+    *,
+    eval_id: str,
+    run_id: str,
+    model_type: str,
+    seed: int,
+) -> pd.DataFrame:
+    turnover_target_changes = trace.get("turnover_target_changes")
+    dates = trace.get("dates", [])
+    if turnover_target_changes is None or not turnover_target_changes:
+        turnover_target_changes = [np.nan] * len(dates)
+    df = pd.DataFrame(
+        {
+            "date": dates,
+            "portfolio_return": trace.get("portfolio_returns", []),
+            "reward": trace.get("rewards", []),
+            "turnover": trace.get("turnovers", []),
+            "turnover_target_change": turnover_target_changes,
+        }
+    )
+    df["eval_id"] = eval_id
+    df["run_id"] = run_id
+    df["model_type"] = model_type
+    df["seed"] = seed
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
+def eval_model_to_trace(
+    model,
+    env: DummyVecEnv,
+    *,
+    eval_id: str,
+    run_id: str,
+    model_type: str,
+    seed: int,
+) -> Tuple[PortfolioMetrics, pd.DataFrame]:
+    metrics, trace = run_backtest_episode_detailed(model, env)
+    trace_df = trace_dict_to_frame(
+        trace,
+        eval_id=eval_id,
+        run_id=run_id,
+        model_type=model_type,
+        seed=seed,
+    )
+    return metrics, trace_df
+
+
+def eval_strategies_to_trace(
+    returns: pd.DataFrame,
+    volatility: pd.DataFrame,
+    *,
+    transaction_cost: float,
+    eval_id: str,
+    run_id: str,
+    seed: int,
+) -> Tuple[Dict[str, PortfolioMetrics], pd.DataFrame]:
+    results = run_all_baselines_detailed(
+        returns,
+        volatility,
+        transaction_cost=transaction_cost,
+    )
+    frames = []
+    metrics_by_name: Dict[str, PortfolioMetrics] = {}
+    for name, (metrics, trace) in results.items():
+        metrics_by_name[name] = metrics
+        frames.append(
+            trace_dict_to_frame(
+                trace,
+                eval_id=eval_id,
+                run_id=run_id,
+                model_type=name,
+                seed=seed,
+            )
+        )
+    trace_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    return metrics_by_name, trace_df
+
+
+def compute_regime_labels(trace_df: pd.DataFrame, thresholds: Dict[str, float]) -> pd.DataFrame:
+    if trace_df.empty:
+        return trace_df
+    if "vz" not in trace_df.columns:
+        raise ValueError("REGIME_LABELS_MISSING_VZ")
+    q33 = float(thresholds["q33"])
+    q66 = float(thresholds["q66"])
+    df = trace_df.copy()
+    regimes = pd.Series(index=df.index, dtype="object")
+    vz = df["vz"].astype(float)
+    regimes[vz < q33] = "low"
+    regimes[(vz >= q33) & (vz < q66)] = "mid"
+    regimes[vz >= q66] = "high"
+    df["regime"] = regimes
+    df["regime_label"] = df["regime"]
+    df = df.dropna(subset=["regime"])
+    return df
+
+
+def summarize_regime_metrics(
+    trace_df: pd.DataFrame,
+    *,
+    period: str = "test",
+    include_all: bool = True,
+) -> List[Dict]:
+    rows: List[Dict] = []
+    if trace_df.empty:
+        return rows
+    has_eval_id = "eval_id" in trace_df.columns
+    group_cols = ["run_id", "model_type", "seed"]
+    if has_eval_id:
+        group_cols = ["eval_id"] + group_cols
+    for group_keys, group in trace_df.groupby(group_cols):
+        if has_eval_id:
+            eval_id, run_id, model_type, seed = group_keys
+        else:
+            eval_id = None
+            run_id, model_type, seed = group_keys
+        seed_val = int(seed)
+        for regime, regime_group in group.groupby("regime"):
+            metrics = compute_metrics(
+                regime_group["reward"].tolist(),
+                regime_group["portfolio_return"].tolist(),
+                regime_group["turnover"].tolist(),
+            )
+            row = {
+                "run_id": run_id,
+                "model_type": model_type,
+                "seed": seed_val,
+                "regime": regime,
+                "period": period,
+                **metrics.to_dict(),
+            }
+            if has_eval_id:
+                row["eval_id"] = eval_id
+            rows.append(row)
+        if include_all:
+            metrics = compute_metrics(
+                group["reward"].tolist(),
+                group["portfolio_return"].tolist(),
+                group["turnover"].tolist(),
+            )
+            row = {
+                "run_id": run_id,
+                "model_type": model_type,
+                "seed": seed_val,
+                "regime": "all",
+                "period": period,
+                **metrics.to_dict(),
+            }
+            if has_eval_id:
+                row["eval_id"] = eval_id
+            rows.append(row)
+    return rows

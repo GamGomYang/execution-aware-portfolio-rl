@@ -67,7 +67,8 @@ prl:
   alpha0: 0.2
   beta: 1.0
   lambdav: 2.0
-  bias: 0.0
+  bias: -2.0
+  center_prob: true
   alpha_min: 0.01
   alpha_max: 1.0
 

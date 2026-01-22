@@ -24,6 +24,7 @@ def write_metrics(path: Path, row: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
         "run_id",
+        "eval_id",
         "model_type",
         "seed",
         "period",
@@ -151,6 +152,7 @@ def main():
         run_id = run_id[: -len("_final")]
     row = {
         "run_id": run_id,
+        "eval_id": run_id,
         "model_type": args.model_type,
         "seed": args.seed,
         "period": "test",

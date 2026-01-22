@@ -6,16 +6,17 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from prl.baselines import BASELINE_NAMES
 from prl.data import MarketData
 from prl.features import VolatilityFeatures
 from prl.metrics import PortfolioMetrics
 from prl.train import _write_run_metadata
 
 
-def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
+def test_eval_period_alignment(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cfg = {
-        "mode": "paper_gate",
+        "mode": "smoke",
         "dates": {
             "train_start": "2020-01-01",
             "train_end": "2020-01-10",
@@ -59,20 +60,20 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
             "total_timesteps": 5,
             "ent_coef": 0.2,
         },
-        "seeds": [0, 1],
+        "seeds": [0],
     }
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg))
 
-    dates = pd.date_range("2020-01-01", periods=6, freq="B")
-    market = MarketData(
-        prices=pd.DataFrame(1.0, index=dates, columns=["AAA", "BBB"]),
-        returns=pd.DataFrame(0.001, index=dates, columns=["AAA", "BBB"]),
-    )
+    dates = pd.date_range("2020-01-01", periods=5, freq="B")
+    returns = pd.DataFrame(0.0, index=dates, columns=["AAA", "BBB"])
+    volatility = pd.DataFrame(0.1, index=dates, columns=["AAA", "BBB"])
+    market = MarketData(prices=pd.DataFrame(1.0, index=dates, columns=["AAA", "BBB"]), returns=returns)
+
     stats_path = tmp_path / "stats.json"
     stats_path.write_text(json.dumps({"mean": 0.0, "std": 1.0}))
     features = VolatilityFeatures(
-        volatility=pd.DataFrame(0.02, index=dates, columns=["AAA", "BBB"]),
+        volatility=volatility,
         portfolio_scalar=pd.Series(0.0, index=dates),
         mean=0.0,
         std=1.0,
@@ -120,55 +121,29 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
         return DummyEnv(returns=market.returns)
 
     def _fake_load_model(*args, **kwargs):
-        class DummyModel:
-            def predict(self, obs, deterministic=True):
-                return np.zeros((1, market.returns.shape[1])), None
+        return object()
 
-        return DummyModel()
+    short_dates = list(dates[:3])
 
     def _fake_run_backtest_episode_detailed(*args, **kwargs):
         metrics = PortfolioMetrics(
-            total_reward=0.1,
-            avg_reward=0.01,
-            cumulative_return=0.02,
-            avg_turnover=0.03,
-            total_turnover=0.3,
-            sharpe=0.5,
-            max_drawdown=-0.1,
-            steps=len(dates),
-        )
-        trace = {
-            "dates": list(dates),
-            "rewards": [0.01] * len(dates),
-            "portfolio_returns": [0.001] * len(dates),
-            "turnovers": [0.1] * len(dates),
-            "turnover_target_changes": [0.05] * len(dates),
-        }
-        return metrics, trace
-
-    def _fake_baselines(*args, **kwargs):
-        metrics = PortfolioMetrics(
-            total_reward=0.05,
-            avg_reward=0.005,
-            cumulative_return=0.01,
+            total_reward=0.3,
+            avg_reward=0.1,
+            cumulative_return=0.0,
             avg_turnover=0.0,
             total_turnover=0.0,
-            sharpe=0.1,
-            max_drawdown=-0.05,
-            steps=len(dates),
+            sharpe=0.0,
+            max_drawdown=0.0,
+            steps=len(short_dates),
         )
         trace = {
-            "dates": list(dates),
-            "rewards": [0.0] * len(dates),
-            "portfolio_returns": [0.0] * len(dates),
-            "turnovers": [0.0] * len(dates),
-            "turnover_target_changes": [0.0] * len(dates),
+            "dates": short_dates,
+            "rewards": [0.1] * len(short_dates),
+            "portfolio_returns": [0.0] * len(short_dates),
+            "turnovers": [0.0] * len(short_dates),
+            "turnover_target_changes": [0.0] * len(short_dates),
         }
-        return {
-            "buy_and_hold_equal_weight": (metrics, trace),
-            "daily_rebalanced_equal_weight": (metrics, trace),
-            "inverse_vol_risk_parity": (metrics, trace),
-        }
+        return metrics, trace
 
     monkeypatch.setattr("scripts.run_all.prepare_market_and_features", _fake_prepare_market_and_features)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
@@ -176,26 +151,18 @@ def test_run_all_multiseed_generates_artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
     monkeypatch.setattr("prl.eval.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
-    monkeypatch.setattr("prl.eval.run_all_baselines_detailed", _fake_baselines)
 
     monkeypatch.setenv("PYTHONPATH", str(tmp_path))
     monkeypatch.setattr(
         "sys.argv",
-        ["run_all.py", "--config", str(cfg_path), "--seeds", "0", "1", "--model-types", "baseline", "prl", "--offline"],
+        ["run_all.py", "--config", str(cfg_path), "--seeds", "0", "--model-types", "baseline", "prl", "--offline"],
     )
 
     from scripts import run_all as run_all_script
 
     run_all_script.main()
 
-    metrics_path = Path("outputs/reports/metrics.csv")
-    assert metrics_path.exists()
-    metrics_df = pd.read_csv(metrics_path)
-    rl_rows = metrics_df[metrics_df["model_type"].isin(["baseline_sac", "prl_sac"])]
-    assert len(rl_rows) == 4
-
-    assert Path("outputs/reports/summary_seed_stats.csv").exists()
-
-    for run_id in rl_rows["run_id"].unique():
-        assert (Path("outputs/reports") / f"trace_{run_id}.parquet").exists()
-        assert (Path("outputs/reports") / f"regime_thresholds_{run_id}.json").exists()
+    metrics_df = pd.read_csv("outputs/reports/metrics.csv")
+    baseline_df = metrics_df[metrics_df["model_type"].isin(BASELINE_NAMES)]
+    assert not baseline_df.empty
+    assert set(baseline_df["steps"]) == {len(short_dates)}

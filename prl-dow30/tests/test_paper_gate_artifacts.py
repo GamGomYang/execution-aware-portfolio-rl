@@ -161,7 +161,7 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.run_all.create_scheduler", lambda *args, **kwargs: None)
     monkeypatch.setattr("scripts.run_all.run_training", _fake_run_training)
     monkeypatch.setattr("scripts.run_all.load_model", _fake_load_model)
-    monkeypatch.setattr("scripts.run_all.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
+    monkeypatch.setattr("prl.eval.run_backtest_episode_detailed", _fake_run_backtest_episode_detailed)
 
     import scripts.run_all as run_all
 

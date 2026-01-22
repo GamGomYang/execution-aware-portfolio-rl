@@ -70,6 +70,7 @@ def patch_train(monkeypatch):
 def test_run_metadata_written(tmp_path, monkeypatch):
     from prl.train import run_training
 
+    monkeypatch.chdir(tmp_path)
     cfg = {
         "mode": "smoke",
         "dates": {
