@@ -161,3 +161,12 @@ def test_run_all_writes_metrics_csv(tmp_path, monkeypatch):
     assert metrics_path.exists()
     df = pd.read_csv(metrics_path)
     assert len(df) >= 2
+    expected_net_cols = {
+        "cumulative_return_net_exp",
+        "cumulative_return_net_lin",
+        "sharpe_net_exp",
+        "sharpe_net_lin",
+        "max_drawdown_net_exp",
+        "max_drawdown_net_lin",
+    }
+    assert expected_net_cols.issubset(set(df.columns))

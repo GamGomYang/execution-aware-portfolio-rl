@@ -127,8 +127,12 @@ def _plot_equity_curve(trace_df: pd.DataFrame, fig_path: Path) -> None:
         return
     returns = trace_df["portfolio_return"].fillna(0.0).to_numpy()
     equity = np.cumprod(1.0 + returns)
+    net_returns = trace_df["net_return_exp"].fillna(0.0).to_numpy() if "net_return_exp" in trace_df.columns else None
+    equity_net = np.cumprod(1.0 + net_returns) if net_returns is not None else None
     fig, ax = plt.subplots(figsize=(7, 4))
-    ax.plot(trace_df["date"], equity, label="equity")
+    ax.plot(trace_df["date"], equity, label="equity_gross")
+    if equity_net is not None:
+        ax.plot(trace_df["date"], equity_net, label="equity_net_exp", linestyle="--")
     ax.set_xlabel("date")
     ax.set_ylabel("equity")
     ax.legend()
@@ -143,11 +147,16 @@ def _plot_equity_by_regime(trace_df: pd.DataFrame, fig_path: Path) -> None:
         return
     fig, ax = plt.subplots(figsize=(7, 4))
     returns = trace_df["portfolio_return"].fillna(0.0).to_numpy()
+    net_returns = trace_df["net_return_exp"].fillna(0.0).to_numpy() if "net_return_exp" in trace_df.columns else None
     for regime in ["low", "mid", "high"]:
         mask = trace_df["regime"] == regime
         masked_returns = np.where(mask, returns, 0.0)
         equity = np.cumprod(1.0 + masked_returns)
-        ax.plot(trace_df["date"], equity, label=regime)
+        ax.plot(trace_df["date"], equity, label=f"{regime} gross")
+        if net_returns is not None:
+            masked_net = np.where(mask, net_returns, 0.0)
+            equity_net = np.cumprod(1.0 + masked_net)
+            ax.plot(trace_df["date"], equity_net, linestyle="--", label=f"{regime} net_exp")
     ax.set_xlabel("date")
     ax.set_ylabel("equity")
     ax.legend()
@@ -183,7 +192,19 @@ def _last_value(series: pd.Series) -> float | None:
 def _render_regime_table(regime_df: pd.DataFrame) -> str:
     if regime_df is None or regime_df.empty:
         return "No regime metrics available."
-    cols = ["regime", "cumulative_return", "sharpe", "max_drawdown", "avg_turnover", "total_reward"]
+    net_cols = [
+        col
+        for col in [
+            "cumulative_return_net_exp",
+            "cumulative_return_net_lin",
+            "sharpe_net_exp",
+            "sharpe_net_lin",
+            "max_drawdown_net_exp",
+            "max_drawdown_net_lin",
+        ]
+        if col in regime_df.columns
+    ]
+    cols = ["regime", "cumulative_return", "sharpe", "max_drawdown", "avg_turnover", "total_reward"] + net_cols
     header = "| " + " | ".join(cols) + " |"
     sep = "|" + "|".join(["---"] * len(cols)) + "|"
     lines = [header, sep]
@@ -198,6 +219,7 @@ def _render_regime_table(regime_df: pd.DataFrame) -> str:
                     f"{row.get('max_drawdown', 0.0):.6f}",
                     f"{row.get('avg_turnover', 0.0):.6f}",
                     f"{row.get('total_reward', 0.0):.6f}",
+                    *[f"{row.get(col, 0.0):.6f}" for col in net_cols],
                 ]
             )
             + " |"

@@ -78,6 +78,9 @@ def run_baseline_strategy_detailed(
     portfolio_returns = []
     turnovers = []
     dates = []
+    costs = []
+    net_returns_exp = []
+    net_returns_lin = []
     for i in range(returns_arr.shape[0]):
         r_arith = np.expm1(returns_arr[i])
         port_ret = float(np.dot(w_prev, r_arith))
@@ -93,20 +96,33 @@ def run_baseline_strategy_detailed(
 
         turnover = turnover_rebalance_l1(w_target, w_post)
         log_argument = max(1.0 + port_ret, log_clip)
-        reward = math.log(log_argument) - transaction_cost * turnover
+        cost = transaction_cost * turnover
+        reward = math.log(log_argument) - cost
 
         rewards.append(reward)
         portfolio_returns.append(port_ret)
         turnovers.append(turnover)
+        costs.append(cost)
+        net_returns_exp.append(math.exp(reward) - 1.0)
+        net_returns_lin.append(port_ret - cost)
         dates.append(returns.index[i])
         w_prev = w_target
 
-    metrics = compute_metrics(rewards, portfolio_returns, turnovers)
+    metrics = compute_metrics(
+        rewards,
+        portfolio_returns,
+        turnovers,
+        net_returns_exp=net_returns_exp,
+        net_returns_lin=net_returns_lin,
+    )
     trace = {
         "dates": dates,
         "rewards": rewards,
         "portfolio_returns": portfolio_returns,
         "turnovers": turnovers,
+        "costs": costs,
+        "net_returns_exp": net_returns_exp,
+        "net_returns_lin": net_returns_lin,
     }
     return metrics, trace
 

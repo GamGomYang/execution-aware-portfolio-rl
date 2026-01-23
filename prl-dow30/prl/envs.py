@@ -135,6 +135,7 @@ class Dow30PortfolioEnv(Env):
             "turnover_target_change": turnover_target_change,
             "date": step_date,
             "log_argument": log_argument,
+            "cost": cost,
         }
         return obs, reward, terminated, truncated, info
 

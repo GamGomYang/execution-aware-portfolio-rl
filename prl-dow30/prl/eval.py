@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -84,6 +85,9 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
     turnovers: List[float] = []
     dates: List = []
     turnover_target_changes: List[float] = []
+    costs: List[float] = []
+    net_returns_exp: List[float] = []
+    net_returns_lin: List[float] = []
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward_vec, done_vec, info_list = env.step(action)
@@ -91,17 +95,32 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         done = bool(done_vec[0])
         rewards.append(reward)
         info = info_list[0]
-        portfolio_returns.append(info.get("portfolio_return", 0.0))
-        turnovers.append(info.get("turnover", 0.0))
+        port_ret = info.get("portfolio_return", 0.0)
+        turnover = info.get("turnover", 0.0)
+        cost = float(info.get("cost", 0.0))
+        portfolio_returns.append(port_ret)
+        turnovers.append(turnover)
         dates.append(info.get("date"))
         turnover_target_changes.append(info.get("turnover_target_change", 0.0))
-    metrics = compute_metrics(rewards, portfolio_returns, turnovers)
+        costs.append(cost)
+        net_returns_exp.append(math.exp(reward) - 1.0)
+        net_returns_lin.append(port_ret - cost)
+    metrics = compute_metrics(
+        rewards,
+        portfolio_returns,
+        turnovers,
+        net_returns_exp=net_returns_exp,
+        net_returns_lin=net_returns_lin,
+    )
     trace = {
         "dates": dates,
         "rewards": rewards,
         "portfolio_returns": portfolio_returns,
         "turnovers": turnovers,
         "turnover_target_changes": turnover_target_changes,
+        "costs": costs,
+        "net_returns_exp": net_returns_exp,
+        "net_returns_lin": net_returns_lin,
     }
     return metrics, trace
 
@@ -121,8 +140,17 @@ def trace_dict_to_frame(
 ) -> pd.DataFrame:
     turnover_target_changes = trace.get("turnover_target_changes")
     dates = trace.get("dates", [])
+    costs = trace.get("costs")
+    net_returns_exp = trace.get("net_returns_exp")
+    net_returns_lin = trace.get("net_returns_lin")
     if turnover_target_changes is None or not turnover_target_changes:
         turnover_target_changes = [np.nan] * len(dates)
+    if costs is None or not costs:
+        costs = [np.nan] * len(dates)
+    if net_returns_exp is None or not net_returns_exp:
+        net_returns_exp = [np.nan] * len(dates)
+    if net_returns_lin is None or not net_returns_lin:
+        net_returns_lin = [np.nan] * len(dates)
     df = pd.DataFrame(
         {
             "date": dates,
@@ -130,6 +158,9 @@ def trace_dict_to_frame(
             "reward": trace.get("rewards", []),
             "turnover": trace.get("turnovers", []),
             "turnover_target_change": turnover_target_changes,
+            "cost": costs,
+            "net_return_exp": net_returns_exp,
+            "net_return_lin": net_returns_lin,
         }
     )
     df["eval_id"] = eval_id
@@ -137,6 +168,11 @@ def trace_dict_to_frame(
     df["model_type"] = model_type
     df["seed"] = seed
     df["date"] = pd.to_datetime(df["date"])
+    df["equity_gross"] = np.cumprod(1.0 + df["portfolio_return"].fillna(0.0))
+    if "net_return_exp" in df.columns:
+        df["equity_net_exp"] = np.cumprod(1.0 + df["net_return_exp"].fillna(0.0))
+    if "net_return_lin" in df.columns:
+        df["equity_net_lin"] = np.cumprod(1.0 + df["net_return_lin"].fillna(0.0))
     return df
 
 
@@ -235,6 +271,8 @@ def summarize_regime_metrics(
                 regime_group["reward"].tolist(),
                 regime_group["portfolio_return"].tolist(),
                 regime_group["turnover"].tolist(),
+                net_returns_exp=regime_group.get("net_return_exp"),
+                net_returns_lin=regime_group.get("net_return_lin"),
             )
             row = {
                 "run_id": run_id,
@@ -252,6 +290,8 @@ def summarize_regime_metrics(
                 group["reward"].tolist(),
                 group["portfolio_return"].tolist(),
                 group["turnover"].tolist(),
+                net_returns_exp=group.get("net_return_exp"),
+                net_returns_lin=group.get("net_return_lin"),
             )
             row = {
                 "run_id": run_id,

@@ -31,10 +31,16 @@ def write_metrics(path: Path, row: dict):
         "total_reward",
         "avg_reward",
         "cumulative_return",
+        "cumulative_return_net_exp",
+        "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
         "sharpe",
+        "sharpe_net_exp",
+        "sharpe_net_lin",
         "max_drawdown",
+        "max_drawdown_net_exp",
+        "max_drawdown_net_lin",
         "steps",
     ]
     file_exists = path.exists()

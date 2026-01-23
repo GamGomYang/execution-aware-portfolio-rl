@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Iterable, List
+from typing import Iterable, Optional
 
 import numpy as np
 
@@ -43,26 +43,19 @@ class PortfolioMetrics:
     sharpe: float
     max_drawdown: float
     steps: int
+    cumulative_return_net_exp: Optional[float] = None
+    sharpe_net_exp: Optional[float] = None
+    max_drawdown_net_exp: Optional[float] = None
+    cumulative_return_net_lin: Optional[float] = None
+    sharpe_net_lin: Optional[float] = None
+    max_drawdown_net_lin: Optional[float] = None
 
     def to_dict(self):
         return asdict(self)
 
 
-def compute_metrics(
-    rewards: Iterable[float],
-    portfolio_returns: Iterable[float],
-    turnovers: Iterable[float],
-) -> PortfolioMetrics:
-    rewards_arr = np.array(list(rewards), dtype=np.float64)
-    returns_arr = np.array(list(portfolio_returns), dtype=np.float64)
-    turnovers_arr = np.array(list(turnovers), dtype=np.float64)
-
-    total_reward = float(rewards_arr.sum())
-    avg_reward = float(rewards_arr.mean()) if rewards_arr.size else 0.0
-
-    cumulative_return = float(np.prod(1.0 + returns_arr) - 1.0)
-    avg_turnover = float(turnovers_arr.mean()) if turnovers_arr.size else 0.0
-    total_turnover = float(turnovers_arr.sum())
+def _compute_return_stats(returns_arr: np.ndarray) -> tuple[float, float, float]:
+    cumulative_return = float(np.prod(1.0 + returns_arr) - 1.0) if returns_arr.size else 0.0
 
     return_std = returns_arr.std(ddof=0)
     sharpe = 0.0
@@ -77,6 +70,38 @@ def compute_metrics(
     else:
         max_drawdown = 0.0
 
+    return cumulative_return, sharpe, max_drawdown
+
+
+def compute_metrics(
+    rewards: Iterable[float],
+    portfolio_returns: Iterable[float],
+    turnovers: Iterable[float],
+    *,
+    net_returns_exp: Optional[Iterable[float]] = None,
+    net_returns_lin: Optional[Iterable[float]] = None,
+) -> PortfolioMetrics:
+    rewards_arr = np.array(list(rewards), dtype=np.float64)
+    returns_arr = np.array(list(portfolio_returns), dtype=np.float64)
+    turnovers_arr = np.array(list(turnovers), dtype=np.float64)
+
+    total_reward = float(rewards_arr.sum())
+    avg_reward = float(rewards_arr.mean()) if rewards_arr.size else 0.0
+
+    avg_turnover = float(turnovers_arr.mean()) if turnovers_arr.size else 0.0
+    total_turnover = float(turnovers_arr.sum())
+
+    cumulative_return, sharpe, max_drawdown = _compute_return_stats(returns_arr)
+
+    net_exp_stats = None
+    if net_returns_exp is not None:
+        net_returns_exp_arr = np.array(list(net_returns_exp), dtype=np.float64)
+        net_exp_stats = _compute_return_stats(net_returns_exp_arr)
+    net_lin_stats = None
+    if net_returns_lin is not None:
+        net_returns_lin_arr = np.array(list(net_returns_lin), dtype=np.float64)
+        net_lin_stats = _compute_return_stats(net_returns_lin_arr)
+
     return PortfolioMetrics(
         total_reward=total_reward,
         avg_reward=avg_reward,
@@ -86,4 +111,10 @@ def compute_metrics(
         sharpe=sharpe,
         max_drawdown=max_drawdown,
         steps=int(rewards_arr.size),
+        cumulative_return_net_exp=net_exp_stats[0] if net_exp_stats else None,
+        sharpe_net_exp=net_exp_stats[1] if net_exp_stats else None,
+        max_drawdown_net_exp=net_exp_stats[2] if net_exp_stats else None,
+        cumulative_return_net_lin=net_lin_stats[0] if net_lin_stats else None,
+        sharpe_net_lin=net_lin_stats[1] if net_lin_stats else None,
+        max_drawdown_net_lin=net_lin_stats[2] if net_lin_stats else None,
     )

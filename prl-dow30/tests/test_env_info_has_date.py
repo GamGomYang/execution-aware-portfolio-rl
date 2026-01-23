@@ -22,3 +22,5 @@ def test_env_info_has_date():
     env.reset()
     _, _, _, _, info = env.step(np.array([0.0, 0.0], dtype=np.float32))
     assert info["date"] == dates[env.window_size]
+    assert "cost" in info
+    assert info["cost"] == 0.0
