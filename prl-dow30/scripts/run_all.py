@@ -271,6 +271,7 @@ def main():
 
     metrics_rows: list[dict] = []
     regime_rows: list[dict] = []
+    run_ids_this_session: list[str] = []
     reports_dir = Path("outputs/reports")
     reports_dir.mkdir(parents=True, exist_ok=True)
     for seed in seeds:
@@ -390,9 +391,11 @@ def main():
                             **base_metrics.to_dict(),
                         }
                     )
+                run_ids_this_session.append(baseline_strategy_run_id)
 
             trace_path = reports_dir / f"trace_{run_id}.parquet"
             trace_df.to_parquet(trace_path, index=False)
+            run_ids_this_session.append(run_id)
 
             thresholds_path = reports_dir / f"regime_thresholds_{run_id}.json"
             thresholds_path.write_text(json.dumps(thresholds, indent=2))
@@ -423,6 +426,8 @@ def main():
     write_regime_metrics(reports_dir / "regime_metrics.csv", regime_rows)
     summary_seed_rows = summarize_seed_stats(metrics_rows)
     write_summary(reports_dir / "summary_seed_stats.csv", summary_seed_rows)
+    run_index_path = reports_dir / "run_index.json"
+    run_index_path.write_text(json.dumps({"run_ids": run_ids_this_session}, indent=2))
     print("Completed run_all workflow.")
 
 

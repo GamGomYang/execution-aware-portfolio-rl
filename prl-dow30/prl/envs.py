@@ -136,6 +136,7 @@ class Dow30PortfolioEnv(Env):
             "date": step_date,
             "log_argument": log_argument,
             "cost": cost,
+            "log_return_gross": math.log(log_argument),
         }
         return obs, reward, terminated, truncated, info
 

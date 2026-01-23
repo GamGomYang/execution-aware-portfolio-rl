@@ -143,6 +143,7 @@ def trace_dict_to_frame(
     costs = trace.get("costs")
     net_returns_exp = trace.get("net_returns_exp")
     net_returns_lin = trace.get("net_returns_lin")
+    log_returns_gross = trace.get("log_returns_gross")
     if turnover_target_changes is None or not turnover_target_changes:
         turnover_target_changes = [np.nan] * len(dates)
     if costs is None or not costs:
@@ -151,6 +152,8 @@ def trace_dict_to_frame(
         net_returns_exp = [np.nan] * len(dates)
     if net_returns_lin is None or not net_returns_lin:
         net_returns_lin = [np.nan] * len(dates)
+    if log_returns_gross is None or not log_returns_gross:
+        log_returns_gross = [np.nan] * len(dates)
     df = pd.DataFrame(
         {
             "date": dates,
@@ -161,6 +164,7 @@ def trace_dict_to_frame(
             "cost": costs,
             "net_return_exp": net_returns_exp,
             "net_return_lin": net_returns_lin,
+            "log_return_gross": log_returns_gross,
         }
     )
     df["eval_id"] = eval_id

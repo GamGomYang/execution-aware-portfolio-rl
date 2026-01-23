@@ -97,6 +97,10 @@ def compute_metrics(
     if net_returns_exp is not None:
         net_returns_exp_arr = np.array(list(net_returns_exp), dtype=np.float64)
         net_exp_stats = _compute_return_stats(net_returns_exp_arr)
+    else:
+        # Rewards already contain cost; exp(reward)-1 is the canonical net return.
+        net_returns_exp_arr = np.expm1(rewards_arr)
+        net_exp_stats = _compute_return_stats(net_returns_exp_arr)
     net_lin_stats = None
     if net_returns_lin is not None:
         net_returns_lin_arr = np.array(list(net_returns_lin), dtype=np.float64)

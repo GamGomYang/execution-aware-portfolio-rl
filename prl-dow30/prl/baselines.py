@@ -81,6 +81,7 @@ def run_baseline_strategy_detailed(
     costs = []
     net_returns_exp = []
     net_returns_lin = []
+    log_returns_gross = []
     for i in range(returns_arr.shape[0]):
         r_arith = np.expm1(returns_arr[i])
         port_ret = float(np.dot(w_prev, r_arith))
@@ -105,6 +106,7 @@ def run_baseline_strategy_detailed(
         costs.append(cost)
         net_returns_exp.append(math.exp(reward) - 1.0)
         net_returns_lin.append(port_ret - cost)
+        log_returns_gross.append(math.log(log_argument))
         dates.append(returns.index[i])
         w_prev = w_target
 
@@ -123,6 +125,7 @@ def run_baseline_strategy_detailed(
         "costs": costs,
         "net_returns_exp": net_returns_exp,
         "net_returns_lin": net_returns_lin,
+        "log_returns_gross": log_returns_gross,
     }
     return metrics, trace
 
