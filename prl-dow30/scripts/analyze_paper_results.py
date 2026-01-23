@@ -255,7 +255,7 @@ def _boxplot_by_regime(
                 data.append(vals)
                 labels.append(model_type)
         if data:
-            ax.boxplot(data, labels=labels, showfliers=False)
+            ax.boxplot(data, tick_labels=labels, showfliers=False)
         ax.axhline(0.0, color="black", linewidth=0.5)
         ax.set_title(regime)
         ax.tick_params(axis="x", rotation=30)
