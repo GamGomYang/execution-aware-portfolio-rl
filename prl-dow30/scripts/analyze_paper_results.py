@@ -99,29 +99,41 @@ def compute_paired_diffs(
     df = metrics_df.copy()
     if "period" in df.columns:
         df = df[df["period"] == "test"].copy()
-    base = df[df["model_type"] == baseline_model_type].drop_duplicates(subset=["seed"])
-    prl = df[df["model_type"] == prl_model_type].drop_duplicates(subset=["seed"])
+    has_eval_window = "eval_window" in df.columns
+    eval_windows = [None]
+    if has_eval_window:
+        eval_windows = sorted(df["eval_window"].dropna().unique().tolist())
+    rows = []
+    for eval_window in eval_windows:
+        base_df = df[df["model_type"] == baseline_model_type]
+        prl_df = df[df["model_type"] == prl_model_type]
+        if eval_window is not None:
+            base_df = base_df[base_df["eval_window"] == eval_window]
+            prl_df = prl_df[prl_df["eval_window"] == eval_window]
+        base = base_df.drop_duplicates(subset=["seed"]).set_index("seed")
+        prl = prl_df.drop_duplicates(subset=["seed"]).set_index("seed")
+        base_seeds = set(base.index.tolist())
+        prl_seeds = set(prl.index.tolist())
+        missing_in_prl = sorted(base_seeds - prl_seeds)
+        missing_in_base = sorted(prl_seeds - base_seeds)
+        if missing_in_prl or missing_in_base:
+            raise ValueError(
+                f"SEED_PAIRING_MISMATCH missing_in_prl={missing_in_prl} missing_in_baseline={missing_in_base}"
+            )
+        seeds = sorted(base_seeds)
+        base = base.loc[seeds]
+        prl = prl.loc[seeds]
 
-    base = base.set_index("seed")
-    prl = prl.set_index("seed")
-    base_seeds = set(base.index.tolist())
-    prl_seeds = set(prl.index.tolist())
-    missing_in_prl = sorted(base_seeds - prl_seeds)
-    missing_in_base = sorted(prl_seeds - base_seeds)
-    if missing_in_prl or missing_in_base:
-        raise ValueError(
-            f"SEED_PAIRING_MISMATCH missing_in_prl={missing_in_prl} missing_in_baseline={missing_in_base}"
-        )
-    seeds = sorted(base_seeds)
-    base = base.loc[seeds]
-    prl = prl.loc[seeds]
-
-    metric_cols = _collect_metric_columns(base)
-    diffs = {"seed": seeds}
-    for col in metric_cols:
-        delta_col = _delta_col_name(col)
-        diffs[delta_col] = prl[col].values - base[col].values
-    return pd.DataFrame(diffs)
+        metric_cols = _collect_metric_columns(base)
+        for seed in seeds:
+            row = {"seed": seed}
+            if eval_window is not None:
+                row["eval_window"] = eval_window
+            for col in metric_cols:
+                delta_col = _delta_col_name(col)
+                row[delta_col] = float(prl.loc[seed, col] - base.loc[seed, col])
+            rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def _format_mean_std(values: np.ndarray) -> str:
@@ -193,8 +205,17 @@ def compute_regime_seed_summary(regime_df: pd.DataFrame, *, n_boot: int = 2000) 
         if col.startswith(("sharpe_net_", "max_drawdown_net_", "cumulative_return_net_")):
             metric_map[col] = col
     rows = []
-    for (model_type, regime), group in df.groupby(["model_type", "regime"]):
-        row = {"model_type": model_type, "regime": regime, "n_seeds": int(group["seed"].nunique())}
+    has_eval_window = "eval_window" in df.columns
+    group_cols = ["model_type", "regime"]
+    if has_eval_window:
+        group_cols = ["eval_window"] + group_cols
+    for group_keys, group in df.groupby(group_cols):
+        if has_eval_window:
+            eval_window, model_type, regime = group_keys
+            row = {"eval_window": eval_window, "model_type": model_type, "regime": regime, "n_seeds": int(group["seed"].nunique())}
+        else:
+            model_type, regime = group_keys
+            row = {"model_type": model_type, "regime": regime, "n_seeds": int(group["seed"].nunique())}
         for label, col in metric_map.items():
             values = group[col].to_numpy(dtype=np.float64)
             row[f"{label}_mean"] = float(np.mean(values)) if values.size else float("nan")
@@ -219,20 +240,29 @@ def compute_regime_paired_diffs(
     prl = df[df["model_type"] == prl_model_type]
     metric_cols = _collect_metric_columns(df, include_turnover=True)
     rows = []
-    for regime in ["low", "mid", "high"]:
-        base_r = base[base["regime"] == regime].set_index("seed")
-        prl_r = prl[prl["regime"] == regime].set_index("seed")
-        seeds = sorted(set(base_r.index.tolist()) & set(prl_r.index.tolist()))
-        if not seeds:
-            continue
-        for seed in seeds:
-            row = {"seed": int(seed), "regime": regime}
-            for col in metric_cols:
-                if col not in base_r.columns or col not in prl_r.columns:
-                    continue
-                delta_col = _delta_col_name(col)
-                row[delta_col] = float(prl_r.loc[seed, col] - base_r.loc[seed, col])
-            rows.append(row)
+    has_eval_window = "eval_window" in df.columns
+    eval_windows = [None]
+    if has_eval_window:
+        eval_windows = sorted(df["eval_window"].dropna().unique().tolist())
+    for eval_window in eval_windows:
+        base_subset = base if eval_window is None else base[base["eval_window"] == eval_window]
+        prl_subset = prl if eval_window is None else prl[prl["eval_window"] == eval_window]
+        for regime in ["low", "mid", "high"]:
+            base_r = base_subset[base_subset["regime"] == regime].set_index("seed")
+            prl_r = prl_subset[prl_subset["regime"] == regime].set_index("seed")
+            seeds = sorted(set(base_r.index.tolist()) & set(prl_r.index.tolist()))
+            if not seeds:
+                continue
+            for seed in seeds:
+                row = {"seed": int(seed), "regime": regime}
+                if eval_window is not None:
+                    row["eval_window"] = eval_window
+                for col in metric_cols:
+                    if col not in base_r.columns or col not in prl_r.columns:
+                        continue
+                    delta_col = _delta_col_name(col)
+                    row[delta_col] = float(prl_r.loc[seed, col] - base_r.loc[seed, col])
+                rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -291,8 +321,11 @@ def analyze_metrics(
     baseline_model_type: str,
     prl_model_type: str,
     n_boot: int,
+    run_ids: set[str] | None = None,
 ) -> None:
     df = pd.read_csv(metrics_path)
+    if run_ids:
+        df = df[df["run_id"].isin(run_ids)].copy()
     diffs = compute_paired_diffs(df, baseline_model_type=baseline_model_type, prl_model_type=prl_model_type)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -301,27 +334,29 @@ def analyze_metrics(
 
     stats_rows = []
     stats = _try_stats()
-    delta_cols = [col for col in diffs.columns if col != "seed"]
-    for col in delta_cols:
-        values = diffs[col].to_numpy(dtype=np.float64)
-        mean = float(np.mean(values)) if values.size else float("nan")
-        std = float(np.std(values, ddof=0)) if values.size else float("nan")
-        ci_low, ci_high = bootstrap_ci(values, n_boot=n_boot)
-        p_t = float("nan")
-        p_w = float("nan")
-        if stats is not None and values.size >= 2:
-            try:
-                p_t = float(stats.ttest_rel(values, np.zeros_like(values)).pvalue)
-            except Exception:
-                p_t = float("nan")
-            try:
-                p_w = float(stats.wilcoxon(values).pvalue)
-            except Exception:
-                p_w = float("nan")
-        elif values.size >= 2:
-            p_t, p_w = _fallback_pvalues(values, seed=0)
-        stats_rows.append(
-            {
+    group_field = "eval_window" if "eval_window" in diffs.columns else None
+    delta_cols = [col for col in diffs.columns if col not in {"seed", "eval_window"}]
+    grouped = [(None, diffs)] if group_field is None else diffs.groupby(group_field, dropna=False)
+    for key, group in grouped:
+        for col in delta_cols:
+            values = group[col].to_numpy(dtype=np.float64)
+            mean = float(np.mean(values)) if values.size else float("nan")
+            std = float(np.std(values, ddof=0)) if values.size else float("nan")
+            ci_low, ci_high = bootstrap_ci(values, n_boot=n_boot)
+            p_t = float("nan")
+            p_w = float("nan")
+            if stats is not None and values.size >= 2:
+                try:
+                    p_t = float(stats.ttest_rel(values, np.zeros_like(values)).pvalue)
+                except Exception:
+                    p_t = float("nan")
+                try:
+                    p_w = float(stats.wilcoxon(values).pvalue)
+                except Exception:
+                    p_w = float("nan")
+            elif values.size >= 2:
+                p_t, p_w = _fallback_pvalues(values, seed=0)
+            row = {
                 "metric": col,
                 "mean": mean,
                 "std": std,
@@ -331,12 +366,17 @@ def analyze_metrics(
                 "p_value_wilcoxon": p_w,
                 "n_seeds": int(values.size),
             }
-        )
+            if group_field is not None:
+                row[group_field] = key
+            stats_rows.append(row)
 
     summary_df = pd.DataFrame(stats_rows)
     summary_path = output_dir / "paired_stats_summary.csv"
     summary_df.to_csv(summary_path, index=False)
 
+    if "eval_window" in df.columns and not df["eval_window"].empty:
+        target_window = sorted(df["eval_window"].dropna().unique().tolist())[0]
+        df = df[df["eval_window"] == target_window]
     base = df[df["model_type"] == baseline_model_type].drop_duplicates(subset=["seed"])
     prl = df[df["model_type"] == prl_model_type].drop_duplicates(subset=["seed"])
     metric_cols = _collect_metric_columns(base)
@@ -352,12 +392,19 @@ def analyze_regimes(
     prl_model_type: str,
     n_boot: int,
     plot: bool,
+    run_ids: set[str] | None = None,
 ) -> None:
     if not regime_metrics_path.exists():
         logging.warning("regime_metrics.csv not found; skipping regime analysis.")
         return
     df = pd.read_csv(regime_metrics_path)
-    summary = compute_regime_seed_summary(df, n_boot=n_boot)
+    if run_ids:
+        df = df[df["run_id"].isin(run_ids)].copy()
+    try:
+        summary = compute_regime_seed_summary(df, n_boot=n_boot)
+    except ValueError as exc:
+        logging.warning("Skipping regime analysis: %s", exc)
+        return
     output_dir.mkdir(parents=True, exist_ok=True)
     summary.to_csv(output_dir / "regime_seed_summary.csv", index=False)
 
@@ -391,17 +438,38 @@ def parse_args():
     parser.add_argument("--prl-model-type", type=str, default="prl_sac")
     parser.add_argument("--bootstrap", type=int, default=2000)
     parser.add_argument("--no-plots", action="store_true")
+    parser.add_argument("--run-index", type=str, help="Path to run_index.json; filters metrics/regime_metrics to listed run_ids.")
+    parser.add_argument(
+        "--run-ids",
+        type=str,
+        help='Comma-separated run_ids to include (applied in conjunction with --run-index if provided).',
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    run_ids: set[str] | None = None
+    if args.run_index:
+        idx_path = Path(args.run_index)
+        if not idx_path.exists():
+            raise FileNotFoundError(f"run_index not found: {idx_path}")
+        import json
+
+        run_index = json.loads(idx_path.read_text())
+        if "run_ids" not in run_index:
+            raise ValueError("run_index.json missing run_ids")
+        run_ids = set(run_index["run_ids"])
+    if args.run_ids:
+        provided = {rid.strip() for rid in args.run_ids.split(",") if rid.strip()}
+        run_ids = provided if run_ids is None else run_ids & provided
     analyze_metrics(
         Path(args.metrics),
         output_dir=Path(args.output_dir),
         baseline_model_type=args.baseline_model_type,
         prl_model_type=args.prl_model_type,
         n_boot=args.bootstrap,
+        run_ids=run_ids,
     )
     analyze_regimes(
         Path(args.regime_metrics),
@@ -410,6 +478,7 @@ def main():
         prl_model_type=args.prl_model_type,
         n_boot=args.bootstrap,
         plot=not args.no_plots,
+        run_ids=run_ids,
     )
     print("Analysis complete.")
 

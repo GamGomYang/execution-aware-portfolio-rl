@@ -39,6 +39,12 @@ def parse_args():
     )
     parser.add_argument("--seeds", nargs="+", type=int, help="Seeds to iterate (defaults to config).")
     parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
+    parser.add_argument(
+        "--output-root",
+        type=str,
+        default="outputs",
+        help="Base directory for reports/models/logs (default: outputs).",
+    )
     return parser.parse_args()
 
 
@@ -49,6 +55,7 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
     fieldnames = [
         "run_id",
         "eval_id",
+        "eval_window",
         "model_type",
         "seed",
         "period",
@@ -94,8 +101,16 @@ def summarize_metrics(rows: list[dict]) -> list[dict]:
         "max_drawdown_net_lin",
         "steps",
     ]
-    for model_type, group in df.groupby("model_type"):
-        row = {"model_type": model_type}
+    group_cols = ["model_type"]
+    if "eval_window" in df.columns:
+        group_cols = ["eval_window"] + group_cols
+    for keys, group in df.groupby(group_cols):
+        if len(group_cols) == 2:
+            eval_window, model_type = keys
+            row = {"eval_window": eval_window, "model_type": model_type}
+        else:
+            model_type = keys
+            row = {"model_type": model_type}
         for col in metric_cols:
             row[f"{col}_mean"] = float(group[col].mean())
             row[f"{col}_std"] = float(group[col].std(ddof=0))
@@ -131,7 +146,10 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
     if not rows:
         return []
     df = pd.DataFrame(rows)
-    df = df.drop_duplicates(subset=["model_type", "seed"])
+    subset = ["model_type", "seed"]
+    if "eval_window" in df.columns:
+        subset = ["eval_window"] + subset
+    df = df.drop_duplicates(subset=subset)
     metric_cols = [
         "total_reward",
         "avg_reward",
@@ -149,8 +167,16 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
         "steps",
     ]
     summary_rows: list[dict] = []
-    for model_type, group in df.groupby("model_type"):
-        row = {"model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+    group_cols = ["model_type"]
+    if "eval_window" in df.columns:
+        group_cols = ["eval_window"] + group_cols
+    for keys, group in df.groupby(group_cols):
+        if len(group_cols) == 2:
+            eval_window, model_type = keys
+            row = {"eval_window": eval_window, "model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+        else:
+            model_type = keys
+            row = {"model_type": model_type, "n_seeds": int(group["seed"].nunique())}
         for col in metric_cols:
             values = group[col].to_numpy(dtype=np.float64)
             row[f"{col}_mean"] = float(np.mean(values)) if values.size else float("nan")
@@ -184,6 +210,26 @@ def _compute_vz_series(volatility: pd.DataFrame, stats_path: Path) -> pd.Series:
     portfolio_vol = volatility.mean(axis=1)
     vz = (portfolio_vol - mean) / (std + 1e-8)
     return vz.astype(np.float64)
+
+
+def _resolve_eval_windows(cfg: dict) -> list[dict]:
+    eval_cfg = cfg.get("eval", {}) or {}
+    windows = eval_cfg.get("windows")
+    if windows:
+        resolved = []
+        for idx, win in enumerate(windows):
+            name = win.get("name") or f"eval_{idx}"
+            start = win.get("start") or win.get("eval_start")
+            end = win.get("end") or win.get("eval_end")
+            if not start or not end:
+                raise ValueError("EVAL_WINDOW_MISSING_START_END")
+            resolved.append({"name": name, "start": start, "end": end})
+        return resolved
+    dates = cfg["dates"]
+    start = eval_cfg.get("eval_start") or dates["test_start"]
+    end = eval_cfg.get("eval_end") or dates["test_end"]
+    name = eval_cfg.get("name") or eval_cfg.get("eval_window") or "test"
+    return [{"name": name, "start": start, "end": end}]
 
 
 def _eval_window_from_trace(trace_df: pd.DataFrame) -> tuple[pd.Timestamp, pd.Timestamp, int]:
@@ -225,6 +271,15 @@ def _update_run_metadata(path: Path, updates: dict) -> None:
     if not path.exists():
         return
     data = json.loads(path.read_text())
+    if "evaluations" in updates:
+        merged = data.get("evaluations", {})
+        merged.update(updates["evaluations"])
+        data["evaluations"] = merged
+        updates = {k: v for k, v in updates.items() if k != "evaluations"}
+    if "evaluation" in updates and isinstance(data.get("evaluation"), dict) and isinstance(updates["evaluation"], dict):
+        merged_eval = {**data["evaluation"], **updates["evaluation"]}
+        data["evaluation"] = merged_eval
+        updates = {k: v for k, v in updates.items() if k != "evaluation"}
     data.update(updates)
     path.write_text(json.dumps(data, indent=2))
 
@@ -265,18 +320,22 @@ def main():
         raise ValueError("env.logit_scale is required for training/evaluation.")
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
-    returns_slice = slice_frame(market.returns, dates["test_start"], dates["test_end"])
-    vol_slice = slice_frame(features.volatility, dates["test_start"], dates["test_end"])
-    returns_slice, vol_slice = _align_returns_vol(returns_slice, vol_slice)
+    eval_windows = _resolve_eval_windows(cfg)
+    multi_window = len(eval_windows) > 1
 
     metrics_rows: list[dict] = []
     regime_rows: list[dict] = []
     run_ids_this_session: list[str] = []
-    reports_dir = Path("outputs/reports")
-    reports_dir.mkdir(parents=True, exist_ok=True)
+    output_root = Path(args.output_root)
+    reports_dir = output_root / "reports"
+    traces_dir = output_root / "traces"
+    models_dir = output_root / "models"
+    logs_dir = output_root / "logs"
+    for path in (reports_dir, traces_dir, models_dir, logs_dir):
+        path.mkdir(parents=True, exist_ok=True)
     for seed in seeds:
         baseline_strategy_run_id = f"baseline_strategies_seed{seed}"
-        baseline_emitted = False
+        baseline_emitted_windows: set[str] = set()
         meta_by_type: dict[str, dict] = {}
         for model_type in args.model_types:
             model_path = run_training(
@@ -285,21 +344,12 @@ def main():
                 seed=seed,
                 raw_dir=raw_dir,
                 processed_dir=processed_dir,
-                output_dir="outputs/models",
+                output_dir=models_dir,
+                reports_dir=reports_dir,
+                logs_dir=logs_dir,
                 force_refresh=data_cfg.get("force_refresh", True),
                 offline=offline,
                 cache_only=cache_only,
-            )
-
-            env = build_env_for_range(
-                market=market,
-                features=features,
-                start=dates["test_start"],
-                end=dates["test_end"],
-                window_size=env_cfg["L"],
-                c_tc=env_cfg["c_tc"],
-                seed=seed,
-                logit_scale=env_cfg["logit_scale"],
             )
 
             scheduler = None
@@ -315,110 +365,133 @@ def main():
             meta = _load_run_metadata(run_id, reports_dir)
             if meta is None:
                 raise ValueError(f"RUN_METADATA_NOT_FOUND for run_id={run_id}")
-            assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
             meta_by_type[model_type] = meta
-            model = load_model(model_path, model_type, env, scheduler=scheduler)
-            metrics, trace_df = eval_model_to_trace(
-                model,
-                env,
-                eval_id=eval_id,
-                run_id=run_id,
-                model_type=label,
-                seed=seed,
-            )
-            metrics_row_id = len(metrics_rows)
-            metrics_rows.append(
-                {
-                    "run_id": run_id,
-                    "eval_id": eval_id,
-                    "model_type": label,
-                    "seed": seed,
-                    "period": "test",
-                    **metrics.to_dict(),
-                }
-            )
-            eval_start, eval_end, eval_num_days = _eval_window_from_trace(trace_df)
-            aligned_returns = slice_frame(returns_slice, eval_start, eval_end)
-            aligned_vol = slice_frame(vol_slice, eval_start, eval_end)
-            aligned_returns, aligned_vol = _align_returns_vol(aligned_returns, aligned_vol)
-            vz_series = _compute_vz_series(aligned_vol, features.stats_path)
-            thresholds = _build_thresholds(
-                vz_series,
-                eval_start=eval_start,
-                eval_end=eval_end,
-                eval_num_days=eval_num_days,
-            )
-            vz_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values})
-            trace_df = trace_df.merge(vz_df, on="date", how="left")
-            trace_df = compute_regime_labels(trace_df, thresholds)
-            if "baseline" in meta_by_type and "prl" in meta_by_type:
-                base_meta = meta_by_type["baseline"]
-                prl_meta = meta_by_type["prl"]
-                if base_meta.get("data_manifest_hash") != prl_meta.get("data_manifest_hash"):
-                    raise ValueError("DATA_MANIFEST_HASH_MISMATCH")
-                if base_meta.get("env_signature_hash") != prl_meta.get("env_signature_hash"):
-                    raise ValueError("ENV_SIGNATURE_HASH_MISMATCH")
 
-            include_baselines = False
-            if not baseline_emitted:
-                if model_type == "prl":
-                    include_baselines = True
-                elif model_type == "baseline" and "prl" not in args.model_types:
-                    include_baselines = True
-            if include_baselines:
-                baseline_emitted = True
-                strategy_metrics, strategy_trace_df = eval_strategies_to_trace(
-                    aligned_returns,
-                    aligned_vol,
-                    transaction_cost=env_cfg["c_tc"],
+            for window in eval_windows:
+                env = build_env_for_range(
+                    market=market,
+                    features=features,
+                    start=window["start"],
+                    end=window["end"],
+                    window_size=env_cfg["L"],
+                    c_tc=env_cfg["c_tc"],
+                    seed=seed,
+                    logit_scale=env_cfg["logit_scale"],
+                )
+
+                assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
+                model = load_model(model_path, model_type, env, scheduler=scheduler)
+                metrics, trace_df = eval_model_to_trace(
+                    model,
+                    env,
                     eval_id=eval_id,
-                    run_id=baseline_strategy_run_id,
+                    run_id=run_id,
+                    model_type=label,
                     seed=seed,
                 )
-                strategy_trace_df = strategy_trace_df.merge(vz_df, on="date", how="left")
-                strategy_trace_df = compute_regime_labels(strategy_trace_df, thresholds)
-                strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}.parquet"
-                strategy_trace_df.to_parquet(strategy_trace_path, index=False)
-                regime_rows.extend(summarize_regime_metrics(strategy_trace_df, period="test"))
-                for name, base_metrics in strategy_metrics.items():
-                    metrics_rows.append(
-                        {
-                            "run_id": baseline_strategy_run_id,
-                            "eval_id": eval_id,
-                            "model_type": name,
-                            "seed": seed,
-                            "period": "test",
-                            **base_metrics.to_dict(),
-                        }
-                    )
-                run_ids_this_session.append(baseline_strategy_run_id)
-
-            trace_path = reports_dir / f"trace_{run_id}.parquet"
-            trace_df.to_parquet(trace_path, index=False)
-            run_ids_this_session.append(run_id)
-
-            thresholds_path = reports_dir / f"regime_thresholds_{run_id}.json"
-            thresholds_path.write_text(json.dumps(thresholds, indent=2))
-
-            regime_rows.extend(summarize_regime_metrics(trace_df, period="test"))
-            eval_info = {
-                "eval_start_date": thresholds["eval_start_date"],
-                "eval_end_date": thresholds["eval_end_date"],
-                "eval_num_days": thresholds["eval_num_days"],
-            }
-            _update_run_metadata(
-                reports_dir / f"run_metadata_{run_id}.json",
-                {
-                    **eval_info,
-                    "evaluation": {
-                        "trace_path": str(trace_path),
-                        "regime_thresholds_path": str(thresholds_path),
-                        "metrics_row_id": metrics_row_id,
-                        "completed_at": datetime.now(timezone.utc).isoformat(),
-                        **eval_info,
+                trace_df["eval_window"] = window["name"]
+                metrics_row_id = len(metrics_rows)
+                metrics_rows.append(
+                    {
+                        "run_id": run_id,
+                        "eval_id": eval_id,
+                        "eval_window": window["name"],
+                        "model_type": label,
+                        "seed": seed,
+                        "period": "test",
+                        **metrics.to_dict(),
                     }
-                },
-            )
+                )
+                returns_slice = slice_frame(market.returns, window["start"], window["end"])
+                vol_slice = slice_frame(features.volatility, window["start"], window["end"])
+                returns_slice, vol_slice = _align_returns_vol(returns_slice, vol_slice)
+                eval_start, eval_end, eval_num_days = _eval_window_from_trace(trace_df)
+                aligned_returns = slice_frame(returns_slice, eval_start, eval_end)
+                aligned_vol = slice_frame(vol_slice, eval_start, eval_end)
+                aligned_returns, aligned_vol = _align_returns_vol(aligned_returns, aligned_vol)
+                vz_series = _compute_vz_series(aligned_vol, features.stats_path)
+                thresholds = _build_thresholds(
+                    vz_series,
+                    eval_start=eval_start,
+                    eval_end=eval_end,
+                    eval_num_days=eval_num_days,
+                )
+                vz_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values})
+                trace_df = trace_df.merge(vz_df, on="date", how="left")
+                trace_df = compute_regime_labels(trace_df, thresholds)
+                if "baseline" in meta_by_type and "prl" in meta_by_type:
+                    base_meta = meta_by_type["baseline"]
+                    prl_meta = meta_by_type["prl"]
+                    if base_meta.get("data_manifest_hash") != prl_meta.get("data_manifest_hash"):
+                        raise ValueError("DATA_MANIFEST_HASH_MISMATCH")
+                    if base_meta.get("env_signature_hash") != prl_meta.get("env_signature_hash"):
+                        raise ValueError("ENV_SIGNATURE_HASH_MISMATCH")
+
+                include_baselines = False
+                if window["name"] not in baseline_emitted_windows:
+                    if model_type == "prl":
+                        include_baselines = True
+                    elif model_type == "baseline" and "prl" not in args.model_types:
+                        include_baselines = True
+                window_suffix = f"_{window['name']}" if multi_window else ""
+                if include_baselines:
+                    baseline_emitted_windows.add(window["name"])
+                    strategy_metrics, strategy_trace_df = eval_strategies_to_trace(
+                        aligned_returns,
+                        aligned_vol,
+                        transaction_cost=env_cfg["c_tc"],
+                        eval_id=eval_id,
+                        run_id=baseline_strategy_run_id,
+                        seed=seed,
+                    )
+                    strategy_trace_df["eval_window"] = window["name"]
+                    strategy_trace_df = strategy_trace_df.merge(vz_df, on="date", how="left")
+                    strategy_trace_df = compute_regime_labels(strategy_trace_df, thresholds)
+                    strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}{window_suffix}.parquet"
+                    strategy_trace_df.to_parquet(strategy_trace_path, index=False)
+                    regime_rows.extend(summarize_regime_metrics(strategy_trace_df, period="test"))
+                    for name, base_metrics in strategy_metrics.items():
+                        metrics_rows.append(
+                            {
+                                "run_id": baseline_strategy_run_id,
+                                "eval_id": eval_id,
+                                "eval_window": window["name"],
+                                "model_type": name,
+                                "seed": seed,
+                                "period": "test",
+                                **base_metrics.to_dict(),
+                            }
+                        )
+                    run_ids_this_session.append(baseline_strategy_run_id)
+
+                trace_path = reports_dir / f"trace_{run_id}{window_suffix}.parquet"
+                trace_df.to_parquet(trace_path, index=False)
+                run_ids_this_session.append(run_id)
+
+                thresholds_path = reports_dir / f"regime_thresholds_{run_id}{window_suffix}.json"
+                thresholds_path.write_text(json.dumps(thresholds, indent=2))
+
+                regime_rows.extend(summarize_regime_metrics(trace_df, period="test"))
+                eval_info = {
+                    "eval_start_date": thresholds["eval_start_date"],
+                    "eval_end_date": thresholds["eval_end_date"],
+                    "eval_num_days": thresholds["eval_num_days"],
+                    "eval_window": window["name"],
+                }
+                evaluation_payload = {
+                    **eval_info,
+                    "trace_path": str(trace_path),
+                    "regime_thresholds_path": str(thresholds_path),
+                    "metrics_row_id": metrics_row_id,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+                updates = {
+                    **eval_info,
+                    "evaluations": {window["name"]: evaluation_payload},
+                }
+                if not multi_window:
+                    updates["evaluation"] = evaluation_payload
+                _update_run_metadata(reports_dir / f"run_metadata_{run_id}.json", updates)
 
     write_metrics(reports_dir / "metrics.csv", metrics_rows)
     summary_rows = summarize_metrics(metrics_rows)
@@ -427,7 +500,34 @@ def main():
     summary_seed_rows = summarize_seed_stats(metrics_rows)
     write_summary(reports_dir / "summary_seed_stats.csv", summary_seed_rows)
     run_index_path = reports_dir / "run_index.json"
-    run_index_path.write_text(json.dumps({"run_ids": run_ids_this_session}, indent=2))
+    unique_run_ids = list(dict.fromkeys(run_ids_this_session))
+    run_index_path.write_text(
+        json.dumps(
+            {
+                "exp_name": cfg.get("name") or cfg.get("exp_name") or Path(args.config).stem,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "config_path": args.config,
+                "model_types": args.model_types,
+                "seeds": list(seeds),
+                "eval_windows": {
+                    "train_start": dates.get("train_start"),
+                    "train_end": dates.get("train_end"),
+                    "test_start": dates.get("test_start"),
+                    "test_end": dates.get("test_end"),
+                    "windows": eval_windows,
+                },
+                "run_ids": unique_run_ids,
+                "metrics_path": str(reports_dir / "metrics.csv"),
+                "regime_metrics_path": str(reports_dir / "regime_metrics.csv"),
+                "reports_dir": str(reports_dir),
+                "traces_dir": str(traces_dir),
+                "models_dir": str(models_dir),
+                "logs_dir": str(logs_dir),
+                "output_root": str(output_root),
+            },
+            indent=2,
+        )
+    )
     print("Completed run_all workflow.")
 
 

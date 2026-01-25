@@ -260,15 +260,26 @@ def summarize_regime_metrics(
     if trace_df.empty:
         return rows
     has_eval_id = "eval_id" in trace_df.columns
+    has_eval_window = "eval_window" in trace_df.columns
     group_cols = ["run_id", "model_type", "seed"]
     if has_eval_id:
         group_cols = ["eval_id"] + group_cols
+    if has_eval_window:
+        group_cols = ["eval_window"] + group_cols
     for group_keys, group in trace_df.groupby(group_cols):
         if has_eval_id:
-            eval_id, run_id, model_type, seed = group_keys
+            if has_eval_window:
+                eval_window, eval_id, run_id, model_type, seed = group_keys
+            else:
+                eval_window = None
+                eval_id, run_id, model_type, seed = group_keys
         else:
             eval_id = None
-            run_id, model_type, seed = group_keys
+            if has_eval_window:
+                eval_window, run_id, model_type, seed = group_keys
+            else:
+                eval_window = None
+                run_id, model_type, seed = group_keys
         seed_val = int(seed)
         for regime, regime_group in group.groupby("regime"):
             metrics = compute_metrics(
@@ -288,6 +299,8 @@ def summarize_regime_metrics(
             }
             if has_eval_id:
                 row["eval_id"] = eval_id
+            if has_eval_window:
+                row["eval_window"] = eval_window
             rows.append(row)
         if include_all:
             metrics = compute_metrics(
@@ -307,5 +320,7 @@ def summarize_regime_metrics(
             }
             if has_eval_id:
                 row["eval_id"] = eval_id
+            if has_eval_window:
+                row["eval_window"] = eval_window
             rows.append(row)
     return rows

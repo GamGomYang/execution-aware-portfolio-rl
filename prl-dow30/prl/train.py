@@ -245,12 +245,13 @@ def _write_run_metadata(
             cost_params=cost_params,
             schema_version=manifest.get("env_schema_version", "v1"),
         )
+    outputs_root = base_dir.parent
     report_paths = {
         "trace_path": str(base_dir / f"trace_{run_id}.parquet"),
         "regime_thresholds_path": str(base_dir / f"regime_thresholds_{run_id}.json"),
         "step4_report_path": str(base_dir / f"step4_report_{run_id}.md"),
         "regime_metrics_path": str(base_dir / "regime_metrics.csv"),
-        "figures_dir": str(Path("outputs/figures") / run_id),
+        "figures_dir": str(outputs_root / "figures" / run_id),
     }
     meta = {
         "run_id": run_id,
@@ -372,6 +373,8 @@ def run_training(
     raw_dir: str | Path = "data/raw",
     processed_dir: str | Path = "data/processed",
     output_dir: str | Path = "outputs/models",
+    reports_dir: str | Path | None = None,
+    logs_dir: str | Path | None = None,
     force_refresh: bool = True,
     offline: bool = False,
     cache_only: bool = False,
@@ -440,7 +443,7 @@ def run_training(
         logit_scale=logit_scale,
     )
     num_assets = market.returns.shape[1]
-    log_dir = Path("outputs/logs")
+    log_dir = Path(logs_dir) if logs_dir is not None else Path("outputs/logs")
     log_path = log_dir / f"train_{run_id}.csv"
     callbacks = [TrainLoggingCallback(log_path, run_id, model_type, seed, log_interval=log_interval)]
     if mode == "paper" and checkpoint_interval:
@@ -468,5 +471,6 @@ def run_training(
     output_path.mkdir(parents=True, exist_ok=True)
     model_path = output_path / f"{run_id}_final.zip"
     model.save(model_path)
-    _write_run_metadata(Path("outputs/reports"), config, seed, mode, model_type, run_id, model_path, log_path)
+    reports_path = Path(reports_dir) if reports_dir is not None else Path("outputs/reports")
+    _write_run_metadata(reports_path, config, seed, mode, model_type, run_id, model_path, log_path)
     return model_path

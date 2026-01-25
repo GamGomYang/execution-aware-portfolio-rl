@@ -95,33 +95,28 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
 
         return DummyEnv()
 
-    def _fake_run_training(
-        config,
-        model_type,
-        seed,
-        raw_dir="data/raw",
-        processed_dir="data/processed",
-        output_dir="outputs/models",
-        force_refresh=True,
-        offline=False,
-        cache_only=False,
-    ):
-        output_dir = Path(output_dir)
+    def _fake_run_training(*args, **kwargs):
+        config = kwargs.get("config", cfg)
+        model_type = kwargs.get("model_type", "baseline")
+        seed = kwargs.get("seed", 0)
+        output_dir = Path(kwargs.get("output_dir", "outputs/models"))
+        reports_dir = Path(kwargs.get("reports_dir", "outputs/reports"))
+        logs_dir = Path(kwargs.get("logs_dir", "outputs/logs"))
         output_dir.mkdir(parents=True, exist_ok=True)
         run_id = _generate_run_id(config, seed, model_type)
         model_path = output_dir / f"{run_id}_final.zip"
         model_path.write_bytes(b"dummy")
 
-        log_dir = Path("outputs/logs")
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"train_{run_id}.csv"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        log_path = logs_dir / f"train_{run_id}.csv"
         log_path.write_text(
             "schema_version,run_id,model_type,seed,timesteps,actor_loss,critic_loss,entropy_loss,ent_coef,ent_coef_loss,alpha_obs_mean,alpha_next_mean\n"
             "1.1,run,baseline,0,1,0.0,0.0,,0.2,,,\n"
         )
 
+        reports_dir.mkdir(parents=True, exist_ok=True)
         _write_run_metadata(
-            Path("outputs/reports"),
+            reports_dir,
             config,
             seed,
             config.get("mode", ""),
