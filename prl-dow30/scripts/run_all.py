@@ -281,6 +281,20 @@ def _update_run_metadata(path: Path, updates: dict) -> None:
         data["evaluation"] = merged_eval
         updates = {k: v for k, v in updates.items() if k != "evaluation"}
     data.update(updates)
+    report_paths = data.get("report_paths", {})
+    eval_section = updates.get("evaluation") or updates.get("evaluations", {})
+    if isinstance(eval_section, dict):
+        last_eval = eval_section if "trace_path" in eval_section else None
+        if "evaluations" in updates and isinstance(updates["evaluations"], dict):
+            last_eval = list(updates["evaluations"].values())[-1]
+        if last_eval:
+            trace_path = last_eval.get("trace_path")
+            thresholds_path = last_eval.get("regime_thresholds_path")
+            if trace_path:
+                report_paths["trace_path"] = trace_path
+            if thresholds_path:
+                report_paths["regime_thresholds_path"] = thresholds_path
+            data["report_paths"] = report_paths
     path.write_text(json.dumps(data, indent=2))
 
 
@@ -293,6 +307,12 @@ def main():
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
     data_cfg = cfg.get("data", {})
+    if prl_cfg:
+        multiplier = prl_cfg.get("mid_plasticity_multiplier")
+        if multiplier is not None:
+            logging.info("PRL mid_plasticity_multiplier=%s", multiplier)
+        else:
+            logging.info("PRL mid_plasticity_multiplier not set")
     if data_cfg.get("paper_mode", False) and not data_cfg.get("require_cache", False):
         raise ValueError("paper_mode=true requires require_cache=true.")
     raw_dir = data_cfg.get("raw_dir", "data/raw")
@@ -322,10 +342,18 @@ def main():
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
     eval_windows = _resolve_eval_windows(cfg)
     multi_window = len(eval_windows) > 1
+    eval_cfg = cfg.get("eval", {}) or {}
+    write_trace = eval_cfg.get("write_trace", True)
+    trace_stride = int(eval_cfg.get("trace_stride", 1))
+    if trace_stride < 1:
+        raise ValueError("trace_stride must be >= 1")
+    run_baselines_flag = eval_cfg.get("run_baselines", True)
+    write_step4 = eval_cfg.get("write_step4", True) and write_trace
 
     metrics_rows: list[dict] = []
     regime_rows: list[dict] = []
     run_ids_this_session: list[str] = []
+    step4_targets: set[str] = set()
     output_root = Path(args.output_root)
     reports_dir = output_root / "reports"
     traces_dir = output_root / "traces"
@@ -366,6 +394,7 @@ def main():
             if meta is None:
                 raise ValueError(f"RUN_METADATA_NOT_FOUND for run_id={run_id}")
             meta_by_type[model_type] = meta
+            step4_targets.add(run_id)
 
             for window in eval_windows:
                 env = build_env_for_range(
@@ -434,7 +463,7 @@ def main():
                     elif model_type == "baseline" and "prl" not in args.model_types:
                         include_baselines = True
                 window_suffix = f"_{window['name']}" if multi_window else ""
-                if include_baselines:
+                if include_baselines and run_baselines_flag:
                     baseline_emitted_windows.add(window["name"])
                     strategy_metrics, strategy_trace_df = eval_strategies_to_trace(
                         aligned_returns,
@@ -447,8 +476,9 @@ def main():
                     strategy_trace_df["eval_window"] = window["name"]
                     strategy_trace_df = strategy_trace_df.merge(vz_df, on="date", how="left")
                     strategy_trace_df = compute_regime_labels(strategy_trace_df, thresholds)
-                    strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}{window_suffix}.parquet"
-                    strategy_trace_df.to_parquet(strategy_trace_path, index=False)
+                    if write_trace:
+                        strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}{window_suffix}.parquet"
+                        strategy_trace_df.iloc[::trace_stride].to_parquet(strategy_trace_path, index=False)
                     regime_rows.extend(summarize_regime_metrics(strategy_trace_df, period="test"))
                     for name, base_metrics in strategy_metrics.items():
                         metrics_rows.append(
@@ -465,7 +495,10 @@ def main():
                     run_ids_this_session.append(baseline_strategy_run_id)
 
                 trace_path = reports_dir / f"trace_{run_id}{window_suffix}.parquet"
-                trace_df.to_parquet(trace_path, index=False)
+                if write_trace:
+                    trace_to_save = trace_df.iloc[::trace_stride].copy()
+                    trace_path_to_write = trace_path
+                    trace_to_save.to_parquet(trace_path_to_write, index=False)
                 run_ids_this_session.append(run_id)
 
                 thresholds_path = reports_dir / f"regime_thresholds_{run_id}{window_suffix}.json"
@@ -480,7 +513,7 @@ def main():
                 }
                 evaluation_payload = {
                     **eval_info,
-                    "trace_path": str(trace_path),
+                    "trace_path": str(trace_path) if write_trace else None,
                     "regime_thresholds_path": str(thresholds_path),
                     "metrics_row_id": metrics_row_id,
                     "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -528,6 +561,34 @@ def main():
             indent=2,
         )
     )
+    if write_step4 and step4_targets:
+        from scripts import make_step4_report
+
+        import sys
+
+        for run_id in sorted(step4_targets):
+            meta_path = reports_dir / f"run_metadata_{run_id}.json"
+            if not meta_path.exists():
+                continue
+            if not write_trace:
+                continue
+            args_list = [
+                "make_step4_report",
+                "--run-id",
+                run_id,
+                "--metadata",
+                str(meta_path),
+                "--outputs-dir",
+                str(output_root),
+            ]
+            prev_argv = sys.argv
+            sys.argv = args_list
+            try:
+                make_step4_report.main()
+            except Exception as exc:  # pragma: no cover - best-effort
+                logging.warning("step4 report failed for %s: %s", run_id, exc)
+            finally:
+                sys.argv = prev_argv
     print("Completed run_all workflow.")
 
 

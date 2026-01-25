@@ -1,0 +1,46 @@
+{
+  "run_id": "20260125T015607Z_de20c303_seed0_baseline_2db1",
+  "seed": 0,
+  "mode": "default",
+  "model_type": "baseline",
+  "config_path": "",
+  "config_hash": "de20c303903aa1638e64eef2e23aab60b4995e7f58f0bab5553c526318f61584",
+  "git_commit": "1469e1daa97ffd848df7d19a8fb6a58780d449e7",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_version": "2.3.1+cpu",
+  "yfinance_version": "1.1.0",
+  "sb3_version": "2.3.0",
+  "packages": {
+    "torch": "2.3.1+cpu",
+    "pandas": "3.0.0",
+    "yfinance": "1.1.0",
+    "stable_baselines3": "2.3.0"
+  },
+  "created_at": "2026-01-25T01:56:08.513271+00:00",
+  "data_manifest_path": "/tmp/pytest-of-root/pytest-6/test_short_train_and_eval_pipe0/data/processed/data_manifest.json",
+  "data_manifest_hash": "619f5e0e4afb17c8bea7753daf54d24fbbcf3d25c0e1a35fcdbe199fa2a7c687",
+  "asset_list": [
+    "AAA",
+    "BBB"
+  ],
+  "num_assets": 2,
+  "L": null,
+  "Lv": null,
+  "obs_dim_expected": null,
+  "env_signature_hash": null,
+  "artifacts": {
+    "model_path": "/tmp/pytest-of-root/pytest-6/test_short_train_and_eval_pipe0/outputs/models/20260125T015607Z_de20c303_seed0_baseline_2db1_final.zip",
+    "train_log_path": "outputs/logs/train_20260125T015607Z_de20c303_seed0_baseline_2db1.csv"
+  },
+  "artifact_paths": {
+    "model_path": "/tmp/pytest-of-root/pytest-6/test_short_train_and_eval_pipe0/outputs/models/20260125T015607Z_de20c303_seed0_baseline_2db1_final.zip",
+    "train_log_path": "outputs/logs/train_20260125T015607Z_de20c303_seed0_baseline_2db1.csv"
+  },
+  "report_paths": {
+    "trace_path": "outputs/reports/trace_20260125T015607Z_de20c303_seed0_baseline_2db1.parquet",
+    "regime_thresholds_path": "outputs/reports/regime_thresholds_20260125T015607Z_de20c303_seed0_baseline_2db1.json",
+    "step4_report_path": "outputs/reports/step4_report_20260125T015607Z_de20c303_seed0_baseline_2db1.md",
+    "regime_metrics_path": "outputs/reports/regime_metrics.csv",
+    "figures_dir": "outputs/figures/20260125T015607Z_de20c303_seed0_baseline_2db1"
+  }
+}

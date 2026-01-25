@@ -1,0 +1,72 @@
+{
+  "run_id": "runid_baseline_seed0",
+  "seed": 0,
+  "mode": "smoke",
+  "model_type": "baseline",
+  "config_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/case_a/config.yaml",
+  "config_hash": "1dc1489c44153aaad52a67b327d1950966f407f4e44a168964e3b234dbc6aa0e",
+  "git_commit": "1469e1daa97ffd848df7d19a8fb6a58780d449e7",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_version": "2.3.1+cpu",
+  "yfinance_version": "1.1.0",
+  "sb3_version": "2.3.0",
+  "packages": {
+    "torch": "2.3.1+cpu",
+    "pandas": "3.0.0",
+    "yfinance": "1.1.0",
+    "stable_baselines3": "2.3.0"
+  },
+  "created_at": "2026-01-25T01:36:21.751658+00:00",
+  "data_manifest_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/case_a/processed/data_manifest.json",
+  "data_manifest_hash": "0a31ee60cb50c48550616a37e3e8cebb25b204fe80c53e14dec66bb615d0f37e",
+  "asset_list": [
+    "AAA",
+    "BBB"
+  ],
+  "num_assets": 2,
+  "L": 2,
+  "Lv": 2,
+  "obs_dim_expected": 8,
+  "env_signature_hash": "9d116aa0c8675543fe7c2ce59d77dadea5efbd6ce1bf5c829e16ea3336fdb8e3",
+  "artifacts": {
+    "model_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/models/runid_baseline_seed0_final.zip",
+    "train_log_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/logs/train_runid_baseline_seed0.csv"
+  },
+  "artifact_paths": {
+    "model_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/models/runid_baseline_seed0_final.zip",
+    "train_log_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/logs/train_runid_baseline_seed0.csv"
+  },
+  "report_paths": {
+    "trace_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/trace_runid_baseline_seed0.parquet",
+    "regime_thresholds_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/regime_thresholds_runid_baseline_seed0.json",
+    "step4_report_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/step4_report_runid_baseline_seed0.md",
+    "regime_metrics_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/regime_metrics.csv",
+    "figures_dir": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/figures/runid_baseline_seed0"
+  },
+  "evaluations": {
+    "test": {
+      "eval_start_date": "2020-01-01",
+      "eval_end_date": "2020-01-03",
+      "eval_num_days": 3,
+      "eval_window": "test",
+      "trace_path": null,
+      "regime_thresholds_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/regime_thresholds_runid_baseline_seed0.json",
+      "metrics_row_id": 0,
+      "completed_at": "2026-01-25T01:36:21.785496+00:00"
+    }
+  },
+  "eval_start_date": "2020-01-01",
+  "eval_end_date": "2020-01-03",
+  "eval_num_days": 3,
+  "eval_window": "test",
+  "evaluation": {
+    "eval_start_date": "2020-01-01",
+    "eval_end_date": "2020-01-03",
+    "eval_num_days": 3,
+    "eval_window": "test",
+    "trace_path": null,
+    "regime_thresholds_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/regime_thresholds_runid_baseline_seed0.json",
+    "metrics_row_id": 0,
+    "completed_at": "2026-01-25T01:36:21.785496+00:00"
+  }
+}

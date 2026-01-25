@@ -1,14 +1,14 @@
 {
-  "created_at": "2026-01-12T14:39:30.125246+00:00",
-  "start": "2010-01-01",
+  "created_at": "2026-01-25T02:33:08.343973+00:00",
+  "start": "2016-01-01",
   "end": "2025-12-31",
   "universe_policy": "availability_filtered",
   "calendar_freq": "B",
-  "market_closed_days_removed": 151,
-  "market_closed_fraction_removed": 0.03617632965979876,
+  "market_closed_days_removed": 96,
+  "market_closed_fraction_removed": 0.036795707167497124,
   "market_closed_rule": "drop_all_nan_rows_before_missing_fraction",
-  "total_days_before_drop": 4174,
-  "total_days_after_drop": 4023,
+  "total_days_before_drop": 2609,
+  "total_days_after_drop": 2513,
   "requested_tickers": [
     "AAPL",
     "AMGN",
@@ -65,37 +65,81 @@
     "MSFT",
     "NKE",
     "PG",
+    "TRV",
     "UNH",
     "V",
     "VZ",
     "WMT"
   ],
   "dropped_tickers": [
-    "TRV",
     "WBA",
     "DOW"
   ],
   "dropped_reasons": {
-    "TRV": "DOWNLOAD_FAILED",
     "WBA": "DOWNLOAD_FAILED",
     "DOW": "FIRST_DATE_TOO_LATE"
   },
-  "N_assets_final": 27,
+  "N_assets_final": 28,
+  "asset_list": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "TRV",
+    "UNH",
+    "V",
+    "VZ",
+    "WMT"
+  ],
+  "num_assets": 28,
+  "L": 10,
+  "Lv": 10,
+  "obs_dim_expected": 336,
+  "env_signature_hash": "091b2e6f539ba1b8ef2cf0de2f6f3f94abb3cc6a99936c7855dce89d37fac862",
+  "env_schema_version": "v1",
+  "feature_flags": {
+    "returns_window": true,
+    "volatility": true,
+    "prev_weights": true
+  },
+  "cost_params": {
+    "transaction_cost": 0.0005
+  },
   "source": "yfinance_only",
   "price_type": "adj_close",
   "processed_hashes": {
-    "prices.parquet": "1a13030817d6017745d58a6a4aade41eba79a4338cfc40a61a3cf772997a73f7",
-    "returns.parquet": "092e73380ae4f24c015625d1eec1eb268dd97fe89fb1899bd30b4fe0e9a58919"
+    "prices.parquet": "a520d4de02fa2c94539fa6b5e8276692d04603186bdf8a66e71218663c3049d1",
+    "returns.parquet": "159273ff20c78c2d42fceff4bd43fc4095ad53557fda338468e865c98332d638"
   },
   "quality_params": {
-    "min_vol_std": 0.005,
-    "min_max_abs_return": 0.02,
-    "max_flat_fraction": 0.2,
-    "max_missing_fraction": 0.01
+    "min_vol_std": 0.0,
+    "min_max_abs_return": 0.0,
+    "max_flat_fraction": 1.0,
+    "max_missing_fraction": 1.0
   },
-  "min_history_days": 500,
-  "min_assets": 20,
-  "history_tolerance_days": 30,
+  "min_history_days": 120,
+  "min_assets": 15,
+  "history_tolerance_days": 60,
   "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
-  "yfinance_version": "1.0"
+  "yfinance_version": "1.1.0",
+  "data_manifest_hash": "2d8774426203fbf9ab4d551ac6563e8930e7e1ba25452b89c6746d187f3dd9b4"
 }

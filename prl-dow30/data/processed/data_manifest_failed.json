@@ -1,0 +1,47 @@
+{
+  "created_at": "2026-01-25T01:38:37.859485+00:00",
+  "start": "2024-01-02",
+  "end": "2024-04-15",
+  "requested_tickers": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "TRV",
+    "UNH",
+    "V",
+    "VZ",
+    "WBA",
+    "WMT",
+    "DOW"
+  ],
+  "kept_tickers": [],
+  "dropped_tickers": [
+    "WBA"
+  ],
+  "dropped_reasons": {
+    "WBA": "DOWNLOAD_FAILED"
+  },
+  "N_assets_final": 0,
+  "min_assets": 2,
+  "error_code": "FIXED_LIST_DOWNLOAD_FAILED"
+}

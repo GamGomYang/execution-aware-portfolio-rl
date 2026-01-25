@@ -1,0 +1,73 @@
+{
+  "run_id": "20260125T013911Z_e020c1ca_seed0_baseline_927f",
+  "seed": 0,
+  "mode": "fast_real",
+  "model_type": "baseline",
+  "config_path": "/tmp/fast_real.yaml",
+  "config_hash": "e020c1cac64467158787dca1122401390946063041250a30d69ca24e535c609b",
+  "git_commit": "1469e1daa97ffd848df7d19a8fb6a58780d449e7",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_version": "2.3.1+cpu",
+  "yfinance_version": "1.1.0",
+  "sb3_version": "2.3.0",
+  "packages": {
+    "torch": "2.3.1+cpu",
+    "pandas": "3.0.0",
+    "yfinance": "1.1.0",
+    "stable_baselines3": "2.3.0"
+  },
+  "created_at": "2026-01-25T01:39:13.409261+00:00",
+  "data_manifest_path": "data/processed/data_manifest.json",
+  "data_manifest_hash": "a220b125c95a7d67bc6d5b4f608bfc6a0288feccc1d1781e91badb02fd74a959",
+  "asset_list": [
+    "AAPL",
+    "MSFT",
+    "SPY"
+  ],
+  "num_assets": 3,
+  "L": null,
+  "Lv": null,
+  "obs_dim_expected": null,
+  "env_signature_hash": null,
+  "artifacts": {
+    "model_path": "tmp_fast_real_out/models/20260125T013911Z_e020c1ca_seed0_baseline_927f_final.zip",
+    "train_log_path": "tmp_fast_real_out/logs/train_20260125T013911Z_e020c1ca_seed0_baseline_927f.csv"
+  },
+  "artifact_paths": {
+    "model_path": "tmp_fast_real_out/models/20260125T013911Z_e020c1ca_seed0_baseline_927f_final.zip",
+    "train_log_path": "tmp_fast_real_out/logs/train_20260125T013911Z_e020c1ca_seed0_baseline_927f.csv"
+  },
+  "report_paths": {
+    "trace_path": "tmp_fast_real_out/reports/trace_20260125T013911Z_e020c1ca_seed0_baseline_927f.parquet",
+    "regime_thresholds_path": "tmp_fast_real_out/reports/regime_thresholds_20260125T013911Z_e020c1ca_seed0_baseline_927f.json",
+    "step4_report_path": "tmp_fast_real_out/reports/step4_report_20260125T013911Z_e020c1ca_seed0_baseline_927f.md",
+    "regime_metrics_path": "tmp_fast_real_out/reports/regime_metrics.csv",
+    "figures_dir": "tmp_fast_real_out/figures/20260125T013911Z_e020c1ca_seed0_baseline_927f"
+  },
+  "evaluations": {
+    "W1": {
+      "eval_start_date": "2024-03-08",
+      "eval_end_date": "2024-04-12",
+      "eval_num_days": 25,
+      "eval_window": "W1",
+      "trace_path": "tmp_fast_real_out/reports/trace_20260125T013911Z_e020c1ca_seed0_baseline_927f.parquet",
+      "regime_thresholds_path": "tmp_fast_real_out/reports/regime_thresholds_20260125T013911Z_e020c1ca_seed0_baseline_927f.json",
+      "metrics_row_id": 0,
+      "completed_at": "2026-01-25T01:39:13.625718+00:00"
+    }
+  },
+  "eval_start_date": "2024-03-08",
+  "eval_end_date": "2024-04-12",
+  "eval_num_days": 25,
+  "eval_window": "W1",
+  "evaluation": {
+    "eval_start_date": "2024-03-08",
+    "eval_end_date": "2024-04-12",
+    "eval_num_days": 25,
+    "eval_window": "W1",
+    "trace_path": "tmp_fast_real_out/reports/trace_20260125T013911Z_e020c1ca_seed0_baseline_927f.parquet",
+    "regime_thresholds_path": "tmp_fast_real_out/reports/regime_thresholds_20260125T013911Z_e020c1ca_seed0_baseline_927f.json",
+    "metrics_row_id": 0,
+    "completed_at": "2026-01-25T01:39:13.625718+00:00"
+  }
+}

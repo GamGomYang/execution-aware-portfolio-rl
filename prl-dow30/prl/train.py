@@ -83,6 +83,7 @@ def create_scheduler(prl_cfg: Dict[str, float], window_size: int, num_assets: in
         vol_std=std,
         window_size=window_size,
         num_assets=num_assets,
+        mid_plasticity_multiplier=prl_cfg.get("mid_plasticity_multiplier", 1.0),
     )
     return PRLAlphaScheduler(cfg)
 
@@ -231,18 +232,19 @@ def _write_run_metadata(
     if obs_dim_expected is None and L is not None and num_assets:
         obs_dim_expected = int(num_assets) * (int(L) + 2)
     env_signature_hash = manifest.get("env_signature_hash")
-    if env_signature_hash is None and asset_list and L is not None and Lv is not None:
-        feature_flags = manifest.get(
-            "feature_flags",
-            {"returns_window": True, "volatility": True, "prev_weights": True},
-        )
-        cost_params = manifest.get("cost_params", {"transaction_cost": config.get("env", {}).get("c_tc")})
+    feature_flags = manifest.get(
+        "feature_flags",
+        {"returns_window": True, "volatility": True, "prev_weights": True},
+    )
+    # Always compute signature with the configured transaction cost; manifest may carry a different default.
+    cost_params_cfg = {"transaction_cost": config.get("env", {}).get("c_tc")}
+    if asset_list and L is not None and Lv is not None:
         env_signature_hash = compute_env_signature(
             asset_list,
             int(L),
             int(Lv),
             feature_flags=feature_flags,
-            cost_params=cost_params,
+            cost_params=cost_params_cfg,
             schema_version=manifest.get("env_schema_version", "v1"),
         )
     outputs_root = base_dir.parent

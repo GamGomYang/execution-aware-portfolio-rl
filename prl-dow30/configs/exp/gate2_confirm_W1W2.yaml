@@ -1,4 +1,5 @@
 mode: gate2_confirm
+name: gate2_confirm_W1W2
 
 dates:
   train_start: '2015-01-01'
@@ -14,6 +15,10 @@ eval:
     - name: W2
       start: '2022-02-15'
       end: '2023-12-29'
+  write_trace: true
+  trace_stride: 5
+  run_baselines: false
+  write_step4: false
 
 data:
   raw_dir: data/raw
@@ -21,11 +26,10 @@ data:
   source: yfinance_only
   universe_policy: availability_filtered
   min_assets: 20
-  force_refresh: false
   offline: true
   require_cache: true
   paper_mode: true
-  min_history_days: 90
+  min_history_days: 180
   history_tolerance_days: 90
   ticker_substitutions: {}
   quality_params:
@@ -54,13 +58,14 @@ sac:
   batch_size: 64
   gamma: 0.99
   tau: 0.005
-  buffer_size: 20000
-  total_timesteps: 5000
-  eval_freq: 1000
+  buffer_size: 60000
+  total_timesteps: 40000
+  eval_freq: 2000
   ent_coef: 0.2
-  log_interval_steps: 50
+  log_interval_steps: 200
   checkpoint_interval: null
 
 seeds:
   - 0
   - 1
+  - 2

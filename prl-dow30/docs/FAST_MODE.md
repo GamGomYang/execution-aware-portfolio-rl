@@ -16,3 +16,16 @@
 - Do not delete or overwrite previous runs; pick a fresh `--output-root` per gate cycle.
 - Any analysis, dashboards, or reports should resolve artifacts via `run_index.json` rather than hardcoded `outputs/reports`.
 - Net_exp metrics remain the primary decision signal; gross/net_lin are secondary diagnostics.
+
+## Gate run commands (templates)
+- Gate0 smoke (W1): `python -m scripts.run_all --config configs/exp/gate0_smoke_W1.yaml --output-root outputs/exp_runs/gate0_smoke/<ts>`
+- Gate1 reference baseline (W1, seeds=1, force_refresh=false): `python -m scripts.run_all --config configs/exp/gate1_reference_baseline_sac_W1.yaml --model-types baseline --output-root outputs/exp_runs/gate1/reference_baseline_sac/<ts>`
+- Gate1 screen (A-series knobs): `python -m scripts.run_all --config configs/exp/exp_A1_smooth_a010.yaml --output-root outputs/exp_runs/A1_a010/<ts>`
+- Gate2 confirm (W1+W2): `python -m scripts.run_all --config configs/exp/gate2_confirm_W1W2.yaml --output-root outputs/exp_runs/gate2_confirm/<ts>`
+- Gate3 risk align: `python -m scripts.run_all --config configs/exp/gate3_riskalign.yaml --output-root outputs/exp_runs/gate3/<ts>`
+- Final: `python -m scripts.run_all --config configs/exp/final_confirm.yaml --output-root outputs/exp_runs/final/<ts>`
+
+## Post-run analysis
+- Metrics/regime filter by run_index: `python -m scripts.analyze_paper_results --metrics <out>/reports/metrics.csv --regime-metrics <out>/reports/regime_metrics.csv --run-index <out>/reports/run_index.json --output-dir <out>/reports`
+- Diagnosis decomposition: `python -m scripts.diagnosis_decomposition --metrics <out>/reports/metrics.csv --regime-metrics <out>/reports/regime_metrics.csv --output-dir <out>/reports`
+- Gate1 leaderboard: `python -m scripts.build_gate1_leaderboard --reference-run-index outputs/exp_runs/gate1/reference_baseline_sac/<ts_ref>/reports/run_index.json --candidate-run-indexes "outputs/exp_runs/gate1/*/*/reports/run_index.json" --output-dir outputs/exp_runs/gate1`

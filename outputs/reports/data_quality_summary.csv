@@ -1,0 +1,3 @@
+ticker,kept,drop_reason,missing_fraction_raw,valid_obs_count,first_valid_date,return_std,max_abs_return,flat_fraction,market_closed_days_removed,market_closed_fraction_removed,total_days_before_drop,total_days_after_drop
+AAA,True,,0.0,8,2020-01-01,0.0002037872745084959,0.010000000000000009,0.125,0,0.0,8,8
+BBB,False,DOWNLOAD_FAILED,1.0,0,,,,,0,0.0,8,8

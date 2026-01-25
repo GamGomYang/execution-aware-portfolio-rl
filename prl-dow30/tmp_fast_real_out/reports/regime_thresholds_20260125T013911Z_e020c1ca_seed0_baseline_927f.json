@@ -1,0 +1,8 @@
+{
+  "q33": -0.17016223415152837,
+  "q66": 0.9580453949694985,
+  "regime_policy": "Vz quantile split on aligned eval window",
+  "eval_start_date": "2024-03-08",
+  "eval_end_date": "2024-04-12",
+  "eval_num_days": 25
+}

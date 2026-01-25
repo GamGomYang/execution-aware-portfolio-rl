@@ -1,0 +1,34 @@
+{
+  "exp_name": "fast_real_run",
+  "timestamp": "2026-01-25T01:39:14.330125+00:00",
+  "config_path": "/tmp/fast_real.yaml",
+  "model_types": [
+    "baseline"
+  ],
+  "seeds": [
+    0
+  ],
+  "eval_windows": {
+    "train_start": "2024-01-02",
+    "train_end": "2024-02-28",
+    "test_start": "2024-03-01",
+    "test_end": "2024-04-15",
+    "windows": [
+      {
+        "name": "W1",
+        "start": "2024-03-01",
+        "end": "2024-04-15"
+      }
+    ]
+  },
+  "run_ids": [
+    "20260125T013911Z_e020c1ca_seed0_baseline_927f"
+  ],
+  "metrics_path": "tmp_fast_real_out/reports/metrics.csv",
+  "regime_metrics_path": "tmp_fast_real_out/reports/regime_metrics.csv",
+  "reports_dir": "tmp_fast_real_out/reports",
+  "traces_dir": "tmp_fast_real_out/traces",
+  "models_dir": "tmp_fast_real_out/models",
+  "logs_dir": "tmp_fast_real_out/logs",
+  "output_root": "tmp_fast_real_out"
+}

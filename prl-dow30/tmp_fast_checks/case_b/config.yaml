@@ -1,0 +1,50 @@
+data:
+  history_tolerance_days: 0
+  min_assets: 1
+  min_history_days: 5
+  offline: true
+  paper_mode: true
+  processed_dir: /workspace/study-model/prl-dow30/tmp_fast_checks/case_b/processed
+  quality_params:
+    max_flat_fraction: 1.0
+    max_missing_fraction: 1.0
+    min_max_abs_return: 0.0
+    min_vol_std: 0.0
+  raw_dir: data/raw
+  require_cache: true
+  source: yfinance_only
+  ticker_substitutions: {}
+  universe_policy: availability_filtered
+dates:
+  test_end: '2020-01-10'
+  test_start: '2020-01-01'
+  train_end: '2020-01-10'
+  train_start: '2020-01-01'
+env:
+  L: 2
+  Lv: 2
+  c_tc: 0.0
+  logit_scale: 1.0
+eval:
+  run_baselines: true
+  trace_stride: 5
+  write_step4: true
+  write_trace: true
+mode: smoke
+prl:
+  alpha0: 0.2
+  alpha_max: 1.0
+  alpha_min: 0.01
+  beta: 1.0
+  bias: 0.0
+  lambdav: 2.0
+sac:
+  batch_size: 8
+  buffer_size: 1000
+  ent_coef: 0.2
+  gamma: 0.99
+  learning_rate: 0.001
+  tau: 0.005
+  total_timesteps: 5
+seeds:
+- 0
