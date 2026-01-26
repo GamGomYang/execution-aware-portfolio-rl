@@ -66,7 +66,31 @@ class PRLSAC(SAC):
             alpha_obs, diagnostics = self.scheduler.alpha_from_obs(replay_data.observations, return_diagnostics=True)
             alpha_obs = alpha_obs.detach()
             assert alpha_obs.shape == log_prob.shape, "alpha_obs shape mismatch"
-            actor_loss = (alpha_obs * log_prob - min_q_pi).mean()
+            actor_loss_base = (alpha_obs * log_prob - min_q_pi).mean()
+
+            # CVaR/variance penalty hooks to down-weight tail risk or reduce variance of returns.
+            # penalty_raw terms keep gradients; penalty_weighted scales by gamma/beta.
+            gamma = getattr(self.scheduler.cfg, "cvar_penalty_gamma", None)
+            beta = getattr(self.scheduler.cfg, "var_penalty_beta", None)
+            if beta is None and gamma not in (None, 0):
+                # Fallback: reuse gamma as variance weight when beta is unspecified to ensure penalty has effect.
+                beta = gamma
+            # CVaR-style penalty: emphasize lower-tail Q-values (25% quantile)
+            tail_q = th.quantile(min_q_pi.detach(), 0.25)
+            cvar_penalty_raw = th.relu(tail_q - min_q_pi).mean()
+            var_penalty_raw = th.var(min_q_pi, unbiased=False)
+            penalty_weighted = th.zeros_like(actor_loss_base)
+            if gamma is not None and gamma != 0:
+                penalty_weighted = penalty_weighted + cvar_penalty_raw * float(gamma)
+            if beta is not None and beta != 0:
+                penalty_weighted = penalty_weighted + var_penalty_raw * float(beta)
+
+            # Clip penalty magnitude to avoid loss blow-ups when variance term explodes.
+            clamp_ratio = getattr(self.scheduler.cfg, "penalty_clip_ratio", 0.2)
+            max_penalty = clamp_ratio * actor_loss_base.abs()
+            penalty_weighted = th.clamp(penalty_weighted, min=-max_penalty, max=max_penalty)
+
+            actor_loss = actor_loss_base + penalty_weighted
 
             self.policy.actor.optimizer.zero_grad()
             actor_loss.backward()
@@ -86,3 +110,10 @@ class PRLSAC(SAC):
             self.logger.record("train/emergency_rate", diagnostics.emergency.float().mean().item())
             self.logger.record("train/beta_effective_mean", diagnostics.beta_effective.mean().item())
             self.logger.record("train/entropy_loss", float((alpha_obs * log_prob).mean().item()))
+            self.logger.record("train/actor_loss_base", actor_loss_base.item())
+            self.logger.record("train/cvar_penalty_raw_mean", cvar_penalty_raw.item())
+            self.logger.record("train/cvar_penalty_weighted_mean", (cvar_penalty_raw * float(gamma or 0.0)).item())
+            self.logger.record("train/var_penalty_raw_mean", var_penalty_raw.item())
+            self.logger.record("train/var_penalty_weighted_mean", (var_penalty_raw * float(beta or 0.0)).item())
+            penalty_ratio = abs(penalty_weighted.item()) / (abs(actor_loss_base.item()) + 1e-8)
+            self.logger.record("train/penalty_ratio", penalty_ratio)

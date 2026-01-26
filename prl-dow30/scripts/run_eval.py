@@ -41,6 +41,18 @@ def write_metrics(path: Path, row: dict):
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     file_exists = path.exists()

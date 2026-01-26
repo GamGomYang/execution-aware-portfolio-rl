@@ -39,6 +39,8 @@ def _collect_metric_columns(df: pd.DataFrame, *, include_turnover: bool = True) 
     for col in sorted(df.columns):
         if col.startswith(("sharpe_net_", "max_drawdown_net_", "cumulative_return_net_")):
             metric_cols.append(col)
+        if col.startswith(("mean_daily_", "std_daily_")):
+            metric_cols.append(col)
     return metric_cols
 
 
@@ -146,6 +148,30 @@ def _format_mean_std(values: np.ndarray) -> str:
 
 def _format_delta_ci(mean: float, ci_low: float, ci_high: float) -> str:
     return f"{mean:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
+
+
+def summarize_seed_stats(metrics_df: pd.DataFrame) -> pd.DataFrame:
+    df = metrics_df.copy()
+    if "period" in df.columns:
+        df = df[df["period"] == "test"].copy()
+    metric_cols = _collect_metric_columns(df, include_turnover=True)
+    group_cols = ["model_type"]
+    if "eval_window" in df.columns:
+        group_cols = ["eval_window"] + group_cols
+    rows = []
+    for keys, group in df.groupby(group_cols):
+        if len(group_cols) == 2:
+            eval_window, model_type = keys
+            row = {"eval_window": eval_window, "model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+        else:
+            model_type = keys
+            row = {"model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+        for col in metric_cols:
+            vals = group[col].to_numpy(dtype=np.float64)
+            row[f"{col}_mean"] = float(np.mean(vals)) if vals.size else float("nan")
+            row[f"{col}_std"] = float(np.std(vals, ddof=0)) if vals.size else float("nan")
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def _build_table(
@@ -326,9 +352,12 @@ def analyze_metrics(
     df = pd.read_csv(metrics_path)
     if run_ids:
         df = df[df["run_id"].isin(run_ids)].copy()
+    # summary per model_type/eval_window (seed-level means/stds), keep mean/std columns
+    summary_seed = summarize_seed_stats(df)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_seed.to_csv(output_dir / "summary_seed_stats.csv", index=False)
     diffs = compute_paired_diffs(df, baseline_model_type=baseline_model_type, prl_model_type=prl_model_type)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     diffs_path = output_dir / "paired_seed_diffs.csv"
     diffs.to_csv(diffs_path, index=False)
 
@@ -345,17 +374,25 @@ def analyze_metrics(
             ci_low, ci_high = bootstrap_ci(values, n_boot=n_boot)
             p_t = float("nan")
             p_w = float("nan")
+            wilcoxon_skip = ""
             if stats is not None and values.size >= 2:
                 try:
                     p_t = float(stats.ttest_rel(values, np.zeros_like(values)).pvalue)
                 except Exception:
                     p_t = float("nan")
                 try:
-                    p_w = float(stats.wilcoxon(values).pvalue)
-                except Exception:
+                    if np.allclose(values, 0.0):
+                        p_w = 1.0
+                        wilcoxon_skip = "all_zero"
+                    else:
+                        p_w = float(stats.wilcoxon(values).pvalue)
+                except Exception as exc:
                     p_w = float("nan")
+                    wilcoxon_skip = f"wilcoxon_error:{exc}"
             elif values.size >= 2:
                 p_t, p_w = _fallback_pvalues(values, seed=0)
+            else:
+                wilcoxon_skip = "n_lt_2"
             row = {
                 "metric": col,
                 "mean": mean,
@@ -364,6 +401,7 @@ def analyze_metrics(
                 "ci_high": ci_high,
                 "p_value_ttest": p_t,
                 "p_value_wilcoxon": p_w,
+                "wilcoxon_skipped_reason": wilcoxon_skip,
                 "n_seeds": int(values.size),
             }
             if group_field is not None:

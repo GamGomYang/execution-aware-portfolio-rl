@@ -45,7 +45,24 @@ def parse_args():
         default="outputs",
         help="Base directory for reports/models/logs (default: outputs).",
     )
+    parser.add_argument(
+        "--total-timesteps",
+        type=int,
+        help="Override sac.total_timesteps for quick smoke runs.",
+    )
     return parser.parse_args()
+
+
+def _mean_std_safe(values: list[float]) -> tuple[float, float]:
+    arr = np.asarray(list(values), dtype=np.float64)
+    arr = arr[~np.isnan(arr)]
+    if arr.size == 0:
+        return 0.0, 0.0
+    mean = float(arr.mean())
+    std = float(arr.std(ddof=0))
+    if std <= 1e-8:
+        std = 0.0
+    return mean, std
 
 
 def write_metrics(path: Path, rows: list[dict]) -> None:
@@ -72,6 +89,18 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     with path.open("w", newline="") as f:
@@ -99,6 +128,18 @@ def summarize_metrics(rows: list[dict]) -> list[dict]:
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     group_cols = ["model_type"]
@@ -164,6 +205,18 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     summary_rows: list[dict] = []
@@ -303,6 +356,9 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     cfg["config_path"] = args.config
+    if args.total_timesteps:
+        cfg.setdefault("sac", {})
+        cfg["sac"]["total_timesteps"] = args.total_timesteps
     dates = cfg["dates"]
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
@@ -431,6 +487,8 @@ def main():
                         **metrics.to_dict(),
                     }
                 )
+                # mid-only daily return mean/std (uses regime labels computed below)
+                metrics_row_ref = metrics_rows[metrics_row_id]
                 returns_slice = slice_frame(market.returns, window["start"], window["end"])
                 vol_slice = slice_frame(features.volatility, window["start"], window["end"])
                 returns_slice, vol_slice = _align_returns_vol(returns_slice, vol_slice)
@@ -448,6 +506,16 @@ def main():
                 vz_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values})
                 trace_df = trace_df.merge(vz_df, on="date", how="left")
                 trace_df = compute_regime_labels(trace_df, thresholds)
+                mid_df = trace_df[trace_df["regime"] == "mid"]
+                mean_gross_mid, std_gross_mid = _mean_std_safe(mid_df["portfolio_return"].tolist())
+                mean_exp_mid, std_exp_mid = _mean_std_safe(mid_df["net_return_exp"].tolist())
+                mean_lin_mid, std_lin_mid = _mean_std_safe(mid_df["net_return_lin"].tolist())
+                metrics_row_ref["mean_daily_return_gross_mid"] = mean_gross_mid
+                metrics_row_ref["std_daily_return_gross_mid"] = std_gross_mid
+                metrics_row_ref["mean_daily_net_return_exp_mid"] = mean_exp_mid
+                metrics_row_ref["std_daily_net_return_exp_mid"] = std_exp_mid
+                metrics_row_ref["mean_daily_net_return_lin_mid"] = mean_lin_mid
+                metrics_row_ref["std_daily_net_return_lin_mid"] = std_lin_mid
                 if "baseline" in meta_by_type and "prl" in meta_by_type:
                     base_meta = meta_by_type["baseline"]
                     prl_meta = meta_by_type["prl"]

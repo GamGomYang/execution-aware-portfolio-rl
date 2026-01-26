@@ -46,7 +46,6 @@ DOW30_TICKERS: Sequence[str] = (
     "UNH",
     "V",
     "VZ",
-    "WBA",
     "WMT",
     "DOW",
 )

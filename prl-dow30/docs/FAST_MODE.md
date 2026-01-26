@@ -24,8 +24,34 @@
 - Gate2 confirm (W1+W2): `python -m scripts.run_all --config configs/exp/gate2_confirm_W1W2.yaml --output-root outputs/exp_runs/gate2_confirm/<ts>`
 - Gate3 risk align: `python -m scripts.run_all --config configs/exp/gate3_riskalign.yaml --output-root outputs/exp_runs/gate3/<ts>`
 - Final: `python -m scripts.run_all --config configs/exp/final_confirm.yaml --output-root outputs/exp_runs/final/<ts>`
+- Gate3 (per-seed, W1+W2, timeout-safe):
+  - Baseline (seed loop): `for s in 0 1 2 3 4; do TS=$(date +%Y%m%d_%H%M%S); python -m scripts.run_all --config configs/exp/gate3_reference_baseline_sac_W1W2.yaml --model-types baseline --seeds $s --output-root outputs/exp_runs/gate3/reference_baseline_sac_seed${s}/${TS}; done`
+  - Candidate C1: `for s in 0 1 2 3 4; do TS=$(date +%Y%m%d_%H%M%S); python -m scripts.run_all --config configs/exp/gate3_m07_C1_varbeta_03.yaml --model-types prl --seeds $s --output-root outputs/exp_runs/gate3/m07_C1_varbeta_03_seed${s}/${TS}; done`
+  - Candidate C2: `for s in 0 1 2 3 4; do TS=$(date +%Y%m%d_%H%M%S); python -m scripts.run_all --config configs/exp/gate3_m07_C2_cvargamma_03.yaml --model-types prl --seeds $s --output-root outputs/exp_runs/gate3/m07_C2_cvargamma_03_seed${s}/${TS}; done`
+  - Pack(합본) 예시(각 시드 latest 폴더 대상으로 concat):  
+    ```
+    python - <<'PY'
+    import glob, json, pandas as pd, pathlib
+    roots = glob.glob('outputs/exp_runs/gate3/reference_baseline_sac_seed*/*')
+    out = pathlib.Path('outputs/exp_runs/gate3/reference_baseline_sac_PACK/reports')
+    out.mkdir(parents=True, exist_ok=True)
+    metrics = pd.concat([pd.read_csv(pathlib.Path(r,'reports/metrics.csv')) for r in roots])
+    regime = pd.concat([pd.read_csv(pathlib.Path(r,'reports/regime_metrics.csv')) for r in roots])
+    run_idx = {'run_ids':[], 'sources':{}}
+    for r in roots:
+        j = json.load(open(pathlib.Path(r,'reports/run_index.json')))
+        run_idx['run_ids'].extend(j.get('run_ids',[]))
+        run_idx['sources'][r]=j
+    metrics.to_csv(out/'metrics.csv', index=False)
+    regime.to_csv(out/'regime_metrics.csv', index=False)
+    json.dump(run_idx, open(out/'run_index.json','w'), indent=2)
+    PY
+    ```
 
 ## Post-run analysis
 - Metrics/regime filter by run_index: `python -m scripts.analyze_paper_results --metrics <out>/reports/metrics.csv --regime-metrics <out>/reports/regime_metrics.csv --run-index <out>/reports/run_index.json --output-dir <out>/reports`
 - Diagnosis decomposition: `python -m scripts.diagnosis_decomposition --metrics <out>/reports/metrics.csv --regime-metrics <out>/reports/regime_metrics.csv --output-dir <out>/reports`
 - Gate1 leaderboard: `python -m scripts.build_gate1_leaderboard --reference-run-index outputs/exp_runs/gate1/reference_baseline_sac/<ts_ref>/reports/run_index.json --candidate-run-indexes "outputs/exp_runs/gate1/*/*/reports/run_index.json" --output-dir outputs/exp_runs/gate1`
+- Gate3 analyze + leaderboard (PACK 기준):
+  - Analyze per PACK: `python -m scripts.analyze_paper_results --metrics <pack>/reports/metrics.csv --regime-metrics <pack>/reports/regime_metrics.csv --run-index <pack>/reports/run_index.json --output-dir <pack>/reports`
+  - Leaderboard: ref PACK vs C1/C2 PACK를 입력으로 `scripts.build_gate3_leaderboard.py`(gate2 버전과 동일 인터페이스)로 실행하거나, 임시로 pandas concat 후 동일 규칙(PASS: ΔSharpe>=+0.20 & MDD 악화 없음)으로 정렬해 CSV를 만든다.

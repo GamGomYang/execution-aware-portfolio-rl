@@ -84,6 +84,9 @@ def create_scheduler(prl_cfg: Dict[str, float], window_size: int, num_assets: in
         window_size=window_size,
         num_assets=num_assets,
         mid_plasticity_multiplier=prl_cfg.get("mid_plasticity_multiplier", 1.0),
+        var_penalty_beta=prl_cfg.get("var_penalty_beta"),
+        cvar_penalty_gamma=prl_cfg.get("cvar_penalty_gamma"),
+        penalty_clip_ratio=prl_cfg.get("penalty_clip_ratio", 0.2),
     )
     return PRLAlphaScheduler(cfg)
 
@@ -183,6 +186,12 @@ class TrainLoggingCallback(BaseCallback):
             "alpha_clamped_mean": logger_vals.get("train/alpha_clamped_mean"),
             "emergency_rate": logger_vals.get("train/emergency_rate"),
             "beta_effective_mean": logger_vals.get("train/beta_effective_mean"),
+            "actor_loss_base": logger_vals.get("train/actor_loss_base"),
+            "cvar_penalty_raw_mean": logger_vals.get("train/cvar_penalty_raw_mean"),
+            "cvar_penalty_weighted_mean": logger_vals.get("train/cvar_penalty_weighted_mean"),
+            "var_penalty_raw_mean": logger_vals.get("train/var_penalty_raw_mean"),
+            "var_penalty_weighted_mean": logger_vals.get("train/var_penalty_weighted_mean"),
+            "penalty_ratio": logger_vals.get("train/penalty_ratio"),
         }
         self.buffer.append(record)
         if len(self.buffer) >= self.log_interval:

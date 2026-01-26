@@ -23,6 +23,10 @@ class PRLConfig:
     emergency_mode: str = "clamp"
     emergency_vz_threshold: float = 2.0
     mid_plasticity_multiplier: float = 1.0
+    # Optional risk penalty knobs (currently logged only)
+    var_penalty_beta: float | None = None
+    cvar_penalty_gamma: float | None = None
+    penalty_clip_ratio: float = 0.2
 
 
 @dataclass
