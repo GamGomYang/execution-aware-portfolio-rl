@@ -238,6 +238,9 @@ def main():
     if not run_id:
         raise ValueError("run_id missing from metadata.")
 
+    # Ensure no lingering figures from prior runs/tests trigger warnings.
+    plt.close("all")
+
     paths = _resolve_paths(run_id, metadata, outputs_dir)
     figures_dir = paths["figures_dir"]
     _ensure_figure_dir(figures_dir)
@@ -274,6 +277,8 @@ def main():
     _plot_equity_curve(trace_df, figures_dir / "equity_curve.png")
     _plot_equity_by_regime(trace_df, figures_dir / "equity_by_regime.png")
     _plot_turnover_by_regime(trace_df, figures_dir / "turnover_by_regime.png")
+
+    plt.close("all")
 
     final_actor_loss = _last_value(train_df["actor_loss"]) if train_df is not None else None
     final_critic_loss = _last_value(train_df["critic_loss"]) if train_df is not None else None
