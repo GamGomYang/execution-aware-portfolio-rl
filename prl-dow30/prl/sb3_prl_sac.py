@@ -33,6 +33,17 @@ class PRLSAC(SAC):
         if self.scheduler is None:
             raise ValueError("PRL scheduler is required for training.")
         self.policy.set_training_mode(True)
+        def _record_tensor_stats(name: str, tensor: th.Tensor) -> None:
+            values = tensor.detach().float().view(-1)
+            if values.numel() == 0:
+                return
+            self.logger.record(f"train/{name}_min", values.min().item())
+            self.logger.record(f"train/{name}_max", values.max().item())
+            self.logger.record(f"train/{name}_p05", th.quantile(values, 0.05).item())
+            self.logger.record(f"train/{name}_p50", th.quantile(values, 0.50).item())
+            self.logger.record(f"train/{name}_p95", th.quantile(values, 0.95).item())
+            self.logger.record(f"train/{name}_std", values.std(unbiased=False).item())
+
         for _ in range(gradient_steps):
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
 
@@ -109,6 +120,10 @@ class PRLSAC(SAC):
             self.logger.record("train/alpha_clamped_mean", diagnostics.alpha_clamped.mean().item())
             self.logger.record("train/emergency_rate", diagnostics.emergency.float().mean().item())
             self.logger.record("train/beta_effective_mean", diagnostics.beta_effective.mean().item())
+            _record_tensor_stats("prl_prob", diagnostics.prl_prob)
+            _record_tensor_stats("vz", diagnostics.vz)
+            _record_tensor_stats("alpha_raw", diagnostics.alpha_raw)
+            _record_tensor_stats("alpha_obs", alpha_obs)
             self.logger.record("train/entropy_loss", float((alpha_obs * log_prob).mean().item()))
             self.logger.record("train/actor_loss_base", actor_loss_base.item())
             self.logger.record("train/cvar_penalty_raw_mean", cvar_penalty_raw.item())
