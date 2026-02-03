@@ -130,9 +130,30 @@ def _set_global_seeds(seed: int) -> None:
 
 def _config_hash(config: Dict) -> str:
     blob = json.dumps(config, sort_keys=True).encode("utf-8")
-    import hashlib
-
     return hashlib.sha256(blob).hexdigest()
+
+
+def _manifest_hash(manifest: Dict) -> str:
+    if not manifest:
+        return ""
+    if "data_manifest_hash" not in manifest:
+        payload = {key: value for key, value in manifest.items() if key != "data_manifest_hash"}
+        return sha256_bytes(canonical_json(payload))
+    return str(manifest.get("data_manifest_hash") or "")
+
+
+def _vol_stats_filename(config: Dict, lv: int, manifest_hash: str) -> str:
+    dates = config["dates"]
+    stats_key = manifest_hash or _config_hash(config)
+    return f"vol_stats_{stats_key[:8]}_Lv{lv}_{dates['train_start']}_{dates['train_end']}.json"
+
+
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def _git_commit() -> str:
@@ -220,15 +241,13 @@ def _write_run_metadata(
     run_id: str,
     model_path: Path,
     log_path: Path,
+    vol_stats_path: Path | None = None,
 ) -> Path:
     manifest_path = Path(config.get("data", {}).get("processed_dir", "data/processed")) / "data_manifest.json"
     manifest = {}
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text())
-    if "data_manifest_hash" not in manifest and manifest:
-        payload = {key: value for key, value in manifest.items() if key != "data_manifest_hash"}
-        manifest["data_manifest_hash"] = sha256_bytes(canonical_json(payload))
-    manifest_hash = manifest.get("data_manifest_hash", "")
+    manifest_hash = _manifest_hash(manifest)
     now = datetime.now(timezone.utc)
     config_hash_val = _config_hash(config)
     config_path = config.get("config_path", "")
@@ -264,6 +283,19 @@ def _write_run_metadata(
         "regime_metrics_path": str(base_dir / "regime_metrics.csv"),
         "figures_dir": str(outputs_root / "figures" / run_id),
     }
+    if vol_stats_path is None:
+        lv = config.get("env", {}).get("Lv")
+        if lv is None:
+            lv = manifest.get("Lv")
+        if lv is not None:
+            stats_filename = _vol_stats_filename(config, int(lv), manifest_hash)
+            processed_dir = Path(config.get("data", {}).get("processed_dir", "data/processed"))
+            vol_stats_path = processed_dir / stats_filename
+
+    vol_stats_hash = None
+    if vol_stats_path is not None and vol_stats_path.exists():
+        vol_stats_hash = _sha256_file(vol_stats_path)
+
     meta = {
         "run_id": run_id,
         "seed": seed,
@@ -285,6 +317,8 @@ def _write_run_metadata(
         "created_at": created_at,
         "data_manifest_path": str(manifest_path),
         "data_manifest_hash": manifest_hash,
+        "vol_stats_path": str(vol_stats_path) if vol_stats_path is not None else None,
+        "vol_stats_hash": vol_stats_hash,
         "asset_list": asset_list,
         "num_assets": num_assets,
         "L": L,
@@ -350,12 +384,15 @@ def prepare_market_and_features(
         force_refresh=force_refresh,
     )
     market = MarketData(prices=prices, returns=returns, manifest=manifest, quality_summary=quality_summary)
+    manifest_hash = _manifest_hash(manifest)
+    stats_filename = _vol_stats_filename(config, lv, manifest_hash)
     vol_features = compute_volatility_features(
         returns=market.returns,
         lv=lv,
         train_start=dates["train_start"],
         train_end=dates["train_end"],
         processed_dir=processed_dir,
+        stats_filename=stats_filename,
     )
     return market, vol_features
 
@@ -483,5 +520,15 @@ def run_training(
     model_path = output_path / f"{run_id}_final.zip"
     model.save(model_path)
     reports_path = Path(reports_dir) if reports_dir is not None else Path("outputs/reports")
-    _write_run_metadata(reports_path, config, seed, mode, model_type, run_id, model_path, log_path)
+    _write_run_metadata(
+        reports_path,
+        config,
+        seed,
+        mode,
+        model_type,
+        run_id,
+        model_path,
+        log_path,
+        vol_stats_path=features.stats_path,
+    )
     return model_path
