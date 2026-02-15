@@ -8,13 +8,41 @@ from scripts import build_gate3_leaderboard
 
 def _make_run_index(tmpdir: Path, name: str, rows: list[dict]) -> Path:
     reports = tmpdir / name / "reports"
+    logs = tmpdir / name / "logs"
     reports.mkdir(parents=True, exist_ok=True)
+    logs.mkdir(parents=True, exist_ok=True)
     metrics_path = reports / "metrics.csv"
     pd.DataFrame(rows).to_csv(metrics_path, index=False)
+    # create minimal PRL train logs for gate checks
+    for row in rows:
+        if "prl" not in str(row.get("model_type", "")):
+            continue
+        run_id = row["run_id"]
+        seed = row.get("seed", 0)
+        log_df = pd.DataFrame(
+            [
+                {
+                    "schema_version": "1.1",
+                    "run_id": run_id,
+                    "model_type": "prl",
+                    "seed": seed,
+                    "timesteps": 100,
+                    "emergency_rate": 0.0,
+                    "prl_prob_p05": 0.1,
+                    "prl_prob_p95": 0.9,
+                    "prl_prob_std": 0.3,
+                    "prl_prob_min": 0.0,
+                    "prl_prob_max": 1.0,
+                }
+            ]
+        )
+        log_df.to_csv(logs / f"train_{run_id}.csv", index=False)
     run_index = {
         "run_ids": [r["run_id"] for r in rows],
         "metrics_path": str(metrics_path),
         "regime_metrics_path": str(reports / "regime_metrics.csv"),
+        "reports_dir": str(reports),
+        "logs_dir": str(logs),
         "config_path": "dummy.yaml",
         "exp_name": name,
     }

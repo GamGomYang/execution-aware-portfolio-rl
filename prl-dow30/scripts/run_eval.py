@@ -136,6 +136,8 @@ def main():
         c_tc=env_cfg["c_tc"],
         seed=args.seed,
         logit_scale=env_cfg["logit_scale"],
+        risk_lambda=env_cfg.get("risk_lambda", 0.0),
+        risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
     )
 
     model_path = Path(args.model_path) if args.model_path else None

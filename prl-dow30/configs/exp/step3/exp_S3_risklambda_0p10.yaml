@@ -1,5 +1,5 @@
 mode: exp_R2_prlmove_nc_bs32
-name: exp_R2_prlmove_nc_bs32_b2_lv30_bias0
+name: exp_S3_risklambda_0p10
 dates:
   train_start: '2016-01-01'
   train_end: '2017-12-31'
@@ -36,7 +36,10 @@ env:
   Lv: 10
   c_tc: 0.0005
   logit_scale: 10.0
-  random_reset_train: true
+  random_reset_train: false
+  risk_lambda: 0.1
+  risk_penalty_type: r2
+  rebalance_eta: null
 prl:
   alpha0: 0.2
   beta: 2.0

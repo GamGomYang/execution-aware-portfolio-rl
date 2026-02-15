@@ -44,6 +44,9 @@ def build_vec_env(
     c_tc: float,
     seed: int,
     logit_scale: float | None = None,
+    random_reset: bool = False,
+    risk_lambda: float = 0.0,
+    risk_penalty_type: str = "r2",
 ) -> DummyVecEnv:
     returns_aligned, vol_aligned = _align_frames(returns, volatility)
     if len(returns_aligned) <= window_size + 1:
@@ -57,6 +60,9 @@ def build_vec_env(
         window_size=window_size,
         transaction_cost=c_tc,
         logit_scale=float(logit_scale),
+        random_reset=bool(random_reset),
+        risk_lambda=float(risk_lambda),
+        risk_penalty_type=str(risk_penalty_type),
     )
 
     def _init():
@@ -284,12 +290,19 @@ def _write_run_metadata(
     if obs_dim_expected is None and L is not None and num_assets:
         obs_dim_expected = int(num_assets) * (int(L) + 2)
     env_signature_hash = manifest.get("env_signature_hash")
-    feature_flags = manifest.get(
-        "feature_flags",
-        {"returns_window": True, "volatility": True, "prev_weights": True},
+    feature_flags = dict(
+        manifest.get(
+            "feature_flags",
+            {"returns_window": True, "volatility": True, "prev_weights": True},
+        )
     )
+    reward_type = "log_net_minus_r2"
+    feature_flags["reward_type"] = reward_type
     # Always compute signature with the configured transaction cost; manifest may carry a different default.
-    cost_params_cfg = {"transaction_cost": config.get("env", {}).get("c_tc")}
+    cost_params_cfg = {
+        "transaction_cost": config.get("env", {}).get("c_tc"),
+        "risk_lambda": float(config.get("env", {}).get("risk_lambda", 0.0)),
+    }
     if asset_list and L is not None and Lv is not None:
         env_signature_hash = compute_env_signature(
             asset_list,
@@ -349,6 +362,13 @@ def _write_run_metadata(
         "Lv": Lv,
         "obs_dim_expected": obs_dim_expected,
         "env_signature_hash": env_signature_hash,
+        "env_signature_version": "v2",
+        "env_params": {
+            "transaction_cost": cost_params_cfg.get("transaction_cost"),
+            "risk_lambda": cost_params_cfg.get("risk_lambda", 0.0),
+            "risk_penalty_type": config.get("env", {}).get("risk_penalty_type", "r2"),
+            "reward_type": reward_type,
+        },
         "artifacts": {
             "model_path": str(model_path),
             "train_log_path": str(log_path),
@@ -430,12 +450,25 @@ def build_env_for_range(
     c_tc: float,
     seed: int,
     logit_scale: float | None = None,
+    random_reset: bool = False,
+    risk_lambda: float = 0.0,
+    risk_penalty_type: str = "r2",
 ) -> DummyVecEnv:
     returns_slice = slice_frame(market.returns, start, end)
     vol_slice = slice_frame(features.volatility, start, end)
     if logit_scale is None:
         logit_scale = EnvConfig.logit_scale
-    return build_vec_env(returns_slice, vol_slice, window_size, c_tc, seed, logit_scale)
+    return build_vec_env(
+        returns_slice,
+        vol_slice,
+        window_size,
+        c_tc,
+        seed,
+        logit_scale,
+        random_reset=random_reset,
+        risk_lambda=risk_lambda,
+        risk_penalty_type=risk_penalty_type,
+    )
 
 
 def run_training(
@@ -504,6 +537,9 @@ def run_training(
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for training.")
     logit_scale = float(env_cfg["logit_scale"])
+    random_reset_train = bool(env_cfg.get("random_reset_train", False))
+    risk_lambda = float(env_cfg.get("risk_lambda", 0.0))
+    risk_penalty_type = str(env_cfg.get("risk_penalty_type", "r2"))
     env = build_env_for_range(
         market=market,
         features=features,
@@ -513,6 +549,9 @@ def run_training(
         c_tc=env_cfg["c_tc"],
         seed=seed,
         logit_scale=logit_scale,
+        random_reset=random_reset_train,
+        risk_lambda=risk_lambda,
+        risk_penalty_type=risk_penalty_type,
     )
     num_assets = market.returns.shape[1]
     log_dir = Path(logs_dir) if logs_dir is not None else Path("outputs/logs")

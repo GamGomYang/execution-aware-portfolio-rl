@@ -25,8 +25,18 @@ def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | Non
     num_assets = int(getattr(base_env, "num_assets", len(asset_list)))
     obs_dim = int(base_env.observation_space.shape[0])
     window_size = int(getattr(base_env, "window_size", 0))
-    cost_params = {"transaction_cost": getattr(base_env.cfg, "transaction_cost", None)}
-    feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True}
+    env_params = run_metadata.get("env_params", {}) or {}
+    sig_version = run_metadata.get("env_signature_version")
+    if sig_version == "v2" or "risk_lambda" in env_params or "reward_type" in env_params:
+        cost_params = {
+            "transaction_cost": getattr(base_env.cfg, "transaction_cost", None),
+            "risk_lambda": float(getattr(base_env.cfg, "risk_lambda", 0.0)),
+        }
+        reward_type = env_params.get("reward_type", "log_net_minus_r2")
+        feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True, "reward_type": reward_type}
+    else:
+        cost_params = {"transaction_cost": getattr(base_env.cfg, "transaction_cost", None)}
+        feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True}
 
     expected_obs_dim = run_metadata.get("obs_dim_expected")
     expected_num_assets = run_metadata.get("num_assets")
@@ -88,6 +98,8 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
     costs: List[float] = []
     net_returns_exp: List[float] = []
     net_returns_lin: List[float] = []
+    log_returns_gross: List[float] = []
+    log_returns_net: List[float] = []
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward_vec, done_vec, info_list = env.step(action)
@@ -98,13 +110,20 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         port_ret = info.get("portfolio_return", 0.0)
         turnover = info.get("turnover", 0.0)
         cost = float(info.get("cost", 0.0))
+        log_return_gross = info.get("log_return_gross")
+        log_return_net = info.get("log_return_net")
         portfolio_returns.append(port_ret)
         turnovers.append(turnover)
         dates.append(info.get("date"))
         turnover_target_changes.append(info.get("turnover_target_change", 0.0))
         costs.append(cost)
-        net_returns_exp.append(math.exp(reward) - 1.0)
+        if log_return_net is not None:
+            net_returns_exp.append(math.exp(float(log_return_net)) - 1.0)
+        else:
+            net_returns_exp.append(math.exp(reward) - 1.0)
         net_returns_lin.append(port_ret - cost)
+        log_returns_gross.append(float(log_return_gross) if log_return_gross is not None else float("nan"))
+        log_returns_net.append(float(log_return_net) if log_return_net is not None else float("nan"))
     metrics = compute_metrics(
         rewards,
         portfolio_returns,
@@ -121,6 +140,8 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         "costs": costs,
         "net_returns_exp": net_returns_exp,
         "net_returns_lin": net_returns_lin,
+        "log_returns_gross": log_returns_gross,
+        "log_returns_net": log_returns_net,
     }
     return metrics, trace
 
@@ -144,6 +165,7 @@ def trace_dict_to_frame(
     net_returns_exp = trace.get("net_returns_exp")
     net_returns_lin = trace.get("net_returns_lin")
     log_returns_gross = trace.get("log_returns_gross")
+    log_returns_net = trace.get("log_returns_net")
     if turnover_target_changes is None or not turnover_target_changes:
         turnover_target_changes = [np.nan] * len(dates)
     if costs is None or not costs:
@@ -154,6 +176,8 @@ def trace_dict_to_frame(
         net_returns_lin = [np.nan] * len(dates)
     if log_returns_gross is None or not log_returns_gross:
         log_returns_gross = [np.nan] * len(dates)
+    if log_returns_net is None or not log_returns_net:
+        log_returns_net = [np.nan] * len(dates)
     df = pd.DataFrame(
         {
             "date": dates,
@@ -165,6 +189,7 @@ def trace_dict_to_frame(
             "net_return_exp": net_returns_exp,
             "net_return_lin": net_returns_lin,
             "log_return_gross": log_returns_gross,
+            "log_return_net": log_returns_net,
         }
     )
     df["eval_id"] = eval_id

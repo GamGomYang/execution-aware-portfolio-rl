@@ -18,6 +18,7 @@ from typing import Iterable, List
 
 import pandas as pd
 
+from scripts.prl_gate_utils import PRL_GATE_THRESHOLDS, aggregate_prl_gate
 
 def _collect_paths(patterns: List[str]) -> List[Path]:
     paths: List[Path] = []
@@ -132,9 +133,12 @@ def main(argv: list[str] | None = None):
 
     for cand_path in cand_paths:
         idx = _load_run_index(cand_path)
-        metrics = _load_with_filter(Path(idx["metrics_path"]), idx.get("run_ids", []))
+        metrics_path = Path(idx["metrics_path"])
+        run_ids = idx.get("run_ids", [])
+        metrics = _load_with_filter(metrics_path, run_ids)
         if metrics.empty:
             continue
+        prl_gate = aggregate_prl_gate(run_ids, idx, metrics_path)
         cand_summary = _compute_window_summary(metrics)
         merged = cand_summary.merge(ref_summary, on="window", suffixes=("_cand", "_ref"))
         if merged.empty:
@@ -160,7 +164,10 @@ def main(argv: list[str] | None = None):
             and (merged["max_drawdown_net_exp_cand"] >= merged["max_drawdown_net_exp_ref"]).all()
         )
 
-        if hard_fail_turnover or hard_fail_sharpe:
+        if not prl_gate.passed:
+            decision = "FAIL"
+            decision_reason = prl_gate.reason
+        elif hard_fail_turnover or hard_fail_sharpe:
             decision = "FAIL"
             decision_reason = "hard_cut_turnover" if hard_fail_turnover else "sharpe_below_fail_threshold"
         elif pass_gate3:
@@ -202,6 +209,14 @@ def main(argv: list[str] | None = None):
                     "decision": decision,
                     "decision_reason": decision_reason,
                     "guardrail": guardrail,
+                    "prl_gate_pass": prl_gate.passed,
+                    "prl_gate_reason": prl_gate.reason,
+                    "prl_emergency_rate": prl_gate.emergency_rate,
+                    "prl_prob_p05": prl_gate.prl_prob_p05,
+                    "prl_prob_p95": prl_gate.prl_prob_p95,
+                    "prl_prob_std": prl_gate.prl_prob_std,
+                    "prl_prob_min": prl_gate.prl_prob_min,
+                    "prl_prob_max": prl_gate.prl_prob_max,
                     "reference_run_index_path": args.reference_run_index,
                     "candidate_run_index_path": str(cand_path),
                     "fail_turnover_hard_cut": hard_fail_turnover,
@@ -222,6 +237,12 @@ def main(argv: list[str] | None = None):
         f"- Candidates: {len(cand_paths)}",
         f"- Guardrail turnover x{args.turnover_guardrail_mult}, hardcut x{args.hardcut_turnover_mult}",
         f"- PASS if ΔSharpe >= {args.pass_delta_sharpe} AND MDD 악화 없음; hard fail if ΔSharpe <= {args.fail_delta_sharpe} or turnover hardcut.",
+        (
+            f"- PRL gate: emergency_rate <= {PRL_GATE_THRESHOLDS['emergency_rate_max']}, "
+            f"prl_prob_p05 <= {PRL_GATE_THRESHOLDS['prl_prob_p05_max']}, "
+            f"prl_prob_p95 >= {PRL_GATE_THRESHOLDS['prl_prob_p95_min']}, "
+            f"prl_prob_std >= {PRL_GATE_THRESHOLDS['prl_prob_std_min']}. (missing PRL logs => FAIL)"
+        ),
         "",
         "## Leaderboard",
         leaderboard.to_markdown(index=False),

@@ -27,6 +27,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import pandas as pd
 import yaml
 
+from scripts.prl_gate_utils import PRL_GATE_THRESHOLDS, load_prl_gate_for_run_id
 
 LOGGER = logging.getLogger("gate1_leaderboard")
 
@@ -163,7 +164,8 @@ def build_leaderboard(
     rows = []
     for cand_idx_path in candidate_run_indexes:
         idx = _read_run_index(cand_idx_path)
-        metrics = _pick_eval_window(_load_with_filter(Path(idx["metrics_path"]), idx.get("run_ids", [])))
+        metrics_path = Path(idx["metrics_path"])
+        metrics = _pick_eval_window(_load_with_filter(metrics_path, idx.get("run_ids", [])))
         regime = _pick_eval_window(_load_with_filter(Path(idx["regime_metrics_path"]), idx.get("run_ids", [])))
         prl_rows = metrics[metrics["model_type"] == prl_model_type].copy()
         if prl_rows.empty:
@@ -176,6 +178,8 @@ def build_leaderboard(
         for _, row in prl_rows.iterrows():
             seed = int(row["seed"])
             ref = ref_by_seed.get(seed, fallback_ref)
+            run_id = str(row.get("run_id", ""))
+            prl_gate = load_prl_gate_for_run_id(run_id, idx, metrics_path)
             cand = {
                 "exp_name": idx.get("exp_name", Path(idx.get("config_path", "")).stem),
                 "seed": seed,
@@ -193,8 +197,12 @@ def build_leaderboard(
                 cand["cumulative_return_net_exp_mid"] = float(mid_row.get("cumulative_return_net_exp", 0.0))
 
             decision, reason, score = _decision_and_score(cand, ref)
+            if not prl_gate.passed:
+                decision = "FAIL"
+                reason = prl_gate.reason
             row_out = {
                 **cand,
+                "run_id": run_id,
                 "baseline_ref_sharpe_net_exp": ref["sharpe_net_exp"],
                 "baseline_ref_avg_turnover": ref["avg_turnover"],
                 "baseline_ref_max_drawdown_net_exp": ref["max_drawdown_net_exp"],
@@ -203,6 +211,15 @@ def build_leaderboard(
                 "baseline_ref_cumret_net_exp_mid": ref.get("cumulative_return_net_exp_mid"),
                 "delta_sharpe_net_exp_vs_ref": cand["sharpe_net_exp"] - ref["sharpe_net_exp"],
                 "delta_turnover_vs_ref": cand["avg_turnover"] - ref["avg_turnover"],
+                "prl_gate_pass": prl_gate.passed,
+                "prl_gate_reason": prl_gate.reason,
+                "prl_emergency_rate": prl_gate.emergency_rate,
+                "prl_prob_p05": prl_gate.prl_prob_p05,
+                "prl_prob_p95": prl_gate.prl_prob_p95,
+                "prl_prob_std": prl_gate.prl_prob_std,
+                "prl_prob_min": prl_gate.prl_prob_min,
+                "prl_prob_max": prl_gate.prl_prob_max,
+                "prl_log_source": prl_gate.source,
                 "score": score,
                 "decision": decision,
                 "decision_reason": reason,
@@ -233,6 +250,13 @@ def _write_summary(
     top = leaderboard.head(5)
     lines.append("- PASS rules: T1 (turnover <= 70% of ref and Sharpe >= ref) or T2 (Sharpe >= ref + 0.10).")
     lines.append("- FAIL rules: Sharpe <= ref - 0.05 or turnover >= 110% of ref.")
+    lines.append(
+        f"- PRL gate: emergency_rate <= {PRL_GATE_THRESHOLDS['emergency_rate_max']}, "
+        f"prl_prob_p05 <= {PRL_GATE_THRESHOLDS['prl_prob_p05_max']}, "
+        f"prl_prob_p95 >= {PRL_GATE_THRESHOLDS['prl_prob_p95_min']}, "
+        f"prl_prob_std >= {PRL_GATE_THRESHOLDS['prl_prob_std_min']}. "
+        "(missing PRL logs => FAIL)"
+    )
     lines.append("- Score = sharpe_net_exp - 0.25*|mdd_net_exp| - 0.10*avg_turnover (mid worse than ref -> -0.05 penalty).")
     lines.append("- Gate1 is 방향성 확인 단계: 통계 검정은 참고용이며 판정은 지표/스코어 기반.")
     lines.append("")

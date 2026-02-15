@@ -30,6 +30,9 @@ class EnvConfig:
     transaction_cost: float
     log_clip: float = 1e-8
     logit_scale: float = 10.0
+    random_reset: bool = False
+    risk_lambda: float = 0.0
+    risk_penalty_type: str = "r2"
 
 
 class Dow30PortfolioEnv(Env):
@@ -64,6 +67,8 @@ class Dow30PortfolioEnv(Env):
         assert self.window_size > 0, "window_size must be > 0"
         assert cfg.transaction_cost >= 0, "transaction cost must be non-negative"
         assert cfg.logit_scale is not None, "logit_scale must be set"
+        if cfg.risk_penalty_type != "r2":
+            raise ValueError(f"Unsupported risk_penalty_type: {cfg.risk_penalty_type}")
 
     def seed(self, seed: Optional[int] = None) -> None:  # pragma: no cover - gymnasium compatibility
         np.random.seed(seed)
@@ -87,11 +92,17 @@ class Dow30PortfolioEnv(Env):
     def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None):
         if seed is not None:
             self.seed(seed)
-        self.current_step = self.window_size
+        if self.cfg.random_reset:
+            max_start = len(self.returns) - 1
+            if max_start < self.window_size:
+                raise ValueError("Not enough data to random reset the environment.")
+            self.current_step = int(np.random.randint(self.window_size, max_start + 1))
+        else:
+            self.current_step = self.window_size
         self.prev_weights = np.ones(self.num_assets, dtype=np.float32) / self.num_assets
         self.reset_count += 1
         obs = self._get_observation()
-        info: Dict[str, Any] = {"reset_count": self.reset_count}
+        info: Dict[str, Any] = {"reset_count": self.reset_count, "start_step": self.current_step}
         return obs, info
 
     def _portfolio_return(self, returns_t: np.ndarray) -> float:
@@ -120,7 +131,11 @@ class Dow30PortfolioEnv(Env):
         cost = self.cfg.transaction_cost * turnover
 
         log_argument = max(1.0 + portfolio_return, self.cfg.log_clip)
-        reward = math.log(log_argument) - cost
+        log_return_gross = math.log(log_argument)
+        log_return_net = log_return_gross - cost
+        risk_lambda = float(self.cfg.risk_lambda)
+        risk_penalty = risk_lambda * (portfolio_return**2)
+        reward = log_return_net - risk_penalty
 
         self.prev_weights = weights
         self.current_step += 1
@@ -134,9 +149,13 @@ class Dow30PortfolioEnv(Env):
             "turnover_rebalance": turnover,
             "turnover_target_change": turnover_target_change,
             "date": step_date,
-            "log_argument": log_argument,
             "cost": cost,
-            "log_return_gross": math.log(log_argument),
+            "log_argument": log_argument,
+            "log_return_gross": log_return_gross,
+            "log_return_net": log_return_net,
+            "risk_penalty": risk_penalty,
+            "risk_lambda": risk_lambda,
+            "reward_no_risk": log_return_net,
         }
         return obs, reward, terminated, truncated, info
 

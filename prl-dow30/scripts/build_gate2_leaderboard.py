@@ -22,6 +22,7 @@ from typing import Iterable, List
 
 import pandas as pd
 
+from scripts.prl_gate_utils import PRL_GATE_THRESHOLDS, aggregate_prl_gate
 
 def _collect_paths(patterns: List[str]) -> List[Path]:
     paths: List[Path] = []
@@ -92,7 +93,8 @@ def main():
     for cand_path in cand_paths:
         idx = _load_run_index(cand_path)
         run_ids = idx.get("run_ids", [])
-        metrics = _load_with_filter(Path(idx["metrics_path"]), run_ids)
+        metrics_path = Path(idx["metrics_path"])
+        metrics = _load_with_filter(metrics_path, run_ids)
         regime = _load_with_filter(Path(idx["regime_metrics_path"]), run_ids)
         regime_mid = regime[regime["regime"] == "mid"].copy()
 
@@ -109,14 +111,28 @@ def main():
             pass_mid_flags.append(r["sharpe_net_exp_delta"] >= -0.01)
         guardrail_hit = any(guardrail_flags)
         pass_mid = all(pass_mid_flags)
+        prl_gate = aggregate_prl_gate(run_ids, idx, metrics_path)
         decision = "PASS" if pass_mid and not guardrail_hit else "FAIL"
+        decision_reason = "pass_mid_no_guardrail" if decision == "PASS" else "mid_guardrail_or_delta"
+        if not prl_gate.passed:
+            decision = "FAIL"
+            decision_reason = prl_gate.reason
 
         row = {
             "exp_name": idx.get("exp_name", Path(idx.get("config_path", "")).stem),
             "run_index_path": str(cand_path),
             "decision": decision,
+            "decision_reason": decision_reason,
             "guardrail_hit": guardrail_hit,
             "pass_mid": pass_mid,
+            "prl_gate_pass": prl_gate.passed,
+            "prl_gate_reason": prl_gate.reason,
+            "prl_emergency_rate": prl_gate.emergency_rate,
+            "prl_prob_p05": prl_gate.prl_prob_p05,
+            "prl_prob_p95": prl_gate.prl_prob_p95,
+            "prl_prob_std": prl_gate.prl_prob_std,
+            "prl_prob_min": prl_gate.prl_prob_min,
+            "prl_prob_max": prl_gate.prl_prob_max,
         }
         for w in ["W1", "W2"]:
             sub = mid_rows[mid_rows["window"] == w]
@@ -148,6 +164,13 @@ def main():
     summary_lines.append(f"- Reference: {args.reference_run_index}")
     summary_lines.append(f"- Candidates: {len(cand_paths)} run_index files")
     summary_lines.append("- PASS rule: min(delta_mid_sharpe) >= -0.01 and no guardrail breach (turnover > 1.2x ref).")
+    summary_lines.append(
+        f"- PRL gate: emergency_rate <= {PRL_GATE_THRESHOLDS['emergency_rate_max']}, "
+        f"prl_prob_p05 <= {PRL_GATE_THRESHOLDS['prl_prob_p05_max']}, "
+        f"prl_prob_p95 >= {PRL_GATE_THRESHOLDS['prl_prob_p95_min']}, "
+        f"prl_prob_std >= {PRL_GATE_THRESHOLDS['prl_prob_std_min']}. "
+        "(missing PRL logs => FAIL)"
+    )
     summary_lines.append("")
     summary_lines.append("## Leaderboard")
     summary_lines.append(leaderboard.to_markdown(index=False))

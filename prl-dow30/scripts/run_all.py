@@ -462,6 +462,8 @@ def main():
                     c_tc=env_cfg["c_tc"],
                     seed=seed,
                     logit_scale=env_cfg["logit_scale"],
+                    risk_lambda=env_cfg.get("risk_lambda", 0.0),
+                    risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
                 )
 
                 assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
