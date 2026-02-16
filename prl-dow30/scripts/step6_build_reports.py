@@ -37,23 +37,36 @@ def _parse_eta_from_dir(path: Path) -> float:
 
 def _collect_runs(root: Path) -> pd.DataFrame:
     rows = []
-    metrics_paths = sorted(root.glob("kappa_*/eta_*/seed_*/metrics.csv"))
-    has_eta_dir_structure = len(metrics_paths) > 0
-    if not has_eta_dir_structure:
-        metrics_paths = sorted(root.glob("kappa_*/seed_*/metrics.csv"))
-
+    metrics_paths = sorted(set(root.glob("kappa_*/*/seed_*/metrics.csv")) | set(root.glob("kappa_*/seed_*/metrics.csv")))
     for metrics_path in metrics_paths:
         seed_dir = metrics_path.parent
         seed = _parse_seed_from_dir(seed_dir)
 
-        if has_eta_dir_structure:
-            eta_dir = seed_dir.parent
-            kappa_dir = eta_dir.parent
-            eta = _parse_eta_from_dir(eta_dir)
-        else:
+        parent_dir = seed_dir.parent
+        arm = None
+        rule_vol_a = np.nan
+        eta = np.nan
+        if parent_dir.name.startswith("kappa_"):
+            # Legacy kappa/seed layout.
             eta_dir = None
-            kappa_dir = seed_dir.parent
-            eta = np.nan
+            kappa_dir = parent_dir
+        else:
+            eta_dir = parent_dir
+            kappa_dir = eta_dir.parent
+            label = eta_dir.name
+            if label.startswith("eta_"):
+                eta = _parse_eta_from_dir(eta_dir)
+                arm = "eta_sweep"
+            elif label in {"main", "baseline"}:
+                arm = label
+            elif label.startswith("rule_vol_a_"):
+                arm = "rule_vol"
+                rule_vol_a = float(label.split("rule_vol_a_", 1)[1])
+            elif label.startswith("fixed_eta_"):
+                arm = "fixed_comparison"
+                eta = float(label.split("fixed_eta_", 1)[1])
+            else:
+                arm = label
 
         kappa = _parse_kappa_from_dir(kappa_dir)
         df = pd.read_csv(metrics_path)
@@ -64,6 +77,8 @@ def _collect_runs(root: Path) -> pd.DataFrame:
         row["seed"] = int(seed)
         row["eta"] = float(row.get("eta", eta))
         row["eta_requested"] = float(row.get("eta_requested", eta))
+        row["arm"] = row.get("arm", arm)
+        row["rule_vol_a"] = float(row.get("rule_vol_a", rule_vol_a))
         row["run_dir"] = str(seed_dir)
         row["eta_dir"] = str(eta_dir) if eta_dir is not None else None
         row["metrics_path"] = str(metrics_path)
@@ -77,42 +92,110 @@ def _collect_runs(root: Path) -> pd.DataFrame:
     out["seed"] = pd.to_numeric(out["seed"], errors="coerce").astype(int)
     out["eta"] = pd.to_numeric(out.get("eta", np.nan), errors="coerce")
     out["eta_requested"] = pd.to_numeric(out.get("eta_requested", np.nan), errors="coerce")
+    out["rule_vol_a"] = pd.to_numeric(out.get("rule_vol_a", np.nan), errors="coerce")
+    if "arm" in out.columns:
+        out["arm"] = out["arm"].astype("string")
     out["pair_eta"] = out["eta_requested"].where(~out["eta_requested"].isna(), out["eta"])
     return out
 
 
 def _build_aggregate(runs: pd.DataFrame) -> pd.DataFrame:
     rows = []
-    for (kappa, eta), group in runs.groupby(["kappa", "pair_eta"]):
+    has_arm = "arm" in runs.columns and runs["arm"].notna().any()
+    group_cols = ["kappa", "pair_eta"]
+    if has_arm:
+        group_cols = ["kappa", "arm", "pair_eta"]
+    for group_key, group in runs.groupby(group_cols):
+        if has_arm:
+            kappa, arm, eta = group_key
+        else:
+            kappa, eta = group_key
+            arm = None
         sharpe = pd.to_numeric(group["sharpe_net_lin"], errors="coerce")
         turnover = pd.to_numeric(group["avg_turnover_exec"], errors="coerce")
         collapse = group["collapse_flag_any"].astype(bool)
         q75 = float(sharpe.quantile(0.75))
         q25 = float(sharpe.quantile(0.25))
-        rows.append(
-            {
-                "kappa": float(kappa),
-                "eta": float(eta),
-                "n_runs": int(len(group)),
-                "median_sharpe": float(sharpe.median()),
-                "iqr_sharpe": float(q75 - q25),
-                "median_turnover_exec": float(turnover.median()),
-                "collapse_rate": float(collapse.mean()),
-            }
-        )
-    return pd.DataFrame(rows).sort_values(["kappa", "eta"]).reset_index(drop=True)
+        row = {
+            "kappa": float(kappa),
+            "eta": float(eta) if np.isfinite(float(eta)) else np.nan,
+            "n_runs": int(len(group)),
+            "median_sharpe": float(sharpe.median()),
+            "iqr_sharpe": float(q75 - q25),
+            "median_turnover_exec": float(turnover.median()),
+            "collapse_rate": float(collapse.mean()),
+        }
+        if arm is not None:
+            row["arm"] = str(arm)
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    sort_cols = ["kappa", "eta"]
+    if "arm" in out.columns:
+        sort_cols = ["kappa", "arm", "eta"]
+    return out.sort_values(sort_cols).reset_index(drop=True)
 
 
 def _build_paired_delta(runs: pd.DataFrame) -> pd.DataFrame:
+    # EXP-1: paired baseline vs main within each kappa/seed.
+    if "arm" in runs.columns and {"main", "baseline"} <= set(runs["arm"].dropna().unique().tolist()):
+        main_rows = runs[runs["arm"] == "main"].copy()
+        baseline_rows = runs[runs["arm"] == "baseline"].copy()
+        if not main_rows.empty and not baseline_rows.empty:
+            baseline_index = baseline_rows.set_index(["kappa", "seed"])
+            rows = []
+            for _, row in main_rows.iterrows():
+                key = (float(row["kappa"]), int(row["seed"]))
+                if key not in baseline_index.index:
+                    continue
+                base = baseline_index.loc[key]
+                rows.append(
+                    {
+                        "seed": int(row["seed"]),
+                        "kappa": float(row["kappa"]),
+                        "eta_main": float(row.get("pair_eta", np.nan)),
+                        "eta_baseline": float(base.get("pair_eta", np.nan)),
+                        "run_id": row.get("run_id"),
+                        "baseline_run_id": base.get("run_id"),
+                        "delta_sharpe": float(row.get("sharpe_net_lin", np.nan)) - float(base.get("sharpe_net_lin", np.nan)),
+                        "delta_cagr": float(row.get("cagr", np.nan)) - float(base.get("cagr", np.nan)),
+                        "delta_maxdd": float(row.get("maxdd", np.nan)) - float(base.get("maxdd", np.nan)),
+                    }
+                )
+            if rows:
+                return pd.DataFrame(rows).sort_values(["seed", "kappa"]).reset_index(drop=True)
+
+    # Existing behavior: paired against kappa=0 baseline by seed+eta.
     baseline = runs[np.isclose(pd.to_numeric(runs["kappa"], errors="coerce"), 0.0, atol=1e-15)]
     if baseline.empty:
-        raise ValueError("Baseline (kappa=0) runs are required for paired deltas.")
+        return pd.DataFrame(
+            columns=[
+                "seed",
+                "kappa",
+                "eta",
+                "run_id",
+                "baseline_run_id",
+                "delta_sharpe",
+                "delta_cagr",
+                "delta_maxdd",
+            ]
+        )
     base_by_seed_eta = baseline.set_index(["seed", "pair_eta"])
 
     pair_keys = sorted({(int(row.seed), float(row.pair_eta)) for row in runs.itertuples()})
     missing_baseline = [key for key in pair_keys if key not in base_by_seed_eta.index]
     if missing_baseline:
-        raise ValueError(f"Missing kappa=0 baseline for (seed, eta): {missing_baseline}")
+        return pd.DataFrame(
+            columns=[
+                "seed",
+                "kappa",
+                "eta",
+                "run_id",
+                "baseline_run_id",
+                "delta_sharpe",
+                "delta_cagr",
+                "delta_maxdd",
+            ]
+        )
 
     rows = []
     for _, row in runs.iterrows():
@@ -205,7 +288,7 @@ def _pick_trace_for_misalignment(runs: pd.DataFrame) -> Path:
 def _build_fig_misalignment(root: Path, runs: pd.DataFrame) -> None:
     trace_path = _pick_trace_for_misalignment(runs)
     if not trace_path.exists():
-        raise FileNotFoundError(f"Trace not found for misalignment figure: {trace_path}")
+        return
     df = pd.read_parquet(trace_path)
 
     required = {"equity_net_lin", "equity_net_lin_target", "turnover_exec", "turnover_target"}
@@ -248,6 +331,9 @@ def _build_fig_frontier(root: Path, runs: pd.DataFrame) -> None:
         )
         .sort_values("eta", ascending=False)
     )
+    grouped = grouped.dropna(subset=["avg_turnover_exec", "sharpe_net_lin", "eta"])
+    if grouped.empty:
+        return
 
     fig, ax = plt.subplots(figsize=(8, 6))
     x = pd.to_numeric(grouped["avg_turnover_exec"], errors="coerce")

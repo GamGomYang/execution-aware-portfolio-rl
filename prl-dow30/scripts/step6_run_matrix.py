@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -29,7 +30,7 @@ ALLOWED_ENV_KEYS = {
     "L",
     "Lv",
 }
-ALLOWED_RULE_VOL_KEYS = {"window", "a", "eta_clip"}
+ALLOWED_RULE_VOL_KEYS = {"window", "a", "a_values", "eta_clip"}
 ALLOWED_ETA_MODES = {"legacy", "none", "fixed", "rule_vol"}
 
 
@@ -145,6 +146,21 @@ def _freeze_guard(cfg: dict[str, Any]) -> None:
         if eta_clip is not None:
             if not isinstance(eta_clip, (list, tuple)) or len(eta_clip) != 2:
                 raise ValueError("Config freeze guard failed. env.rule_vol.eta_clip must be [min, max].")
+        a_values = rule_vol.get("a_values")
+        if a_values is not None:
+            if not isinstance(a_values, (list, tuple)) or len(a_values) == 0:
+                raise ValueError("Config freeze guard failed. env.rule_vol.a_values must be a non-empty list.")
+
+    baseline_env = cfg.get("baseline_env")
+    if baseline_env is not None and not isinstance(baseline_env, dict):
+        raise ValueError("Config freeze guard failed. baseline_env must be a mapping.")
+    if isinstance(baseline_env, dict):
+        for key in baseline_env.keys():
+            if key not in {"eta_mode", "rebalance_eta", "rule_vol"}:
+                raise ValueError(f"Config freeze guard failed. baseline_env key not allowed: {key}")
+        eta_mode_base = str(baseline_env.get("eta_mode", "legacy"))
+        if eta_mode_base not in ALLOWED_ETA_MODES:
+            raise ValueError(f"Config freeze guard failed. Unsupported baseline_env.eta_mode: {eta_mode_base}")
 
 
 def _ensure_paired_seeds(seeds: list[int]) -> list[int]:
@@ -153,6 +169,28 @@ def _ensure_paired_seeds(seeds: list[int]) -> list[int]:
     if len(set(seeds)) != len(seeds):
         raise ValueError(f"Duplicate seeds are not allowed: {seeds}")
     return list(seeds)
+
+
+def _flag_provided(flag: str) -> bool:
+    return f"--{flag}" in sys.argv
+
+
+def _resolve_scalar_from_config(args_value: Any, *, cfg_value: Any, flag: str) -> Any:
+    if _flag_provided(flag):
+        return args_value
+    if cfg_value is not None:
+        return cfg_value
+    return args_value
+
+
+def _resolve_list_from_config(args_values: list[Any], *, cfg_values: Any, flag: str) -> list[Any]:
+    if _flag_provided(flag):
+        return list(args_values)
+    if cfg_values is None:
+        return list(args_values)
+    if not isinstance(cfg_values, (list, tuple)):
+        raise ValueError(f"Config value for {flag} must be a list.")
+    return list(cfg_values)
 
 
 def _resolve_config_path(config_path: str) -> Path:
@@ -168,7 +206,13 @@ def _resolve_config_path(config_path: str) -> Path:
     raise FileNotFoundError(f"Config file not found: {config_path}")
 
 
-def _run_sanity(args: argparse.Namespace, first_seed: int, config_path: Path) -> None:
+def _run_sanity(
+    args: argparse.Namespace,
+    first_seed: int,
+    config_path: Path,
+    *,
+    model_type: str,
+) -> None:
     sanity_script = ROOT / "scripts" / "step6_sanity.py"
     cmd = [
         sys.executable,
@@ -176,7 +220,7 @@ def _run_sanity(args: argparse.Namespace, first_seed: int, config_path: Path) ->
         "--config",
         str(config_path),
         "--model-type",
-        args.model_type,
+        model_type,
         "--seed",
         str(first_seed),
         "--model-root",
@@ -191,27 +235,147 @@ def _run_sanity(args: argparse.Namespace, first_seed: int, config_path: Path) ->
     subprocess.run(cmd, check=True)
 
 
+def _deep_merge_env(base_env: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    out = copy.deepcopy(base_env)
+    for key, value in patch.items():
+        if key == "rule_vol" and isinstance(value, dict):
+            existing = out.get("rule_vol", {}) or {}
+            if not isinstance(existing, dict):
+                existing = {}
+            merged = copy.deepcopy(existing)
+            merged.update(copy.deepcopy(value))
+            out["rule_vol"] = merged
+        else:
+            out[key] = copy.deepcopy(value)
+    return out
+
+
+def _build_arm_specs(cfg: dict[str, Any], *, etas: list[float]) -> list[dict[str, Any]]:
+    env_cfg = cfg.get("env", {}) or {}
+    baseline_env = cfg.get("baseline_env")
+    rule_vol_cfg = (env_cfg.get("rule_vol", {}) or {}) if isinstance(env_cfg.get("rule_vol", {}) or {}, dict) else {}
+    eta_mode = str(env_cfg.get("eta_mode", "legacy"))
+
+    specs: list[dict[str, Any]] = []
+
+    # EXP-1: main vs baseline paired protocol.
+    if isinstance(baseline_env, dict):
+        specs.append(
+            {
+                "dir_name": "main",
+                "arm_name": "main",
+                "env_patch": {},
+                "eta_requested": env_cfg.get("rebalance_eta"),
+            }
+        )
+        specs.append(
+            {
+                "dir_name": "baseline",
+                "arm_name": "baseline",
+                "env_patch": baseline_env,
+                "eta_requested": baseline_env.get("rebalance_eta"),
+            }
+        )
+        return specs
+
+    # EXP-4: adaptive rule-vol protocol (+ fixed comparison arm).
+    if eta_mode == "rule_vol" or "a_values" in rule_vol_cfg:
+        a_values = rule_vol_cfg.get("a_values")
+        if a_values is None:
+            a_values = [rule_vol_cfg.get("a", 1.0)]
+        for raw_a in list(a_values):
+            a = float(raw_a)
+            specs.append(
+                {
+                    "dir_name": f"rule_vol_a_{_format_eta(a)}",
+                    "arm_name": "rule_vol",
+                    "env_patch": {
+                        "eta_mode": "rule_vol",
+                        "rebalance_eta": None,
+                        "rule_vol": {"a": a},
+                    },
+                    "eta_requested": np.nan,
+                    "rule_vol_a": a,
+                }
+            )
+        comparison = cfg.get("comparison", {}) or {}
+        fixed_eta = comparison.get("fixed_eta")
+        if fixed_eta is not None:
+            fixed_eta = float(fixed_eta)
+            specs.append(
+                {
+                    "dir_name": f"fixed_eta_{_format_eta(fixed_eta)}",
+                    "arm_name": "fixed_comparison",
+                    "env_patch": {
+                        "eta_mode": "fixed",
+                        "rebalance_eta": fixed_eta,
+                    },
+                    "eta_requested": fixed_eta,
+                    "rule_vol_a": np.nan,
+                }
+            )
+        return specs
+
+    # EXP-3 and backward-compatible default: fixed eta sweep.
+    for eta in etas:
+        specs.append(
+            {
+                "dir_name": f"eta_{_format_eta(eta)}",
+                "arm_name": "eta_sweep",
+                "env_patch": {
+                    "eta_mode": "fixed",
+                    "rebalance_eta": float(eta),
+                },
+                "eta_requested": float(eta),
+                "rule_vol_a": np.nan,
+            }
+        )
+    return specs
+
+
 def main() -> None:
     args = parse_args()
-    seeds = _ensure_paired_seeds([int(s) for s in args.seeds])
-    kappas = [float(k) for k in args.kappas]
-    etas = [float(e) for e in args.etas]
+    config_path = _resolve_config_path(args.config)
+    base_cfg = yaml.safe_load(config_path.read_text())
+    _freeze_guard(base_cfg)
+
+    model_type = str(
+        _resolve_scalar_from_config(
+            args.model_type,
+            cfg_value=base_cfg.get("model_type"),
+            flag="model-type",
+        )
+    )
+    kappas = [float(k) for k in _resolve_list_from_config(args.kappas, cfg_values=base_cfg.get("kappas"), flag="kappas")]
+    seeds = _ensure_paired_seeds(
+        [int(s) for s in _resolve_list_from_config(args.seeds, cfg_values=base_cfg.get("seeds"), flag="seeds")]
+    )
+    etas = [float(e) for e in _resolve_list_from_config(args.etas, cfg_values=base_cfg.get("etas"), flag="etas")]
     if not etas:
         raise ValueError("etas must not be empty")
     if any((e <= 0.0 or e > 1.0) for e in etas):
         raise ValueError(f"etas must be in (0, 1], got: {etas}")
 
-    config_path = _resolve_config_path(args.config)
-    base_cfg = yaml.safe_load(config_path.read_text())
-    _freeze_guard(base_cfg)
+    output_cfg = base_cfg.get("output", {}) or {}
+    out_root_arg = _resolve_scalar_from_config(args.out, cfg_value=output_cfg.get("root"), flag="out")
+    out_root = Path(str(out_root_arg))
+    save_trace = bool(output_cfg.get("save_trace", True))
+    save_env_signature = bool(output_cfg.get("save_env_signature", True))
+    save_cmd = bool(output_cfg.get("save_cmd", True))
+    execution_cfg = base_cfg.get("execution", {}) or {}
+    enforce_paired = bool(execution_cfg.get("enforce_paired_seeds", True))
+    experiment_name = str(base_cfg.get("experiment_name", config_path.stem))
+    arm_specs = _build_arm_specs(base_cfg, etas=etas)
+    if not arm_specs:
+        raise ValueError("No experiment arms resolved from config.")
 
     # A) Run sanity first (stop entire run on failure).
-    _run_sanity(args, seeds[0], config_path)
+    _run_sanity(args, seeds[0], config_path, model_type=model_type)
 
     # Eval-only frontier: keep one trained model fixed and vary execution layer / env seed.
     model_probe_ctx = build_eval_context(
         config_path=str(config_path),
-        model_type=args.model_type,
+        model_type=model_type,
         seed=seeds[0],
         model_root=args.model_root,
         offline=bool(args.offline),
@@ -221,16 +385,15 @@ def main() -> None:
     )
     shared_model_path = str(model_probe_ctx.model_path)
 
-    out_root = Path(args.out)
     out_root.mkdir(parents=True, exist_ok=True)
 
-    seeds_by_arm: dict[tuple[float, float], set[int]] = {}
+    seeds_by_arm: dict[tuple[float, str], set[int]] = {}
     for kappa in kappas:
         kappa_dir = out_root / f"kappa_{_format_kappa(kappa)}"
         kappa_dir.mkdir(parents=True, exist_ok=True)
-        for eta in etas:
-            eta_dir = kappa_dir / f"eta_{_format_eta(eta)}"
-            eta_dir.mkdir(parents=True, exist_ok=True)
+        for arm_spec in arm_specs:
+            arm_dir = kappa_dir / str(arm_spec["dir_name"])
+            arm_dir.mkdir(parents=True, exist_ok=True)
             done: set[int] = set()
 
             for seed in seeds:
@@ -238,10 +401,9 @@ def main() -> None:
                 run_cfg.setdefault("env", {})
                 run_cfg["env"]["transaction_cost"] = float(kappa)
                 run_cfg["env"]["c_tc"] = float(kappa)
-                run_cfg["env"]["eta_mode"] = "fixed"
-                run_cfg["env"]["rebalance_eta"] = float(eta)
+                run_cfg["env"] = _deep_merge_env(run_cfg["env"], arm_spec.get("env_patch", {}))
 
-                seed_dir = eta_dir / f"seed_{seed}"
+                seed_dir = arm_dir / f"seed_{seed}"
                 seed_dir.mkdir(parents=True, exist_ok=True)
 
                 cfg_out_path = seed_dir / "config.yaml"
@@ -250,16 +412,17 @@ def main() -> None:
                 cmd_text = (
                     f"{sys.executable} scripts/step6_run_matrix.py --config {config_path} "
                     f"--kappas {' '.join(str(x) for x in kappas)} --etas {' '.join(str(x) for x in etas)} "
-                    f"--seeds {' '.join(str(x) for x in seeds)} --out {args.out} "
-                    f"--model-type {args.model_type} --model-root {args.model_root} "
+                    f"--seeds {' '.join(str(x) for x in seeds)} --out {out_root} "
+                    f"--model-type {model_type} --model-root {args.model_root} "
                     f"--max-steps {args.max_steps} --offline {args.offline} "
-                    f"[per-run kappa={kappa}, eta={eta}, seed={seed}]"
+                    f"[per-run kappa={kappa}, arm={arm_spec['dir_name']}, seed={seed}]"
                 )
-                (seed_dir / "cmd.txt").write_text(cmd_text + "\n")
+                if save_cmd:
+                    (seed_dir / "cmd.txt").write_text(cmd_text + "\n")
 
                 ctx = build_eval_context(
                     config_path=str(cfg_out_path),
-                    model_type=args.model_type,
+                    model_type=model_type,
                     seed=seed,
                     model_root=args.model_root,
                     offline=bool(args.offline),
@@ -268,23 +431,58 @@ def main() -> None:
                     prefer_metadata_config=False,
                 )
 
+                eta_mode_run = str(run_cfg["env"].get("eta_mode", "legacy"))
+                rebalance_eta_run = run_cfg["env"].get("rebalance_eta")
+                rebalance_eta_run = float(rebalance_eta_run) if rebalance_eta_run is not None else None
                 metrics, trace, df, current_sig = run_eval_case(
                     ctx,
-                    eta_mode="fixed",
-                    rebalance_eta=float(eta),
+                    eta_mode=eta_mode_run,
+                    rebalance_eta=rebalance_eta_run,
                     transaction_cost=float(kappa),
-                    eval_tag=f"kappa_{_format_kappa(kappa)}__eta_{_format_eta(eta)}__seed_{seed}",
+                    eval_tag=f"kappa_{_format_kappa(kappa)}__{arm_spec['dir_name']}__seed_{seed}",
                 )
 
                 trace_path = seed_dir / "trace.parquet"
-                df.to_parquet(trace_path, index=False)
+                if save_trace:
+                    df.to_parquet(trace_path, index=False)
+                else:
+                    trace_path = Path("")
 
                 env_signature_payload = {
                     "expected_env_signature_hash": (ctx.run_meta or {}).get("env_signature_hash"),
                     "expected_env_signature_version": (ctx.run_meta or {}).get("env_signature_version"),
                     "current": current_sig,
+                    "experiment_name": experiment_name,
+                    "arm": arm_spec["arm_name"],
+                    "step6_params": {
+                        "eta_mode": str(run_cfg["env"].get("eta_mode", "legacy")),
+                        "rule_vol_window": int((run_cfg["env"].get("rule_vol", {}) or {}).get("window", 20)),
+                        "rule_vol_a": (
+                            float((run_cfg["env"].get("rule_vol", {}) or {}).get("a"))
+                            if (run_cfg["env"].get("rule_vol", {}) or {}).get("a") is not None
+                            else None
+                        ),
+                        "eta_clip_min": (
+                            float((run_cfg["env"].get("rule_vol", {}) or {}).get("eta_clip", [0.02, 0.5])[0])
+                            if isinstance((run_cfg["env"].get("rule_vol", {}) or {}).get("eta_clip", [0.02, 0.5]), (list, tuple))
+                            else 0.02
+                        ),
+                        "eta_clip_max": (
+                            float((run_cfg["env"].get("rule_vol", {}) or {}).get("eta_clip", [0.02, 0.5])[1])
+                            if isinstance((run_cfg["env"].get("rule_vol", {}) or {}).get("eta_clip", [0.02, 0.5]), (list, tuple))
+                            else 0.5
+                        ),
+                    },
                 }
-                (seed_dir / "env_signature.json").write_text(json.dumps(env_signature_payload, indent=2))
+                step6_sig_seed = {
+                    "env_signature_hash": current_sig.get("env_signature_hash"),
+                    "step6_params": env_signature_payload["step6_params"],
+                }
+                env_signature_payload["step6_signature_hash"] = hashlib.sha256(
+                    json.dumps(step6_sig_seed, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                if save_env_signature:
+                    (seed_dir / "env_signature.json").write_text(json.dumps(env_signature_payload, indent=2))
 
                 sharpe_net_lin = (
                     float(metrics.sharpe_net_lin) if metrics.sharpe_net_lin is not None else _compute_sharpe(df["net_return_lin"])
@@ -308,17 +506,29 @@ def main() -> None:
                 collapse_any = bool(df.get("collapse_flag", pd.Series(False, index=df.index)).astype(bool).any())
                 collapse_count = int(df.get("collapse_flag", pd.Series(False, index=df.index)).astype(bool).sum())
                 eta_value = float(pd.to_numeric(df.get("eta_t", pd.Series([np.nan])), errors="coerce").mean())
+                rule_vol_info = run_cfg["env"].get("rule_vol", {}) or {}
+                rule_vol_a = rule_vol_info.get("a")
+                rule_vol_a = float(rule_vol_a) if rule_vol_a is not None else arm_spec.get("rule_vol_a", np.nan)
 
                 metrics_row = pd.DataFrame(
                     [
                         {
+                            "experiment_name": experiment_name,
                             "kappa": float(kappa),
                             "seed": int(seed),
+                            "arm": str(arm_spec["arm_name"]),
+                            "arm_dir": str(arm_spec["dir_name"]),
                             "run_id": ctx.run_id,
                             "model_type": ctx.model_type,
-                            "eta_mode": "fixed",
-                            "eta_requested": float(eta),
+                            "eta_mode": eta_mode_run,
+                            "eta_requested": (
+                                float(arm_spec["eta_requested"])
+                                if arm_spec.get("eta_requested") is not None
+                                and np.isfinite(float(arm_spec["eta_requested"]))
+                                else np.nan
+                            ),
                             "eta": eta_value,
+                            "rule_vol_a": rule_vol_a,
                             "n_steps": int(len(df)),
                             "sharpe_net_lin": sharpe_net_lin,
                             "cagr": cagr,
@@ -329,7 +539,7 @@ def main() -> None:
                             "misalignment_gap_mean": misalignment_gap_mean,
                             "collapse_flag_any": collapse_any,
                             "collapse_count": collapse_count,
-                            "trace_path": str(trace_path),
+                            "trace_path": str(trace_path) if save_trace else "",
                         }
                     ]
                 )
@@ -337,15 +547,16 @@ def main() -> None:
 
                 done.add(int(seed))
 
-            seeds_by_arm[(float(kappa), float(eta))] = done
+            seeds_by_arm[(float(kappa), str(arm_spec["dir_name"]))] = done
 
-    target = set(seeds)
-    for (kappa, eta), got in seeds_by_arm.items():
-        if got != target:
-            raise RuntimeError(
-                f"Paired seed enforcement failed for kappa={kappa}, eta={eta}: "
-                f"expected={sorted(target)}, got={sorted(got)}"
-            )
+    if enforce_paired:
+        target = set(seeds)
+        for (kappa, arm_key), got in seeds_by_arm.items():
+            if got != target:
+                raise RuntimeError(
+                    f"Paired seed enforcement failed for kappa={kappa}, arm={arm_key}: "
+                    f"expected={sorted(target)}, got={sorted(got)}"
+                )
 
     build_report_cmd = [sys.executable, str(ROOT / "scripts" / "step6_build_reports.py"), "--root", str(out_root)]
     subprocess.run(build_report_cmd, check=True)
