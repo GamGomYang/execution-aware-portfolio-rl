@@ -1,55 +1,178 @@
-# PRL Dow30
+# Execution-Aware Portfolio Reinforcement Learning  
+## A Two-Stage Decomposition with Execution Timescale Control
 
-Stage 2 delivers an end-to-end Dow30 portfolio reinforcement learning stack that adheres to the fixed requirements in `docs/spec.md`. The pipeline covers yfinance-only data ingestion with a reproducibility cache, volatility-aware feature engineering, a custom gymnasium environment with strict anti-lookahead enforcement, a volatility-only PRL alpha scheduler, SB3 SAC integration (baseline + PRL variants), and CLI scripts for training/evaluation.
+Execution-aware RL framework for **multi-asset portfolio management** on the **Dow30** universe.
 
-## Repository Layout
-- `data/raw` – yfinance Adjusted Close downloads (when building the cache).
-- `data/processed` – aligned parquet matrices (`prices.parquet`, `returns.parquet`) and `vol_stats.json`.
-- `prl/`
-  - `data.py` – data download/cache + return-frame helpers.
-  - `features.py` – rolling volatility + portfolio scalar stats (train-only mean/std).
-  - `envs.py` – `Dow30PortfolioEnv` (`obs = returns_window + vol_vector + prev_weights`, softmax inside `step`, reward uses `w_{t-1}`).
-  - `prl.py` – volatility-only `PRLAlphaScheduler`.
-  - `sb3_prl_sac.py` – Method-A SAC subclass injecting `alpha_obs` / `alpha_next`.
-  - `train.py` / `eval.py` / `metrics.py` – orchestration helpers, evaluation loop, and reporting utilities.
-- `scripts/` – CLI entrypoints (`run_train.py`, `run_eval.py`, `run_all.py`).
-- `configs/default.yaml` – hyperparameters, data paths, and schedule knobs.
-- `docs/spec.md` – frozen design contract from Stage 1.
+Most portfolio-RL formulations implicitly assume the policy’s target weights are the same as what gets traded:
 
-## Usage
-1. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+w_target = w_exec
 
-2. **Build reproducibility cache (online)**  
-   ```bash
-   python scripts/build_cache.py --config configs/paper.yaml
-   ```
-   This downloads yfinance Adj Close for the full Dow30, runs quality checks, and writes `data/processed` parquet + `data_manifest.json` + `outputs/reports/data_quality_summary.csv`.
 
-3. **Configure hyperparameters**  
-   Edit `configs/default.yaml` or switch to `configs/paper.yaml` (paper mode requires the processed cache and never downloads).
+This repository **separates** the two:
 
-4. **Train**  
-   ```bash
-   python scripts/run_train.py --config configs/default.yaml --model-type baseline --seed 0
-   python scripts/run_train.py --config configs/default.yaml --model-type prl --seed 0
-   ```
-   Models are written to `outputs/models/{model_type}_seed{seed}_final.zip`.
+- **Target portfolio (w_target)**: policy output  
+- **Executed portfolio (w_exec)**: weights actually applied to the portfolio path
 
-5. **Evaluate / Backtest (2022-2025)**  
-   ```bash
-   python scripts/run_eval.py --config configs/default.yaml --model-type prl --seed 0
-   ```
-   Metrics append to `outputs/reports/metrics.csv`.
+This separation enables:
+- **Execution-consistent transaction cost accounting**
+- **Execution-timescale control** via a single parameter `eta`
+- **Turnover–tracking–performance frontier** analysis
+- Stabilization under weak/overtrading regimes
 
-6. **Batch workflow (seeds 0/1/2 for both baselines)**  
-   ```bash
-   python scripts/run_all.py --config configs/default.yaml
-   ```
-   Produces `outputs/reports/summary.csv` while also persisting per-run models/metrics.
+---
 
-Notes:
-- Paper mode (`paper.yaml` or `--offline`) is cache-only; if cache files are missing it raises `CACHE_MISSING` and never downloads.
-- The environment applies softmax with `logit_scale` inside `env.step`, clamps log arguments for numerical safety, enforces turnover penalties (`sum(|w_t - w_{t-1}|)`), and exposes `portfolio_return` + `turnover` via `info` for downstream reporting.
+## Core Idea: Two-Stage Control
+
+### Stage 1 — Target Policy
+The policy outputs portfolio logits and produces target weights:
+
+w_target,t = softmax(logits_t)
+
+
+### Stage 2 — Execution Layer (Timescale Control)
+Executed weights follow a controlled update:
+
+w_exec,t = (1 - eta_t) * w_exec,t-1 + eta_t * w_target,t
+
+
+Only `w_exec` is used for realized portfolio dynamics and evaluation:
+
+- **Return**
+r_t = dot(w_exec,t, arithmetic_returns_t)
+
+
+- **Turnover (L1)**
+TO_target = || w_exec,t-1 - w_target,t ||_1
+TO_exec = || w_exec,t-1 - w_exec,t ||_1
+
+
+- **Cost**
+cost_exec = kappa * TO_exec
+cost_target = kappa * TO_target
+
+
+> **Note:** Throughout this repo, `prev_weights` refers to `w_exec,t-1`.
+
+For deeper protocol details and definitions, see `docs/spec.md`.
+
+---
+
+## Key Findings (Dow30)
+
+### 1) Baseline vs Controlled Execution
+- **Baseline:** `eta = 1.0` (fully reactive execution)
+- **Controlled:** `eta = 0.10`
+- Transaction cost levels: `kappa ∈ {0.0, 0.0005, 0.001}`
+- Seeds: `{0, 1, 2}`
+
+Observed in our runs:
+- When `kappa > 0`, controlled execution typically improves **Sharpe**
+- When `kappa = 0`, improvements are not guaranteed but were often observed
+- Collapse rate: `0.0` (under the reported settings)
+
+Artifacts:
+- `aggregate.csv`, `paired_delta.csv`, `collapse_report.md`
+- `fig_frontier.png`, `fig_misalignment.png`
+
+### 2) Execution Timescale Frontier (eta Sweep)
+eta grid:
+
+```text
+[1.0, 0.5, 0.2, 0.1, 0.05,
+0.02, 0.01, 0.005, 0.002,
+0.001, 0.0005, 0.0002]
+Across kappa ∈ {0, 0.0005, 0.001}, we observe monotonic behavior:
+
+eta ↓ => TO_exec ↓
+
+eta ↓ => tracking error ↑
+
+eta ↓ => misalignment gap ↑
+
+Within the tested range, Sharpe often improves as eta decreases; plateau was not observed in our sweep.
+
+3) Adaptive Execution (Volatility-Based eta)
+Rule:
+
+eta_t = clip(a / vol_t, eta_min, eta_max)
+Parameters:
+
+a ∈ {0.5, 1.0, 2.0}
+
+clip range: [0.02, 1.0]
+
+Findings:
+
+Larger a reduces effective eta
+
+High eta -> higher turnover -> lower Sharpe (in our settings)
+
+Configuration signatures cleanly separate eta / rule-vol regimes
+
+Repository Structure
+prl-dow30/
+├── prl/
+│   ├── data.py
+│   ├── features.py
+│   ├── envs.py
+│   ├── prl.py
+│   ├── sb3_prl_sac.py
+│   ├── train.py
+│   ├── eval.py
+│   └── metrics.py
+├── scripts/
+│   ├── run_train.py
+│   ├── run_eval.py
+│   ├── run_all.py
+│   ├── run_matrix.py
+│   ├── build_reports.py
+│   └── sanity_checks.py
+├── configs/
+│   ├── default.yaml
+│   ├── paper.yaml
+│   ├── main_experiment.yaml
+│   ├── eta_sweep.yaml
+│   └── rule_vol.yaml
+├── outputs/
+├── reports/
+└── docs/spec.md
+Validation & Reproducibility
+Step-wise recomputation checks (max absolute error):
+
+w_exec: 1e-9
+
+turnover: 1e-8
+
+reward: 1e-10
+
+cost (kappa=0): 0.0
+
+Paired-delta exactness: ~1e-16
+Signature hashes are unique across eta / rule-vol configurations.
+
+Quickstart
+Install
+pip install -r requirements.txt
+Build Cache (Online)
+python scripts/build_cache.py --config configs/paper.yaml
+Paper mode is designed to run without external downloads during training/evaluation.
+
+Train
+python scripts/run_train.py \
+  --config configs/default.yaml \
+  --model-type prl \
+  --seed 0
+Evaluate
+python scripts/run_eval.py \
+  --config configs/default.yaml \
+  --model-type prl \
+  --seed 0
+Run Experiment Suites
+python scripts/run_matrix.py --config configs/main_experiment.yaml
+python scripts/run_matrix.py --config configs/eta_sweep.yaml
+python scripts/run_matrix.py --config configs/rule_vol.yaml
+
+
+Citation / Reference
+If you use this codebase in research, please cite the accompanying paper (coming soon) and link to this repository.
+
