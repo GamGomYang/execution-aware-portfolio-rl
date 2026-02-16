@@ -10,10 +10,32 @@ from stable_baselines3 import SAC
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 from .baselines import run_all_baselines_detailed
+from .envs import EnvConfig
 from .metrics import PortfolioMetrics, compute_metrics
 from .prl import PRLAlphaScheduler
 from .sb3_prl_sac import PRLSAC
 from .utils.signature import compute_env_signature
+
+
+def _is_step6_signature_extension_active(
+    *,
+    eta_mode: str,
+    rule_vol_window: int,
+    rule_vol_a: float,
+    eta_clip_min: float,
+    eta_clip_max: float,
+) -> bool:
+    return not (
+        str(eta_mode) == str(EnvConfig.eta_mode)
+        and int(rule_vol_window) == int(EnvConfig.rule_vol_window)
+        and np.isclose(float(rule_vol_a), float(EnvConfig.rule_vol_a), atol=0.0, rtol=0.0)
+        and np.isclose(float(eta_clip_min), float(EnvConfig.eta_clip_min), atol=0.0, rtol=0.0)
+        and np.isclose(float(eta_clip_max), float(EnvConfig.eta_clip_max), atol=0.0, rtol=0.0)
+    )
+
+
+def _compute_action_smoothing_flag(*, eta_mode: str, rebalance_eta: float | None) -> bool:
+    return (eta_mode in {"fixed", "rule_vol"}) or (eta_mode == "legacy" and rebalance_eta is not None)
 
 
 def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | None) -> None:
@@ -27,20 +49,44 @@ def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | Non
     window_size = int(getattr(base_env, "window_size", 0))
     env_params = run_metadata.get("env_params", {}) or {}
     sig_version = run_metadata.get("env_signature_version")
-    if sig_version == "v3" or "rebalance_eta" in env_params:
+    if sig_version == "v3" or "rebalance_eta" in env_params or "eta_mode" in env_params:
         rebalance_eta = getattr(base_env.cfg, "rebalance_eta", None)
+        eta_mode = str(getattr(base_env.cfg, "eta_mode", EnvConfig.eta_mode))
+        rule_vol_window = int(getattr(base_env.cfg, "rule_vol_window", EnvConfig.rule_vol_window))
+        rule_vol_a = float(getattr(base_env.cfg, "rule_vol_a", EnvConfig.rule_vol_a))
+        eta_clip_min = float(getattr(base_env.cfg, "eta_clip_min", EnvConfig.eta_clip_min))
+        eta_clip_max = float(getattr(base_env.cfg, "eta_clip_max", EnvConfig.eta_clip_max))
         cost_params = {
             "transaction_cost": getattr(base_env.cfg, "transaction_cost", None),
             "risk_lambda": float(getattr(base_env.cfg, "risk_lambda", 0.0)),
             "rebalance_eta": float(rebalance_eta) if rebalance_eta is not None else None,
         }
+        if _is_step6_signature_extension_active(
+            eta_mode=eta_mode,
+            rule_vol_window=rule_vol_window,
+            rule_vol_a=rule_vol_a,
+            eta_clip_min=eta_clip_min,
+            eta_clip_max=eta_clip_max,
+        ):
+            cost_params.update(
+                {
+                    "eta_mode": eta_mode,
+                    "eta_clip_min": eta_clip_min,
+                    "eta_clip_max": eta_clip_max,
+                    "rule_vol_window": rule_vol_window,
+                    "rule_vol_a": rule_vol_a,
+                }
+            )
         reward_type = env_params.get("reward_type", "log_net_minus_r2")
         feature_flags = {
             "returns_window": True,
             "volatility": True,
             "prev_weights": True,
             "reward_type": reward_type,
-            "action_smoothing": rebalance_eta is not None,
+            "action_smoothing": _compute_action_smoothing_flag(
+                eta_mode=eta_mode,
+                rebalance_eta=float(rebalance_eta) if rebalance_eta is not None else None,
+            ),
         }
     elif sig_version == "v2" or "risk_lambda" in env_params or "reward_type" in env_params:
         cost_params = {
@@ -111,10 +157,18 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
     turnovers_target: List[float] = []
     dates: List = []
     costs: List[float] = []
+    costs_target: List[float] = []
     net_returns_exp: List[float] = []
     net_returns_lin: List[float] = []
+    net_returns_lin_target: List[float] = []
     log_returns_gross: List[float] = []
     log_returns_net: List[float] = []
+    log_returns_net_target: List[float] = []
+    eta_ts: List[float] = []
+    lambda_ts: List[float] = []
+    tracking_errors: List[float] = []
+    collapse_flags: List[bool] = []
+    collapse_reasons: List[str | None] = []
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward_vec, done_vec, info_list = env.step(action)
@@ -126,20 +180,36 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         turnover_exec = info.get("turnover_exec", info.get("turnover", 0.0))
         turnover_target = info.get("turnover_target", info.get("turnover_target_change", turnover_exec))
         cost = float(info.get("cost", 0.0))
+        cost_target = float(info.get("cost_target", np.nan))
+        net_lin_target = float(info.get("net_return_lin_target", np.nan))
+        eta_t = info.get("eta_t", info.get("rebalance_eta", np.nan))
+        lambda_t = info.get("lambda_t", np.nan)
+        tracking_error = float(info.get("tracking_error_l2", np.nan))
+        collapse_flag = info.get("collapse_flag", False)
+        collapse_reason = info.get("collapse_reason", None)
         log_return_gross = info.get("log_return_gross")
         log_return_net = info.get("log_return_net")
+        log_return_net_target = info.get("log_return_net_target")
         portfolio_returns.append(port_ret)
         turnovers_exec.append(turnover_exec)
         turnovers_target.append(turnover_target)
         dates.append(info.get("date"))
         costs.append(cost)
+        costs_target.append(cost_target)
         if log_return_net is not None:
             net_returns_exp.append(math.exp(float(log_return_net)) - 1.0)
         else:
             net_returns_exp.append(math.exp(reward) - 1.0)
         net_returns_lin.append(port_ret - cost)
+        net_returns_lin_target.append(net_lin_target)
         log_returns_gross.append(float(log_return_gross) if log_return_gross is not None else float("nan"))
         log_returns_net.append(float(log_return_net) if log_return_net is not None else float("nan"))
+        log_returns_net_target.append(float(log_return_net_target) if log_return_net_target is not None else float("nan"))
+        eta_ts.append(eta_t)
+        lambda_ts.append(lambda_t)
+        tracking_errors.append(tracking_error)
+        collapse_flags.append(collapse_flag)
+        collapse_reasons.append(collapse_reason)
     metrics = compute_metrics(
         rewards,
         portfolio_returns,
@@ -157,10 +227,18 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         "turnovers_target": turnovers_target,
         "turnover_target_changes": turnovers_target,
         "costs": costs,
+        "costs_target": costs_target,
         "net_returns_exp": net_returns_exp,
         "net_returns_lin": net_returns_lin,
+        "net_returns_lin_target": net_returns_lin_target,
         "log_returns_gross": log_returns_gross,
         "log_returns_net": log_returns_net,
+        "log_returns_net_target": log_returns_net_target,
+        "eta_t": eta_ts,
+        "lambda_t": lambda_ts,
+        "tracking_error_l2": tracking_errors,
+        "collapse_flag": collapse_flags,
+        "collapse_reason": collapse_reasons,
     }
     return metrics, trace
 
@@ -188,6 +266,7 @@ def trace_dict_to_frame(
     net_returns_lin = trace.get("net_returns_lin")
     log_returns_gross = trace.get("log_returns_gross")
     log_returns_net = trace.get("log_returns_net")
+    log_returns_net_target = trace.get("log_returns_net_target")
     if turnovers is None or not turnovers:
         turnovers = [np.nan] * len(dates)
     if turnover_exec is None or not turnover_exec:
@@ -206,6 +285,8 @@ def trace_dict_to_frame(
         log_returns_gross = [np.nan] * len(dates)
     if log_returns_net is None or not log_returns_net:
         log_returns_net = [np.nan] * len(dates)
+    if log_returns_net_target is None or not log_returns_net_target:
+        log_returns_net_target = [np.nan] * len(dates)
     df = pd.DataFrame(
         {
             "date": dates,
@@ -220,8 +301,16 @@ def trace_dict_to_frame(
             "net_return_lin": net_returns_lin,
             "log_return_gross": log_returns_gross,
             "log_return_net": log_returns_net,
+            "log_return_net_target": log_returns_net_target,
         }
     )
+    df["cost_target"] = trace.get("costs_target", np.nan)
+    df["net_return_lin_target"] = trace.get("net_returns_lin_target", np.nan)
+    df["eta_t"] = trace.get("eta_t", np.nan)
+    df["lambda_t"] = trace.get("lambda_t", np.nan)
+    df["tracking_error_l2"] = trace.get("tracking_error_l2", np.nan)
+    df["collapse_flag"] = trace.get("collapse_flag", False)
+    df["collapse_reason"] = trace.get("collapse_reason", None)
     df["eval_id"] = eval_id
     df["run_id"] = run_id
     df["model_type"] = model_type
@@ -232,6 +321,7 @@ def trace_dict_to_frame(
         df["equity_net_exp"] = np.cumprod(1.0 + df["net_return_exp"].fillna(0.0))
     if "net_return_lin" in df.columns:
         df["equity_net_lin"] = np.cumprod(1.0 + df["net_return_lin"].fillna(0.0))
+    df["equity_net_lin_target"] = np.cumprod(1.0 + df["net_return_lin_target"].fillna(0.0))
     return df
 
 

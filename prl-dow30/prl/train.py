@@ -8,7 +8,7 @@ import secrets
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import hashlib
 import numpy as np
@@ -37,6 +37,48 @@ def _align_frames(returns: pd.DataFrame, volatility: pd.DataFrame) -> Tuple[pd.D
     return returns_aligned, vol_aligned
 
 
+def _parse_step6_env_params(env_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    eta_mode = str(env_cfg.get("eta_mode", EnvConfig.eta_mode))
+    rebalance_eta = env_cfg.get("rebalance_eta")
+    rebalance_eta_f = float(rebalance_eta) if rebalance_eta is not None else None
+
+    rule_vol_cfg = env_cfg.get("rule_vol", {}) or {}
+    rule_vol_window = int(rule_vol_cfg.get("window", EnvConfig.rule_vol_window))
+    rule_vol_a = float(rule_vol_cfg.get("a", EnvConfig.rule_vol_a))
+    eta_clip = rule_vol_cfg.get("eta_clip")
+    if eta_clip is None:
+        eta_clip_min = float(EnvConfig.eta_clip_min)
+        eta_clip_max = float(EnvConfig.eta_clip_max)
+    else:
+        if not isinstance(eta_clip, (list, tuple)) or len(eta_clip) != 2:
+            raise ValueError("env.rule_vol.eta_clip must be a 2-element list/tuple: [eta_clip_min, eta_clip_max].")
+        eta_clip_min = float(eta_clip[0])
+        eta_clip_max = float(eta_clip[1])
+
+    return {
+        "eta_mode": eta_mode,
+        "rebalance_eta": rebalance_eta_f,
+        "rule_vol_window": rule_vol_window,
+        "rule_vol_a": rule_vol_a,
+        "eta_clip_min": eta_clip_min,
+        "eta_clip_max": eta_clip_max,
+    }
+
+
+def _is_step6_signature_extension_active(step6: Dict[str, Any]) -> bool:
+    return not (
+        str(step6["eta_mode"]) == str(EnvConfig.eta_mode)
+        and int(step6["rule_vol_window"]) == int(EnvConfig.rule_vol_window)
+        and np.isclose(float(step6["rule_vol_a"]), float(EnvConfig.rule_vol_a), atol=0.0, rtol=0.0)
+        and np.isclose(float(step6["eta_clip_min"]), float(EnvConfig.eta_clip_min), atol=0.0, rtol=0.0)
+        and np.isclose(float(step6["eta_clip_max"]), float(EnvConfig.eta_clip_max), atol=0.0, rtol=0.0)
+    )
+
+
+def _compute_action_smoothing_flag(*, eta_mode: str, rebalance_eta: float | None) -> bool:
+    return (eta_mode in {"fixed", "rule_vol"}) or (eta_mode == "legacy" and rebalance_eta is not None)
+
+
 def build_vec_env(
     returns: pd.DataFrame,
     volatility: pd.DataFrame,
@@ -48,6 +90,11 @@ def build_vec_env(
     risk_lambda: float = 0.0,
     risk_penalty_type: str = "r2",
     rebalance_eta: float | None = None,
+    eta_mode: str = "legacy",
+    rule_vol_window: int = 20,
+    rule_vol_a: float = 1.0,
+    eta_clip_min: float = 0.02,
+    eta_clip_max: float = 0.5,
 ) -> DummyVecEnv:
     returns_aligned, vol_aligned = _align_frames(returns, volatility)
     if len(returns_aligned) <= window_size + 1:
@@ -65,6 +112,11 @@ def build_vec_env(
         risk_lambda=float(risk_lambda),
         risk_penalty_type=str(risk_penalty_type),
         rebalance_eta=float(rebalance_eta) if rebalance_eta is not None else None,
+        eta_mode=str(eta_mode),
+        rule_vol_window=int(rule_vol_window),
+        rule_vol_a=float(rule_vol_a),
+        eta_clip_min=float(eta_clip_min),
+        eta_clip_max=float(eta_clip_max),
     )
 
     def _init():
@@ -300,14 +352,26 @@ def _write_run_metadata(
     )
     reward_type = "log_net_minus_r2"
     feature_flags["reward_type"] = reward_type
-    rebalance_eta = config.get("env", {}).get("rebalance_eta")
-    feature_flags["action_smoothing"] = rebalance_eta is not None
+    step6 = _parse_step6_env_params(config.get("env", {}))
+    eta_mode = str(step6["eta_mode"])
+    rebalance_eta = step6["rebalance_eta"]
+    feature_flags["action_smoothing"] = _compute_action_smoothing_flag(eta_mode=eta_mode, rebalance_eta=rebalance_eta)
     # Always compute signature with the configured transaction cost; manifest may carry a different default.
     cost_params_cfg = {
         "transaction_cost": config.get("env", {}).get("c_tc"),
         "risk_lambda": float(config.get("env", {}).get("risk_lambda", 0.0)),
-        "rebalance_eta": float(rebalance_eta) if rebalance_eta is not None else None,
+        "rebalance_eta": rebalance_eta,
     }
+    if _is_step6_signature_extension_active(step6):
+        cost_params_cfg.update(
+            {
+                "eta_mode": eta_mode,
+                "eta_clip_min": float(step6["eta_clip_min"]),
+                "eta_clip_max": float(step6["eta_clip_max"]),
+                "rule_vol_window": int(step6["rule_vol_window"]),
+                "rule_vol_a": float(step6["rule_vol_a"]),
+            }
+        )
     if asset_list and L is not None and Lv is not None:
         env_signature_hash = compute_env_signature(
             asset_list,
@@ -460,6 +524,11 @@ def build_env_for_range(
     risk_lambda: float = 0.0,
     risk_penalty_type: str = "r2",
     rebalance_eta: float | None = None,
+    eta_mode: str = "legacy",
+    rule_vol_window: int = 20,
+    rule_vol_a: float = 1.0,
+    eta_clip_min: float = 0.02,
+    eta_clip_max: float = 0.5,
 ) -> DummyVecEnv:
     returns_slice = slice_frame(market.returns, start, end)
     vol_slice = slice_frame(features.volatility, start, end)
@@ -476,6 +545,11 @@ def build_env_for_range(
         risk_lambda=risk_lambda,
         risk_penalty_type=risk_penalty_type,
         rebalance_eta=rebalance_eta,
+        eta_mode=eta_mode,
+        rule_vol_window=rule_vol_window,
+        rule_vol_a=rule_vol_a,
+        eta_clip_min=eta_clip_min,
+        eta_clip_max=eta_clip_max,
     )
 
 
@@ -548,7 +622,7 @@ def run_training(
     random_reset_train = bool(env_cfg.get("random_reset_train", False))
     risk_lambda = float(env_cfg.get("risk_lambda", 0.0))
     risk_penalty_type = str(env_cfg.get("risk_penalty_type", "r2"))
-    rebalance_eta = env_cfg.get("rebalance_eta")
+    step6 = _parse_step6_env_params(env_cfg)
     env = build_env_for_range(
         market=market,
         features=features,
@@ -561,7 +635,12 @@ def run_training(
         random_reset=random_reset_train,
         risk_lambda=risk_lambda,
         risk_penalty_type=risk_penalty_type,
-        rebalance_eta=rebalance_eta,
+        rebalance_eta=step6["rebalance_eta"],
+        eta_mode=step6["eta_mode"],
+        rule_vol_window=step6["rule_vol_window"],
+        rule_vol_a=step6["rule_vol_a"],
+        eta_clip_min=step6["eta_clip_min"],
+        eta_clip_max=step6["eta_clip_max"],
     )
     num_assets = market.returns.shape[1]
     log_dir = Path(logs_dir) if logs_dir is not None else Path("outputs/logs")
