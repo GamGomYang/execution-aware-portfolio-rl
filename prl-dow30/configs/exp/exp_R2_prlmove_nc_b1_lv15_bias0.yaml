@@ -1,0 +1,60 @@
+data:
+  force_refresh: false
+  history_tolerance_days: 60
+  min_assets: 15
+  min_history_days: 120
+  offline: true
+  paper_mode: true
+  processed_dir: data/processed
+  quality_params:
+    max_flat_fraction: 1.0
+    max_missing_fraction: 1.0
+    min_max_abs_return: 0.0
+    min_vol_std: 0.0
+  raw_dir: data/raw
+  require_cache: true
+  source: yfinance_only
+  ticker_substitutions: {}
+  universe_policy: availability_filtered
+dates:
+  test_end: '2025-12-31'
+  test_start: '2018-01-01'
+  train_end: '2017-12-31'
+  train_start: '2016-01-01'
+env:
+  L: 10
+  Lv: 10
+  c_tc: 0.0005
+  logit_scale: 10.0
+eval:
+  eval_end: '2025-12-30'
+  eval_start: '2024-01-01'
+  name: W1
+  run_baselines: false
+  trace_stride: 10
+  write_step4: false
+  write_trace: false
+mode: exp_R2_prlmove_nc
+name: exp_R2_prlmove_nc_b1_lv15_bias0
+prl:
+  alpha0: 0.2
+  alpha_max: 2.0
+  alpha_min: 0.01
+  beta: 1.0
+  bias: 0.0
+  center_prob: false
+  lambdav: 15.0
+sac:
+  batch_size: 64
+  buffer_size: 40000
+  checkpoint_interval: null
+  ent_coef: 0.2
+  eval_freq: 1000
+  gamma: 0.99
+  learning_rate: 0.0003
+  log_interval_steps: 100
+  tau: 0.005
+  total_timesteps: 15000
+seeds:
+- 0
+- 1

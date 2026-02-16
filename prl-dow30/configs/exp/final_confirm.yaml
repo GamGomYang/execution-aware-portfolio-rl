@@ -1,0 +1,74 @@
+mode: final_confirm
+name: final_confirm
+
+dates:
+  train_start: '2010-01-01'
+  train_end: '2019-12-31'
+  test_start: '2020-01-01'
+  test_end: '2025-12-31'
+
+eval:
+  name: full
+  eval_start: '2020-01-01'
+  eval_end: '2025-12-31'
+  write_trace: true
+  trace_stride: 2
+  run_baselines: true
+  write_step4: true
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source: yfinance_only
+  universe_policy: availability_filtered
+  min_assets: 30
+  offline: true
+  require_cache: true
+  paper_mode: true
+  min_history_days: 365
+  history_tolerance_days: 180
+  ticker_substitutions: {}
+  quality_params:
+    min_vol_std: 0.0
+    min_max_abs_return: 0.0
+    max_flat_fraction: 1.0
+    max_missing_fraction: 1.0
+
+env:
+  L: 15
+  Lv: 15
+  c_tc: 0.0005
+  logit_scale: 10.0
+
+prl:
+  alpha0: 0.2
+  beta: 1.0
+  lambdav: 2.5
+  bias: -2.0
+  center_prob: true
+  alpha_min: 0.01
+  alpha_max: 1.0
+
+sac:
+  learning_rate: 0.0003
+  batch_size: 128
+  gamma: 0.99
+  tau: 0.005
+  buffer_size: 200000
+  total_timesteps: 300000
+  eval_freq: 10000
+  ent_coef: 0.2
+  log_interval_steps: 1000
+  checkpoint_interval: null
+
+seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9

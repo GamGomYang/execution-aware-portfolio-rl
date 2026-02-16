@@ -1,0 +1,36 @@
+{
+  "exp_name": "config",
+  "timestamp": "2026-01-25T01:36:23.291830+00:00",
+  "config_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/case_a/config.yaml",
+  "model_types": [
+    "baseline",
+    "prl"
+  ],
+  "seeds": [
+    0
+  ],
+  "eval_windows": {
+    "train_start": "2020-01-01",
+    "train_end": "2020-01-10",
+    "test_start": "2020-01-01",
+    "test_end": "2020-01-10",
+    "windows": [
+      {
+        "name": "test",
+        "start": "2020-01-01",
+        "end": "2020-01-10"
+      }
+    ]
+  },
+  "run_ids": [
+    "runid_baseline_seed0",
+    "runid_prl_seed0"
+  ],
+  "metrics_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/metrics.csv",
+  "regime_metrics_path": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports/regime_metrics.csv",
+  "reports_dir": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/reports",
+  "traces_dir": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/traces",
+  "models_dir": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/models",
+  "logs_dir": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a/logs",
+  "output_root": "/workspace/study-model/prl-dow30/tmp_fast_checks/out_fast_a"
+}

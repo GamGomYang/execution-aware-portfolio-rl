@@ -2,6 +2,8 @@ import argparse
 import csv
 import logging
 import json
+import hashlib
+import shutil
 from pathlib import Path
 
 import yaml
@@ -17,6 +19,12 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=0, help="Seed identifier used during training.")
     parser.add_argument("--model-path", type=str, help="Optional explicit model path.")
     parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
+    parser.add_argument(
+        "--output-root",
+        type=str,
+        default="outputs",
+        help="Base directory for reports/models/logs (default: outputs).",
+    )
     return parser.parse_args()
 
 
@@ -35,12 +43,28 @@ def write_metrics(path: Path, row: dict):
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     file_exists = path.exists()
@@ -49,6 +73,47 @@ def write_metrics(path: Path, row: dict):
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
+
+
+def _archive_config_hash(cfg: dict) -> str:
+    payload = {k: v for k, v in cfg.items() if k != "config_path"}
+    blob = json.dumps(payload, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:8]
+
+
+def _archive_exp_id(config_path: str, cfg: dict) -> str:
+    return f"{Path(config_path).stem}__{_archive_config_hash(cfg)}"
+
+
+def _next_archive_path(archive_dir: Path, prefix: str, exp_id: str) -> Path:
+    candidate = archive_dir / f"{prefix}_{exp_id}.csv"
+    if not candidate.exists():
+        return candidate
+    idx = 2
+    while True:
+        candidate = archive_dir / f"{prefix}_{exp_id}__{idx}.csv"
+        if not candidate.exists():
+            return candidate
+        idx += 1
+
+
+def _archive_reports(reports_dir: Path, *, config_path: str, cfg: dict) -> dict[str, str]:
+    archive_dir = reports_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    exp_id = _archive_exp_id(config_path, cfg)
+    written: dict[str, str] = {}
+    targets = {
+        "metrics": reports_dir / "metrics.csv",
+        "summary": reports_dir / "summary.csv",
+        "regime_metrics": reports_dir / "regime_metrics.csv",
+    }
+    for prefix, src in targets.items():
+        if not src.exists():
+            continue
+        dst = _next_archive_path(archive_dir, prefix, exp_id)
+        shutil.copy2(src, dst)
+        written[prefix] = str(dst)
+    return written
 
 
 def _load_latest_run_metadata(model_type: str, seed: int, reports_dir: Path) -> dict | None:
@@ -88,6 +153,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
+    cfg["config_path"] = args.config
     dates = cfg["dates"]
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
@@ -124,19 +190,25 @@ def main():
         c_tc=env_cfg["c_tc"],
         seed=args.seed,
         logit_scale=env_cfg["logit_scale"],
+        risk_lambda=env_cfg.get("risk_lambda", 0.0),
+        risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
+        rebalance_eta=env_cfg.get("rebalance_eta"),
     )
+
+    output_root = Path(args.output_root)
+    reports_dir = output_root / "reports"
+    models_dir = output_root / "models"
 
     model_path = Path(args.model_path) if args.model_path else None
     if model_path is None:
-        meta = _load_latest_run_metadata(args.model_type, args.seed, Path("outputs/reports"))
+        meta = _load_latest_run_metadata(args.model_type, args.seed, reports_dir)
         if meta:
             artifact_paths = meta.get("artifact_paths") or meta.get("artifacts") or {}
             model_path_value = artifact_paths.get("model_path")
             if model_path_value:
                 model_path = Path(model_path_value)
         if not meta or model_path is None:
-            model_path = Path("outputs/models") / f"{args.model_type}_seed{args.seed}_final.zip"
-    reports_dir = Path("outputs/reports")
+            model_path = models_dir / f"{args.model_type}_seed{args.seed}_final.zip"
     meta = _load_run_metadata_for_model(model_path, reports_dir)
     if meta is None:
         raise ValueError(f"RUN_METADATA_NOT_FOUND for model_path={model_path}")
@@ -164,8 +236,12 @@ def main():
         "period": "test",
         **metrics.to_dict(),
     }
-    write_metrics(Path("outputs/reports/metrics.csv"), row)
-    print(f"Backtest complete. Metrics saved to outputs/reports/metrics.csv")
+    metrics_path = reports_dir / "metrics.csv"
+    write_metrics(metrics_path, row)
+    archived = _archive_reports(reports_dir, config_path=args.config, cfg=cfg)
+    if archived:
+        logging.info("Archived reports for exp_id=%s: %s", _archive_exp_id(args.config, cfg), archived)
+    print(f"Backtest complete. Metrics saved to {metrics_path}")
 
 
 if __name__ == "__main__":

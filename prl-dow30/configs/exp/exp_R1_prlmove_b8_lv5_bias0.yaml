@@ -1,0 +1,67 @@
+mode: exp_R1_prlmove
+name: exp_R1_prlmove_b8_lv5_bias0
+
+dates:
+  train_start: '2016-01-01'
+  train_end: '2017-12-31'
+  test_start: '2018-01-01'
+  test_end: '2025-12-31'
+
+eval:
+  name: W1
+  eval_start: '2024-01-01'
+  eval_end: '2025-12-30'
+  write_trace: false
+  trace_stride: 10
+  run_baselines: false
+  write_step4: false
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source: yfinance_only
+  universe_policy: availability_filtered
+  min_assets: 15
+  force_refresh: false
+  offline: true
+  require_cache: true
+  paper_mode: true
+  min_history_days: 120
+  history_tolerance_days: 60
+  ticker_substitutions: {}
+  quality_params:
+    min_vol_std: 0.0
+    min_max_abs_return: 0.0
+    max_flat_fraction: 1.0
+    max_missing_fraction: 1.0
+
+env:
+  L: 10
+  Lv: 10
+  c_tc: 0.0005
+  logit_scale: 10.0
+
+prl:
+  alpha0: 0.2
+  beta: 8
+  lambdav: 5
+  bias: 0.0
+  center_prob: true
+  alpha_min: 0.01
+  alpha_max: 1.5
+
+sac:
+  learning_rate: 0.0003
+  batch_size: 64
+  gamma: 0.99
+  tau: 0.005
+  buffer_size: 40000
+  total_timesteps: 15000
+  eval_freq: 1000
+  ent_coef: 0.2
+  log_interval_steps: 100
+  checkpoint_interval: null
+
+seeds:
+  - 0
+  - 1

@@ -1,7 +1,9 @@
 import argparse
 import csv
+import hashlib
 import json
 import logging
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,7 +41,77 @@ def parse_args():
     )
     parser.add_argument("--seeds", nargs="+", type=int, help="Seeds to iterate (defaults to config).")
     parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
+    parser.add_argument(
+        "--output-root",
+        type=str,
+        default="outputs",
+        help="Base directory for reports/models/logs (default: outputs).",
+    )
+    parser.add_argument(
+        "--total-timesteps",
+        type=int,
+        help="Override sac.total_timesteps for quick smoke runs.",
+    )
     return parser.parse_args()
+
+
+def _mean_std_safe(values: list[float]) -> tuple[float, float]:
+    arr = np.asarray(list(values), dtype=np.float64)
+    arr = arr[~np.isnan(arr)]
+    if arr.size == 0:
+        return 0.0, 0.0
+    mean = float(arr.mean())
+    std = float(arr.std(ddof=0))
+    if std <= 1e-8:
+        std = 0.0
+    return mean, std
+
+
+def _archive_config_hash(cfg: dict) -> str:
+    payload = {k: v for k, v in cfg.items() if k != "config_path"}
+    blob = json.dumps(payload, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:8]
+
+
+def _archive_exp_id(config_path: str, cfg: dict) -> str:
+    stem = Path(config_path).stem
+    return f"{stem}__{_archive_config_hash(cfg)}"
+
+
+def _next_archive_path(archive_dir: Path, prefix: str, exp_id: str) -> Path:
+    candidate = archive_dir / f"{prefix}_{exp_id}.csv"
+    if not candidate.exists():
+        return candidate
+    idx = 2
+    while True:
+        candidate = archive_dir / f"{prefix}_{exp_id}__{idx}.csv"
+        if not candidate.exists():
+            return candidate
+        idx += 1
+
+
+def _archive_reports(
+    reports_dir: Path,
+    *,
+    config_path: str,
+    cfg: dict,
+) -> dict[str, str]:
+    archive_dir = reports_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    exp_id = _archive_exp_id(config_path, cfg)
+    written: dict[str, str] = {}
+    targets = {
+        "metrics": reports_dir / "metrics.csv",
+        "summary": reports_dir / "summary.csv",
+        "regime_metrics": reports_dir / "regime_metrics.csv",
+    }
+    for prefix, src in targets.items():
+        if not src.exists():
+            continue
+        dst = _next_archive_path(archive_dir, prefix, exp_id)
+        shutil.copy2(src, dst)
+        written[prefix] = str(dst)
+    return written
 
 
 def write_metrics(path: Path, rows: list[dict]) -> None:
@@ -49,6 +121,7 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
     fieldnames = [
         "run_id",
         "eval_id",
+        "eval_window",
         "model_type",
         "seed",
         "period",
@@ -59,12 +132,28 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     with path.open("w", newline="") as f:
@@ -86,16 +175,40 @@ def summarize_metrics(rows: list[dict]) -> list[dict]:
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
-    for model_type, group in df.groupby("model_type"):
-        row = {"model_type": model_type}
+    group_cols = ["model_type"]
+    if "eval_window" in df.columns:
+        group_cols = ["eval_window"] + group_cols
+    for keys, group in df.groupby(group_cols):
+        if len(group_cols) == 2:
+            eval_window, model_type = keys
+            row = {"eval_window": eval_window, "model_type": model_type}
+        else:
+            model_type = keys
+            row = {"model_type": model_type}
         for col in metric_cols:
             row[f"{col}_mean"] = float(group[col].mean())
             row[f"{col}_std"] = float(group[col].std(ddof=0))
@@ -131,7 +244,10 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
     if not rows:
         return []
     df = pd.DataFrame(rows)
-    df = df.drop_duplicates(subset=["model_type", "seed"])
+    subset = ["model_type", "seed"]
+    if "eval_window" in df.columns:
+        subset = ["eval_window"] + subset
+    df = df.drop_duplicates(subset=subset)
     metric_cols = [
         "total_reward",
         "avg_reward",
@@ -140,21 +256,56 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
         "max_drawdown",
         "max_drawdown_net_exp",
         "max_drawdown_net_lin",
+        "mean_daily_return_gross",
+        "std_daily_return_gross",
+        "mean_daily_net_return_exp",
+        "std_daily_net_return_exp",
+        "mean_daily_net_return_lin",
+        "std_daily_net_return_lin",
+        "mean_daily_return_gross_mid",
+        "std_daily_return_gross_mid",
+        "mean_daily_net_return_exp_mid",
+        "std_daily_net_return_exp_mid",
+        "mean_daily_net_return_lin_mid",
+        "std_daily_net_return_lin_mid",
         "steps",
     ]
     summary_rows: list[dict] = []
-    for model_type, group in df.groupby("model_type"):
-        row = {"model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+    group_cols = ["model_type"]
+    if "eval_window" in df.columns:
+        group_cols = ["eval_window"] + group_cols
+    for keys, group in df.groupby(group_cols):
+        if len(group_cols) == 2:
+            eval_window, model_type = keys
+            row = {"eval_window": eval_window, "model_type": model_type, "n_seeds": int(group["seed"].nunique())}
+        else:
+            model_type = keys
+            row = {"model_type": model_type, "n_seeds": int(group["seed"].nunique())}
         for col in metric_cols:
             values = group[col].to_numpy(dtype=np.float64)
             row[f"{col}_mean"] = float(np.mean(values)) if values.size else float("nan")
             row[f"{col}_std"] = float(np.std(values, ddof=0)) if values.size else float("nan")
+            if values.size:
+                p25, p50, p75 = np.quantile(values, [0.25, 0.50, 0.75])
+                row[f"{col}_p25"] = float(p25)
+                row[f"{col}_median"] = float(p50)
+                row[f"{col}_p75"] = float(p75)
+                row[f"{col}_iqr"] = float(p75 - p25)
+            else:
+                row[f"{col}_p25"] = float("nan")
+                row[f"{col}_median"] = float("nan")
+                row[f"{col}_p75"] = float("nan")
+                row[f"{col}_iqr"] = float("nan")
             ci_low, ci_high = _bootstrap_ci(values)
             row[f"{col}_ci_low"] = ci_low
             row[f"{col}_ci_high"] = ci_high
@@ -184,6 +335,26 @@ def _compute_vz_series(volatility: pd.DataFrame, stats_path: Path) -> pd.Series:
     portfolio_vol = volatility.mean(axis=1)
     vz = (portfolio_vol - mean) / (std + 1e-8)
     return vz.astype(np.float64)
+
+
+def _resolve_eval_windows(cfg: dict) -> list[dict]:
+    eval_cfg = cfg.get("eval", {}) or {}
+    windows = eval_cfg.get("windows")
+    if windows:
+        resolved = []
+        for idx, win in enumerate(windows):
+            name = win.get("name") or f"eval_{idx}"
+            start = win.get("start") or win.get("eval_start")
+            end = win.get("end") or win.get("eval_end")
+            if not start or not end:
+                raise ValueError("EVAL_WINDOW_MISSING_START_END")
+            resolved.append({"name": name, "start": start, "end": end})
+        return resolved
+    dates = cfg["dates"]
+    start = eval_cfg.get("eval_start") or dates["test_start"]
+    end = eval_cfg.get("eval_end") or dates["test_end"]
+    name = eval_cfg.get("name") or eval_cfg.get("eval_window") or "test"
+    return [{"name": name, "start": start, "end": end}]
 
 
 def _eval_window_from_trace(trace_df: pd.DataFrame) -> tuple[pd.Timestamp, pd.Timestamp, int]:
@@ -225,7 +396,30 @@ def _update_run_metadata(path: Path, updates: dict) -> None:
     if not path.exists():
         return
     data = json.loads(path.read_text())
+    if "evaluations" in updates:
+        merged = data.get("evaluations", {})
+        merged.update(updates["evaluations"])
+        data["evaluations"] = merged
+        updates = {k: v for k, v in updates.items() if k != "evaluations"}
+    if "evaluation" in updates and isinstance(data.get("evaluation"), dict) and isinstance(updates["evaluation"], dict):
+        merged_eval = {**data["evaluation"], **updates["evaluation"]}
+        data["evaluation"] = merged_eval
+        updates = {k: v for k, v in updates.items() if k != "evaluation"}
     data.update(updates)
+    report_paths = data.get("report_paths", {})
+    eval_section = updates.get("evaluation") or updates.get("evaluations", {})
+    if isinstance(eval_section, dict):
+        last_eval = eval_section if "trace_path" in eval_section else None
+        if "evaluations" in updates and isinstance(updates["evaluations"], dict):
+            last_eval = list(updates["evaluations"].values())[-1]
+        if last_eval:
+            trace_path = last_eval.get("trace_path")
+            thresholds_path = last_eval.get("regime_thresholds_path")
+            if trace_path:
+                report_paths["trace_path"] = trace_path
+            if thresholds_path:
+                report_paths["regime_thresholds_path"] = thresholds_path
+            data["report_paths"] = report_paths
     path.write_text(json.dumps(data, indent=2))
 
 
@@ -234,10 +428,19 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     cfg["config_path"] = args.config
+    if args.total_timesteps:
+        cfg.setdefault("sac", {})
+        cfg["sac"]["total_timesteps"] = args.total_timesteps
     dates = cfg["dates"]
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
     data_cfg = cfg.get("data", {})
+    if prl_cfg:
+        multiplier = prl_cfg.get("mid_plasticity_multiplier")
+        if multiplier is not None:
+            logging.info("PRL mid_plasticity_multiplier=%s", multiplier)
+        else:
+            logging.info("PRL mid_plasticity_multiplier not set")
     if data_cfg.get("paper_mode", False) and not data_cfg.get("require_cache", False):
         raise ValueError("paper_mode=true requires require_cache=true.")
     raw_dir = data_cfg.get("raw_dir", "data/raw")
@@ -265,18 +468,30 @@ def main():
         raise ValueError("env.logit_scale is required for training/evaluation.")
 
     seeds = args.seeds or cfg.get("seeds", [0, 1, 2])
-    returns_slice = slice_frame(market.returns, dates["test_start"], dates["test_end"])
-    vol_slice = slice_frame(features.volatility, dates["test_start"], dates["test_end"])
-    returns_slice, vol_slice = _align_returns_vol(returns_slice, vol_slice)
+    eval_windows = _resolve_eval_windows(cfg)
+    multi_window = len(eval_windows) > 1
+    eval_cfg = cfg.get("eval", {}) or {}
+    write_trace = eval_cfg.get("write_trace", True)
+    trace_stride = int(eval_cfg.get("trace_stride", 1))
+    if trace_stride < 1:
+        raise ValueError("trace_stride must be >= 1")
+    run_baselines_flag = eval_cfg.get("run_baselines", True)
+    write_step4 = eval_cfg.get("write_step4", True) and write_trace
 
     metrics_rows: list[dict] = []
     regime_rows: list[dict] = []
     run_ids_this_session: list[str] = []
-    reports_dir = Path("outputs/reports")
-    reports_dir.mkdir(parents=True, exist_ok=True)
+    step4_targets: set[str] = set()
+    output_root = Path(args.output_root)
+    reports_dir = output_root / "reports"
+    traces_dir = output_root / "traces"
+    models_dir = output_root / "models"
+    logs_dir = output_root / "logs"
+    for path in (reports_dir, traces_dir, models_dir, logs_dir):
+        path.mkdir(parents=True, exist_ok=True)
     for seed in seeds:
         baseline_strategy_run_id = f"baseline_strategies_seed{seed}"
-        baseline_emitted = False
+        baseline_emitted_windows: set[str] = set()
         meta_by_type: dict[str, dict] = {}
         for model_type in args.model_types:
             model_path = run_training(
@@ -285,21 +500,12 @@ def main():
                 seed=seed,
                 raw_dir=raw_dir,
                 processed_dir=processed_dir,
-                output_dir="outputs/models",
+                output_dir=models_dir,
+                reports_dir=reports_dir,
+                logs_dir=logs_dir,
                 force_refresh=data_cfg.get("force_refresh", True),
                 offline=offline,
                 cache_only=cache_only,
-            )
-
-            env = build_env_for_range(
-                market=market,
-                features=features,
-                start=dates["test_start"],
-                end=dates["test_end"],
-                window_size=env_cfg["L"],
-                c_tc=env_cfg["c_tc"],
-                seed=seed,
-                logit_scale=env_cfg["logit_scale"],
             )
 
             scheduler = None
@@ -315,110 +521,153 @@ def main():
             meta = _load_run_metadata(run_id, reports_dir)
             if meta is None:
                 raise ValueError(f"RUN_METADATA_NOT_FOUND for run_id={run_id}")
-            assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
             meta_by_type[model_type] = meta
-            model = load_model(model_path, model_type, env, scheduler=scheduler)
-            metrics, trace_df = eval_model_to_trace(
-                model,
-                env,
-                eval_id=eval_id,
-                run_id=run_id,
-                model_type=label,
-                seed=seed,
-            )
-            metrics_row_id = len(metrics_rows)
-            metrics_rows.append(
-                {
-                    "run_id": run_id,
-                    "eval_id": eval_id,
-                    "model_type": label,
-                    "seed": seed,
-                    "period": "test",
-                    **metrics.to_dict(),
-                }
-            )
-            eval_start, eval_end, eval_num_days = _eval_window_from_trace(trace_df)
-            aligned_returns = slice_frame(returns_slice, eval_start, eval_end)
-            aligned_vol = slice_frame(vol_slice, eval_start, eval_end)
-            aligned_returns, aligned_vol = _align_returns_vol(aligned_returns, aligned_vol)
-            vz_series = _compute_vz_series(aligned_vol, features.stats_path)
-            thresholds = _build_thresholds(
-                vz_series,
-                eval_start=eval_start,
-                eval_end=eval_end,
-                eval_num_days=eval_num_days,
-            )
-            vz_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values})
-            trace_df = trace_df.merge(vz_df, on="date", how="left")
-            trace_df = compute_regime_labels(trace_df, thresholds)
-            if "baseline" in meta_by_type and "prl" in meta_by_type:
-                base_meta = meta_by_type["baseline"]
-                prl_meta = meta_by_type["prl"]
-                if base_meta.get("data_manifest_hash") != prl_meta.get("data_manifest_hash"):
-                    raise ValueError("DATA_MANIFEST_HASH_MISMATCH")
-                if base_meta.get("env_signature_hash") != prl_meta.get("env_signature_hash"):
-                    raise ValueError("ENV_SIGNATURE_HASH_MISMATCH")
+            step4_targets.add(run_id)
 
-            include_baselines = False
-            if not baseline_emitted:
-                if model_type == "prl":
-                    include_baselines = True
-                elif model_type == "baseline" and "prl" not in args.model_types:
-                    include_baselines = True
-            if include_baselines:
-                baseline_emitted = True
-                strategy_metrics, strategy_trace_df = eval_strategies_to_trace(
-                    aligned_returns,
-                    aligned_vol,
-                    transaction_cost=env_cfg["c_tc"],
+            for window in eval_windows:
+                env = build_env_for_range(
+                    market=market,
+                    features=features,
+                    start=window["start"],
+                    end=window["end"],
+                    window_size=env_cfg["L"],
+                    c_tc=env_cfg["c_tc"],
+                    seed=seed,
+                    logit_scale=env_cfg["logit_scale"],
+                    risk_lambda=env_cfg.get("risk_lambda", 0.0),
+                    risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
+                    rebalance_eta=env_cfg.get("rebalance_eta"),
+                )
+
+                assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
+                model = load_model(model_path, model_type, env, scheduler=scheduler)
+                metrics, trace_df = eval_model_to_trace(
+                    model,
+                    env,
                     eval_id=eval_id,
-                    run_id=baseline_strategy_run_id,
+                    run_id=run_id,
+                    model_type=label,
                     seed=seed,
                 )
-                strategy_trace_df = strategy_trace_df.merge(vz_df, on="date", how="left")
-                strategy_trace_df = compute_regime_labels(strategy_trace_df, thresholds)
-                strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}.parquet"
-                strategy_trace_df.to_parquet(strategy_trace_path, index=False)
-                regime_rows.extend(summarize_regime_metrics(strategy_trace_df, period="test"))
-                for name, base_metrics in strategy_metrics.items():
-                    metrics_rows.append(
-                        {
-                            "run_id": baseline_strategy_run_id,
-                            "eval_id": eval_id,
-                            "model_type": name,
-                            "seed": seed,
-                            "period": "test",
-                            **base_metrics.to_dict(),
-                        }
-                    )
-                run_ids_this_session.append(baseline_strategy_run_id)
-
-            trace_path = reports_dir / f"trace_{run_id}.parquet"
-            trace_df.to_parquet(trace_path, index=False)
-            run_ids_this_session.append(run_id)
-
-            thresholds_path = reports_dir / f"regime_thresholds_{run_id}.json"
-            thresholds_path.write_text(json.dumps(thresholds, indent=2))
-
-            regime_rows.extend(summarize_regime_metrics(trace_df, period="test"))
-            eval_info = {
-                "eval_start_date": thresholds["eval_start_date"],
-                "eval_end_date": thresholds["eval_end_date"],
-                "eval_num_days": thresholds["eval_num_days"],
-            }
-            _update_run_metadata(
-                reports_dir / f"run_metadata_{run_id}.json",
-                {
-                    **eval_info,
-                    "evaluation": {
-                        "trace_path": str(trace_path),
-                        "regime_thresholds_path": str(thresholds_path),
-                        "metrics_row_id": metrics_row_id,
-                        "completed_at": datetime.now(timezone.utc).isoformat(),
-                        **eval_info,
+                trace_df["eval_window"] = window["name"]
+                metrics_row_id = len(metrics_rows)
+                metrics_rows.append(
+                    {
+                        "run_id": run_id,
+                        "eval_id": eval_id,
+                        "eval_window": window["name"],
+                        "model_type": label,
+                        "seed": seed,
+                        "period": "test",
+                        **metrics.to_dict(),
                     }
-                },
-            )
+                )
+                # mid-only daily return mean/std (uses regime labels computed below)
+                metrics_row_ref = metrics_rows[metrics_row_id]
+                returns_slice = slice_frame(market.returns, window["start"], window["end"])
+                vol_slice = slice_frame(features.volatility, window["start"], window["end"])
+                returns_slice, vol_slice = _align_returns_vol(returns_slice, vol_slice)
+                eval_start, eval_end, eval_num_days = _eval_window_from_trace(trace_df)
+                aligned_returns = slice_frame(returns_slice, eval_start, eval_end)
+                aligned_vol = slice_frame(vol_slice, eval_start, eval_end)
+                aligned_returns, aligned_vol = _align_returns_vol(aligned_returns, aligned_vol)
+                vz_series = _compute_vz_series(aligned_vol, features.stats_path)
+                thresholds = _build_thresholds(
+                    vz_series,
+                    eval_start=eval_start,
+                    eval_end=eval_end,
+                    eval_num_days=eval_num_days,
+                )
+                vz_df = pd.DataFrame({"date": vz_series.index, "vz": vz_series.values})
+                trace_df = trace_df.merge(vz_df, on="date", how="left")
+                trace_df = compute_regime_labels(trace_df, thresholds)
+                mid_df = trace_df[trace_df["regime"] == "mid"]
+                mean_gross_mid, std_gross_mid = _mean_std_safe(mid_df["portfolio_return"].tolist())
+                mean_exp_mid, std_exp_mid = _mean_std_safe(mid_df["net_return_exp"].tolist())
+                mean_lin_mid, std_lin_mid = _mean_std_safe(mid_df["net_return_lin"].tolist())
+                metrics_row_ref["mean_daily_return_gross_mid"] = mean_gross_mid
+                metrics_row_ref["std_daily_return_gross_mid"] = std_gross_mid
+                metrics_row_ref["mean_daily_net_return_exp_mid"] = mean_exp_mid
+                metrics_row_ref["std_daily_net_return_exp_mid"] = std_exp_mid
+                metrics_row_ref["mean_daily_net_return_lin_mid"] = mean_lin_mid
+                metrics_row_ref["std_daily_net_return_lin_mid"] = std_lin_mid
+                if "baseline" in meta_by_type and "prl" in meta_by_type:
+                    base_meta = meta_by_type["baseline"]
+                    prl_meta = meta_by_type["prl"]
+                    if base_meta.get("data_manifest_hash") != prl_meta.get("data_manifest_hash"):
+                        raise ValueError("DATA_MANIFEST_HASH_MISMATCH")
+                    if base_meta.get("env_signature_hash") != prl_meta.get("env_signature_hash"):
+                        raise ValueError("ENV_SIGNATURE_HASH_MISMATCH")
+
+                include_baselines = False
+                if window["name"] not in baseline_emitted_windows:
+                    if model_type == "prl":
+                        include_baselines = True
+                    elif model_type == "baseline" and "prl" not in args.model_types:
+                        include_baselines = True
+                window_suffix = f"_{window['name']}" if multi_window else ""
+                if include_baselines and run_baselines_flag:
+                    baseline_emitted_windows.add(window["name"])
+                    strategy_metrics, strategy_trace_df = eval_strategies_to_trace(
+                        aligned_returns,
+                        aligned_vol,
+                        transaction_cost=env_cfg["c_tc"],
+                        eval_id=eval_id,
+                        run_id=baseline_strategy_run_id,
+                        seed=seed,
+                    )
+                    strategy_trace_df["eval_window"] = window["name"]
+                    strategy_trace_df = strategy_trace_df.merge(vz_df, on="date", how="left")
+                    strategy_trace_df = compute_regime_labels(strategy_trace_df, thresholds)
+                    if write_trace:
+                        strategy_trace_path = reports_dir / f"trace_{baseline_strategy_run_id}{window_suffix}.parquet"
+                        strategy_trace_df.iloc[::trace_stride].to_parquet(strategy_trace_path, index=False)
+                    regime_rows.extend(summarize_regime_metrics(strategy_trace_df, period="test"))
+                    for name, base_metrics in strategy_metrics.items():
+                        metrics_rows.append(
+                            {
+                                "run_id": baseline_strategy_run_id,
+                                "eval_id": eval_id,
+                                "eval_window": window["name"],
+                                "model_type": name,
+                                "seed": seed,
+                                "period": "test",
+                                **base_metrics.to_dict(),
+                            }
+                        )
+                    run_ids_this_session.append(baseline_strategy_run_id)
+
+                trace_path = reports_dir / f"trace_{run_id}{window_suffix}.parquet"
+                if write_trace:
+                    trace_to_save = trace_df.iloc[::trace_stride].copy()
+                    trace_path_to_write = trace_path
+                    trace_to_save.to_parquet(trace_path_to_write, index=False)
+                run_ids_this_session.append(run_id)
+
+                thresholds_path = reports_dir / f"regime_thresholds_{run_id}{window_suffix}.json"
+                thresholds_path.write_text(json.dumps(thresholds, indent=2))
+
+                regime_rows.extend(summarize_regime_metrics(trace_df, period="test"))
+                eval_info = {
+                    "eval_start_date": thresholds["eval_start_date"],
+                    "eval_end_date": thresholds["eval_end_date"],
+                    "eval_num_days": thresholds["eval_num_days"],
+                    "eval_window": window["name"],
+                }
+                evaluation_payload = {
+                    **eval_info,
+                    "trace_path": str(trace_path) if write_trace else None,
+                    "regime_thresholds_path": str(thresholds_path),
+                    "metrics_row_id": metrics_row_id,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+                updates = {
+                    **eval_info,
+                    "evaluations": {window["name"]: evaluation_payload},
+                }
+                if not multi_window:
+                    updates["evaluation"] = evaluation_payload
+                _update_run_metadata(reports_dir / f"run_metadata_{run_id}.json", updates)
 
     write_metrics(reports_dir / "metrics.csv", metrics_rows)
     summary_rows = summarize_metrics(metrics_rows)
@@ -427,7 +676,65 @@ def main():
     summary_seed_rows = summarize_seed_stats(metrics_rows)
     write_summary(reports_dir / "summary_seed_stats.csv", summary_seed_rows)
     run_index_path = reports_dir / "run_index.json"
-    run_index_path.write_text(json.dumps({"run_ids": run_ids_this_session}, indent=2))
+    unique_run_ids = list(dict.fromkeys(run_ids_this_session))
+    run_index_path.write_text(
+        json.dumps(
+            {
+                "exp_name": cfg.get("name") or cfg.get("exp_name") or Path(args.config).stem,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "config_path": args.config,
+                "model_types": args.model_types,
+                "seeds": list(seeds),
+                "eval_windows": {
+                    "train_start": dates.get("train_start"),
+                    "train_end": dates.get("train_end"),
+                    "test_start": dates.get("test_start"),
+                    "test_end": dates.get("test_end"),
+                    "windows": eval_windows,
+                },
+                "run_ids": unique_run_ids,
+                "metrics_path": str(reports_dir / "metrics.csv"),
+                "regime_metrics_path": str(reports_dir / "regime_metrics.csv"),
+                "reports_dir": str(reports_dir),
+                "traces_dir": str(traces_dir),
+                "models_dir": str(models_dir),
+                "logs_dir": str(logs_dir),
+                "output_root": str(output_root),
+            },
+            indent=2,
+        )
+    )
+    archived = _archive_reports(reports_dir, config_path=args.config, cfg=cfg)
+    if archived:
+        logging.info("Archived reports for exp_id=%s: %s", _archive_exp_id(args.config, cfg), archived)
+    if write_step4 and step4_targets:
+        from scripts import make_step4_report
+
+        import sys
+
+        for run_id in sorted(step4_targets):
+            meta_path = reports_dir / f"run_metadata_{run_id}.json"
+            if not meta_path.exists():
+                continue
+            if not write_trace:
+                continue
+            args_list = [
+                "make_step4_report",
+                "--run-id",
+                run_id,
+                "--metadata",
+                str(meta_path),
+                "--outputs-dir",
+                str(output_root),
+            ]
+            prev_argv = sys.argv
+            sys.argv = args_list
+            try:
+                make_step4_report.main()
+            except Exception as exc:  # pragma: no cover - best-effort
+                logging.warning("step4 report failed for %s: %s", run_id, exc)
+            finally:
+                sys.argv = prev_argv
     print("Completed run_all workflow.")
 
 

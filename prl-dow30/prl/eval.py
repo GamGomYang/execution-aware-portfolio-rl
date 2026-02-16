@@ -25,8 +25,33 @@ def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | Non
     num_assets = int(getattr(base_env, "num_assets", len(asset_list)))
     obs_dim = int(base_env.observation_space.shape[0])
     window_size = int(getattr(base_env, "window_size", 0))
-    cost_params = {"transaction_cost": getattr(base_env.cfg, "transaction_cost", None)}
-    feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True}
+    env_params = run_metadata.get("env_params", {}) or {}
+    sig_version = run_metadata.get("env_signature_version")
+    if sig_version == "v3" or "rebalance_eta" in env_params:
+        rebalance_eta = getattr(base_env.cfg, "rebalance_eta", None)
+        cost_params = {
+            "transaction_cost": getattr(base_env.cfg, "transaction_cost", None),
+            "risk_lambda": float(getattr(base_env.cfg, "risk_lambda", 0.0)),
+            "rebalance_eta": float(rebalance_eta) if rebalance_eta is not None else None,
+        }
+        reward_type = env_params.get("reward_type", "log_net_minus_r2")
+        feature_flags = {
+            "returns_window": True,
+            "volatility": True,
+            "prev_weights": True,
+            "reward_type": reward_type,
+            "action_smoothing": rebalance_eta is not None,
+        }
+    elif sig_version == "v2" or "risk_lambda" in env_params or "reward_type" in env_params:
+        cost_params = {
+            "transaction_cost": getattr(base_env.cfg, "transaction_cost", None),
+            "risk_lambda": float(getattr(base_env.cfg, "risk_lambda", 0.0)),
+        }
+        reward_type = env_params.get("reward_type", "log_net_minus_r2")
+        feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True, "reward_type": reward_type}
+    else:
+        cost_params = {"transaction_cost": getattr(base_env.cfg, "transaction_cost", None)}
+        feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True}
 
     expected_obs_dim = run_metadata.get("obs_dim_expected")
     expected_num_assets = run_metadata.get("num_assets")
@@ -82,12 +107,14 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
     done = False
     rewards: List[float] = []
     portfolio_returns: List[float] = []
-    turnovers: List[float] = []
+    turnovers_exec: List[float] = []
+    turnovers_target: List[float] = []
     dates: List = []
-    turnover_target_changes: List[float] = []
     costs: List[float] = []
     net_returns_exp: List[float] = []
     net_returns_lin: List[float] = []
+    log_returns_gross: List[float] = []
+    log_returns_net: List[float] = []
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward_vec, done_vec, info_list = env.step(action)
@@ -96,19 +123,28 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         rewards.append(reward)
         info = info_list[0]
         port_ret = info.get("portfolio_return", 0.0)
-        turnover = info.get("turnover", 0.0)
+        turnover_exec = info.get("turnover_exec", info.get("turnover", 0.0))
+        turnover_target = info.get("turnover_target", info.get("turnover_target_change", turnover_exec))
         cost = float(info.get("cost", 0.0))
+        log_return_gross = info.get("log_return_gross")
+        log_return_net = info.get("log_return_net")
         portfolio_returns.append(port_ret)
-        turnovers.append(turnover)
+        turnovers_exec.append(turnover_exec)
+        turnovers_target.append(turnover_target)
         dates.append(info.get("date"))
-        turnover_target_changes.append(info.get("turnover_target_change", 0.0))
         costs.append(cost)
-        net_returns_exp.append(math.exp(reward) - 1.0)
+        if log_return_net is not None:
+            net_returns_exp.append(math.exp(float(log_return_net)) - 1.0)
+        else:
+            net_returns_exp.append(math.exp(reward) - 1.0)
         net_returns_lin.append(port_ret - cost)
+        log_returns_gross.append(float(log_return_gross) if log_return_gross is not None else float("nan"))
+        log_returns_net.append(float(log_return_net) if log_return_net is not None else float("nan"))
     metrics = compute_metrics(
         rewards,
         portfolio_returns,
-        turnovers,
+        turnovers_exec,
+        turnovers_target=turnovers_target,
         net_returns_exp=net_returns_exp,
         net_returns_lin=net_returns_lin,
     )
@@ -116,11 +152,15 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         "dates": dates,
         "rewards": rewards,
         "portfolio_returns": portfolio_returns,
-        "turnovers": turnovers,
-        "turnover_target_changes": turnover_target_changes,
+        "turnovers": turnovers_exec,
+        "turnovers_exec": turnovers_exec,
+        "turnovers_target": turnovers_target,
+        "turnover_target_changes": turnovers_target,
         "costs": costs,
         "net_returns_exp": net_returns_exp,
         "net_returns_lin": net_returns_lin,
+        "log_returns_gross": log_returns_gross,
+        "log_returns_net": log_returns_net,
     }
     return metrics, trace
 
@@ -138,14 +178,24 @@ def trace_dict_to_frame(
     model_type: str,
     seed: int,
 ) -> pd.DataFrame:
+    turnover_exec = trace.get("turnovers_exec")
+    turnover_target = trace.get("turnovers_target")
     turnover_target_changes = trace.get("turnover_target_changes")
+    turnovers = trace.get("turnovers")
     dates = trace.get("dates", [])
     costs = trace.get("costs")
     net_returns_exp = trace.get("net_returns_exp")
     net_returns_lin = trace.get("net_returns_lin")
     log_returns_gross = trace.get("log_returns_gross")
+    log_returns_net = trace.get("log_returns_net")
+    if turnovers is None or not turnovers:
+        turnovers = [np.nan] * len(dates)
+    if turnover_exec is None or not turnover_exec:
+        turnover_exec = turnovers
+    if turnover_target is None or not turnover_target:
+        turnover_target = turnover_target_changes if turnover_target_changes else [np.nan] * len(dates)
     if turnover_target_changes is None or not turnover_target_changes:
-        turnover_target_changes = [np.nan] * len(dates)
+        turnover_target_changes = turnover_target
     if costs is None or not costs:
         costs = [np.nan] * len(dates)
     if net_returns_exp is None or not net_returns_exp:
@@ -154,17 +204,22 @@ def trace_dict_to_frame(
         net_returns_lin = [np.nan] * len(dates)
     if log_returns_gross is None or not log_returns_gross:
         log_returns_gross = [np.nan] * len(dates)
+    if log_returns_net is None or not log_returns_net:
+        log_returns_net = [np.nan] * len(dates)
     df = pd.DataFrame(
         {
             "date": dates,
             "portfolio_return": trace.get("portfolio_returns", []),
             "reward": trace.get("rewards", []),
-            "turnover": trace.get("turnovers", []),
+            "turnover": turnovers,
+            "turnover_exec": turnover_exec,
+            "turnover_target": turnover_target,
             "turnover_target_change": turnover_target_changes,
             "cost": costs,
             "net_return_exp": net_returns_exp,
             "net_return_lin": net_returns_lin,
             "log_return_gross": log_returns_gross,
+            "log_return_net": log_returns_net,
         }
     )
     df["eval_id"] = eval_id
@@ -260,15 +315,26 @@ def summarize_regime_metrics(
     if trace_df.empty:
         return rows
     has_eval_id = "eval_id" in trace_df.columns
+    has_eval_window = "eval_window" in trace_df.columns
     group_cols = ["run_id", "model_type", "seed"]
     if has_eval_id:
         group_cols = ["eval_id"] + group_cols
+    if has_eval_window:
+        group_cols = ["eval_window"] + group_cols
     for group_keys, group in trace_df.groupby(group_cols):
         if has_eval_id:
-            eval_id, run_id, model_type, seed = group_keys
+            if has_eval_window:
+                eval_window, eval_id, run_id, model_type, seed = group_keys
+            else:
+                eval_window = None
+                eval_id, run_id, model_type, seed = group_keys
         else:
             eval_id = None
-            run_id, model_type, seed = group_keys
+            if has_eval_window:
+                eval_window, run_id, model_type, seed = group_keys
+            else:
+                eval_window = None
+                run_id, model_type, seed = group_keys
         seed_val = int(seed)
         for regime, regime_group in group.groupby("regime"):
             metrics = compute_metrics(
@@ -288,6 +354,8 @@ def summarize_regime_metrics(
             }
             if has_eval_id:
                 row["eval_id"] = eval_id
+            if has_eval_window:
+                row["eval_window"] = eval_window
             rows.append(row)
         if include_all:
             metrics = compute_metrics(
@@ -307,5 +375,7 @@ def summarize_regime_metrics(
             }
             if has_eval_id:
                 row["eval_id"] = eval_id
+            if has_eval_window:
+                row["eval_window"] = eval_window
             rows.append(row)
     return rows

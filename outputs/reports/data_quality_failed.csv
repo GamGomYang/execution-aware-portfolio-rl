@@ -1,0 +1,3 @@
+ticker,kept,drop_reason,missing_fraction_raw,valid_obs_count,first_valid_date,return_std,max_abs_return,flat_fraction
+AAA,True,,0.0,14,2020-01-01,,,
+BBB,True,,0.0,14,2020-01-01,,,

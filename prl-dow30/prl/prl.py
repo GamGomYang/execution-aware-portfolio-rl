@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Sequence
 
 import torch as th
@@ -21,6 +22,11 @@ class PRLConfig:
     center_prob: bool = True
     emergency_mode: str = "clamp"
     emergency_vz_threshold: float = 2.0
+    mid_plasticity_multiplier: float = 1.0
+    # Optional risk penalty knobs (currently logged only)
+    var_penalty_beta: float | None = None
+    cvar_penalty_gamma: float | None = None
+    penalty_clip_ratio: float = 0.2
 
 
 @dataclass
@@ -42,6 +48,8 @@ class PRLAlphaScheduler:
         self.vol_slice = slice(start, start + cfg.num_assets)
         self.vol_mean = th.tensor(cfg.vol_mean, dtype=th.float32)
         self.vol_std = th.tensor(cfg.vol_std, dtype=th.float32)
+        self.mid_multiplier = float(cfg.mid_plasticity_multiplier)
+        self._logged_mid_multiplier = False
 
     def _prepare_obs(self, obs: th.Tensor) -> th.Tensor:
         if obs.dim() == 1:
@@ -69,7 +77,18 @@ class PRLAlphaScheduler:
             P_centered = P - p0
         else:
             P_centered = P
-        alpha_raw = self.cfg.alpha0 * (1 + self.cfg.beta * P_centered)
+        # Apply mid-plasticity multiplier when Vz is near the mid regime (|Vz| <= 0.5 approximates mid vol).
+        mid_mask = th.abs(Vz) <= 0.5
+        multiplier = th.where(mid_mask, th.tensor(self.mid_multiplier, dtype=P.dtype, device=P.device), th.tensor(1.0, dtype=P.dtype, device=P.device))
+        if not self._logged_mid_multiplier and mid_mask.any():
+            logging.getLogger(__name__).info(
+                "PRL mid_plasticity_multiplier applied: multiplier=%.3f mid_fraction=%.3f",
+                self.mid_multiplier,
+                float(mid_mask.float().mean().item()),
+            )
+            self._logged_mid_multiplier = True
+
+        alpha_raw = self.cfg.alpha0 * (1 + self.cfg.beta * multiplier * P_centered)
         alpha_clamped = th.clamp(alpha_raw, min=self.cfg.alpha_min, max=self.cfg.alpha_max)
 
         if self.cfg.emergency_mode == "vz":

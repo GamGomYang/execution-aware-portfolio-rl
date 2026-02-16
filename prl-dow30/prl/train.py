@@ -44,6 +44,10 @@ def build_vec_env(
     c_tc: float,
     seed: int,
     logit_scale: float | None = None,
+    random_reset: bool = False,
+    risk_lambda: float = 0.0,
+    risk_penalty_type: str = "r2",
+    rebalance_eta: float | None = None,
 ) -> DummyVecEnv:
     returns_aligned, vol_aligned = _align_frames(returns, volatility)
     if len(returns_aligned) <= window_size + 1:
@@ -57,6 +61,10 @@ def build_vec_env(
         window_size=window_size,
         transaction_cost=c_tc,
         logit_scale=float(logit_scale),
+        random_reset=bool(random_reset),
+        risk_lambda=float(risk_lambda),
+        risk_penalty_type=str(risk_penalty_type),
+        rebalance_eta=float(rebalance_eta) if rebalance_eta is not None else None,
     )
 
     def _init():
@@ -83,6 +91,10 @@ def create_scheduler(prl_cfg: Dict[str, float], window_size: int, num_assets: in
         vol_std=std,
         window_size=window_size,
         num_assets=num_assets,
+        mid_plasticity_multiplier=prl_cfg.get("mid_plasticity_multiplier", 1.0),
+        var_penalty_beta=prl_cfg.get("var_penalty_beta"),
+        cvar_penalty_gamma=prl_cfg.get("cvar_penalty_gamma"),
+        penalty_clip_ratio=prl_cfg.get("penalty_clip_ratio", 0.2),
     )
     return PRLAlphaScheduler(cfg)
 
@@ -126,9 +138,30 @@ def _set_global_seeds(seed: int) -> None:
 
 def _config_hash(config: Dict) -> str:
     blob = json.dumps(config, sort_keys=True).encode("utf-8")
-    import hashlib
-
     return hashlib.sha256(blob).hexdigest()
+
+
+def _manifest_hash(manifest: Dict) -> str:
+    if not manifest:
+        return ""
+    if "data_manifest_hash" not in manifest:
+        payload = {key: value for key, value in manifest.items() if key != "data_manifest_hash"}
+        return sha256_bytes(canonical_json(payload))
+    return str(manifest.get("data_manifest_hash") or "")
+
+
+def _vol_stats_filename(config: Dict, lv: int, manifest_hash: str) -> str:
+    dates = config["dates"]
+    stats_key = manifest_hash or _config_hash(config)
+    return f"vol_stats_{stats_key[:8]}_Lv{lv}_{dates['train_start']}_{dates['train_end']}.json"
+
+
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def _git_commit() -> str:
@@ -182,6 +215,36 @@ class TrainLoggingCallback(BaseCallback):
             "alpha_clamped_mean": logger_vals.get("train/alpha_clamped_mean"),
             "emergency_rate": logger_vals.get("train/emergency_rate"),
             "beta_effective_mean": logger_vals.get("train/beta_effective_mean"),
+            "prl_prob_min": logger_vals.get("train/prl_prob_min"),
+            "prl_prob_max": logger_vals.get("train/prl_prob_max"),
+            "prl_prob_p05": logger_vals.get("train/prl_prob_p05"),
+            "prl_prob_p50": logger_vals.get("train/prl_prob_p50"),
+            "prl_prob_p95": logger_vals.get("train/prl_prob_p95"),
+            "prl_prob_std": logger_vals.get("train/prl_prob_std"),
+            "vz_min": logger_vals.get("train/vz_min"),
+            "vz_max": logger_vals.get("train/vz_max"),
+            "vz_p05": logger_vals.get("train/vz_p05"),
+            "vz_p50": logger_vals.get("train/vz_p50"),
+            "vz_p95": logger_vals.get("train/vz_p95"),
+            "vz_std": logger_vals.get("train/vz_std"),
+            "alpha_raw_min": logger_vals.get("train/alpha_raw_min"),
+            "alpha_raw_max": logger_vals.get("train/alpha_raw_max"),
+            "alpha_raw_p05": logger_vals.get("train/alpha_raw_p05"),
+            "alpha_raw_p50": logger_vals.get("train/alpha_raw_p50"),
+            "alpha_raw_p95": logger_vals.get("train/alpha_raw_p95"),
+            "alpha_raw_std": logger_vals.get("train/alpha_raw_std"),
+            "alpha_obs_min": logger_vals.get("train/alpha_obs_min"),
+            "alpha_obs_max": logger_vals.get("train/alpha_obs_max"),
+            "alpha_obs_p05": logger_vals.get("train/alpha_obs_p05"),
+            "alpha_obs_p50": logger_vals.get("train/alpha_obs_p50"),
+            "alpha_obs_p95": logger_vals.get("train/alpha_obs_p95"),
+            "alpha_obs_std": logger_vals.get("train/alpha_obs_std"),
+            "actor_loss_base": logger_vals.get("train/actor_loss_base"),
+            "cvar_penalty_raw_mean": logger_vals.get("train/cvar_penalty_raw_mean"),
+            "cvar_penalty_weighted_mean": logger_vals.get("train/cvar_penalty_weighted_mean"),
+            "var_penalty_raw_mean": logger_vals.get("train/var_penalty_raw_mean"),
+            "var_penalty_weighted_mean": logger_vals.get("train/var_penalty_weighted_mean"),
+            "penalty_ratio": logger_vals.get("train/penalty_ratio"),
         }
         self.buffer.append(record)
         if len(self.buffer) >= self.log_interval:
@@ -210,15 +273,13 @@ def _write_run_metadata(
     run_id: str,
     model_path: Path,
     log_path: Path,
+    vol_stats_path: Path | None = None,
 ) -> Path:
     manifest_path = Path(config.get("data", {}).get("processed_dir", "data/processed")) / "data_manifest.json"
     manifest = {}
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text())
-    if "data_manifest_hash" not in manifest and manifest:
-        payload = {key: value for key, value in manifest.items() if key != "data_manifest_hash"}
-        manifest["data_manifest_hash"] = sha256_bytes(canonical_json(payload))
-    manifest_hash = manifest.get("data_manifest_hash", "")
+    manifest_hash = _manifest_hash(manifest)
     now = datetime.now(timezone.utc)
     config_hash_val = _config_hash(config)
     config_path = config.get("config_path", "")
@@ -231,27 +292,52 @@ def _write_run_metadata(
     if obs_dim_expected is None and L is not None and num_assets:
         obs_dim_expected = int(num_assets) * (int(L) + 2)
     env_signature_hash = manifest.get("env_signature_hash")
-    if env_signature_hash is None and asset_list and L is not None and Lv is not None:
-        feature_flags = manifest.get(
+    feature_flags = dict(
+        manifest.get(
             "feature_flags",
             {"returns_window": True, "volatility": True, "prev_weights": True},
         )
-        cost_params = manifest.get("cost_params", {"transaction_cost": config.get("env", {}).get("c_tc")})
+    )
+    reward_type = "log_net_minus_r2"
+    feature_flags["reward_type"] = reward_type
+    rebalance_eta = config.get("env", {}).get("rebalance_eta")
+    feature_flags["action_smoothing"] = rebalance_eta is not None
+    # Always compute signature with the configured transaction cost; manifest may carry a different default.
+    cost_params_cfg = {
+        "transaction_cost": config.get("env", {}).get("c_tc"),
+        "risk_lambda": float(config.get("env", {}).get("risk_lambda", 0.0)),
+        "rebalance_eta": float(rebalance_eta) if rebalance_eta is not None else None,
+    }
+    if asset_list and L is not None and Lv is not None:
         env_signature_hash = compute_env_signature(
             asset_list,
             int(L),
             int(Lv),
             feature_flags=feature_flags,
-            cost_params=cost_params,
+            cost_params=cost_params_cfg,
             schema_version=manifest.get("env_schema_version", "v1"),
         )
+    outputs_root = base_dir.parent
     report_paths = {
         "trace_path": str(base_dir / f"trace_{run_id}.parquet"),
         "regime_thresholds_path": str(base_dir / f"regime_thresholds_{run_id}.json"),
         "step4_report_path": str(base_dir / f"step4_report_{run_id}.md"),
         "regime_metrics_path": str(base_dir / "regime_metrics.csv"),
-        "figures_dir": str(Path("outputs/figures") / run_id),
+        "figures_dir": str(outputs_root / "figures" / run_id),
     }
+    if vol_stats_path is None:
+        lv = config.get("env", {}).get("Lv")
+        if lv is None:
+            lv = manifest.get("Lv")
+        if lv is not None:
+            stats_filename = _vol_stats_filename(config, int(lv), manifest_hash)
+            processed_dir = Path(config.get("data", {}).get("processed_dir", "data/processed"))
+            vol_stats_path = processed_dir / stats_filename
+
+    vol_stats_hash = None
+    if vol_stats_path is not None and vol_stats_path.exists():
+        vol_stats_hash = _sha256_file(vol_stats_path)
+
     meta = {
         "run_id": run_id,
         "seed": seed,
@@ -273,12 +359,22 @@ def _write_run_metadata(
         "created_at": created_at,
         "data_manifest_path": str(manifest_path),
         "data_manifest_hash": manifest_hash,
+        "vol_stats_path": str(vol_stats_path) if vol_stats_path is not None else None,
+        "vol_stats_hash": vol_stats_hash,
         "asset_list": asset_list,
         "num_assets": num_assets,
         "L": L,
         "Lv": Lv,
         "obs_dim_expected": obs_dim_expected,
         "env_signature_hash": env_signature_hash,
+        "env_signature_version": "v3",
+        "env_params": {
+            "transaction_cost": cost_params_cfg.get("transaction_cost"),
+            "risk_lambda": cost_params_cfg.get("risk_lambda", 0.0),
+            "risk_penalty_type": config.get("env", {}).get("risk_penalty_type", "r2"),
+            "rebalance_eta": cost_params_cfg.get("rebalance_eta"),
+            "reward_type": reward_type,
+        },
         "artifacts": {
             "model_path": str(model_path),
             "train_log_path": str(log_path),
@@ -338,12 +434,15 @@ def prepare_market_and_features(
         force_refresh=force_refresh,
     )
     market = MarketData(prices=prices, returns=returns, manifest=manifest, quality_summary=quality_summary)
+    manifest_hash = _manifest_hash(manifest)
+    stats_filename = _vol_stats_filename(config, lv, manifest_hash)
     vol_features = compute_volatility_features(
         returns=market.returns,
         lv=lv,
         train_start=dates["train_start"],
         train_end=dates["train_end"],
         processed_dir=processed_dir,
+        stats_filename=stats_filename,
     )
     return market, vol_features
 
@@ -357,12 +456,27 @@ def build_env_for_range(
     c_tc: float,
     seed: int,
     logit_scale: float | None = None,
+    random_reset: bool = False,
+    risk_lambda: float = 0.0,
+    risk_penalty_type: str = "r2",
+    rebalance_eta: float | None = None,
 ) -> DummyVecEnv:
     returns_slice = slice_frame(market.returns, start, end)
     vol_slice = slice_frame(features.volatility, start, end)
     if logit_scale is None:
         logit_scale = EnvConfig.logit_scale
-    return build_vec_env(returns_slice, vol_slice, window_size, c_tc, seed, logit_scale)
+    return build_vec_env(
+        returns_slice,
+        vol_slice,
+        window_size,
+        c_tc,
+        seed,
+        logit_scale,
+        random_reset=random_reset,
+        risk_lambda=risk_lambda,
+        risk_penalty_type=risk_penalty_type,
+        rebalance_eta=rebalance_eta,
+    )
 
 
 def run_training(
@@ -372,6 +486,8 @@ def run_training(
     raw_dir: str | Path = "data/raw",
     processed_dir: str | Path = "data/processed",
     output_dir: str | Path = "outputs/models",
+    reports_dir: str | Path | None = None,
+    logs_dir: str | Path | None = None,
     force_refresh: bool = True,
     offline: bool = False,
     cache_only: bool = False,
@@ -429,6 +545,10 @@ def run_training(
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for training.")
     logit_scale = float(env_cfg["logit_scale"])
+    random_reset_train = bool(env_cfg.get("random_reset_train", False))
+    risk_lambda = float(env_cfg.get("risk_lambda", 0.0))
+    risk_penalty_type = str(env_cfg.get("risk_penalty_type", "r2"))
+    rebalance_eta = env_cfg.get("rebalance_eta")
     env = build_env_for_range(
         market=market,
         features=features,
@@ -438,9 +558,13 @@ def run_training(
         c_tc=env_cfg["c_tc"],
         seed=seed,
         logit_scale=logit_scale,
+        random_reset=random_reset_train,
+        risk_lambda=risk_lambda,
+        risk_penalty_type=risk_penalty_type,
+        rebalance_eta=rebalance_eta,
     )
     num_assets = market.returns.shape[1]
-    log_dir = Path("outputs/logs")
+    log_dir = Path(logs_dir) if logs_dir is not None else Path("outputs/logs")
     log_path = log_dir / f"train_{run_id}.csv"
     callbacks = [TrainLoggingCallback(log_path, run_id, model_type, seed, log_interval=log_interval)]
     if mode == "paper" and checkpoint_interval:
@@ -468,5 +592,16 @@ def run_training(
     output_path.mkdir(parents=True, exist_ok=True)
     model_path = output_path / f"{run_id}_final.zip"
     model.save(model_path)
-    _write_run_metadata(Path("outputs/reports"), config, seed, mode, model_type, run_id, model_path, log_path)
+    reports_path = Path(reports_dir) if reports_dir is not None else Path("outputs/reports")
+    _write_run_metadata(
+        reports_path,
+        config,
+        seed,
+        mode,
+        model_type,
+        run_id,
+        model_path,
+        log_path,
+        vol_stats_path=features.stats_path,
+    )
     return model_path

@@ -1,0 +1,64 @@
+mode: exp_R2_prlmove_nc_bs32
+name: exp_S3_risklambda_0p20
+dates:
+  train_start: '2016-01-01'
+  train_end: '2017-12-31'
+  test_start: '2018-01-01'
+  test_end: '2025-12-31'
+eval:
+  name: W1
+  eval_start: '2024-01-01'
+  eval_end: '2025-12-30'
+  write_trace: false
+  trace_stride: 10
+  run_baselines: false
+  write_step4: false
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source: yfinance_only
+  universe_policy: availability_filtered
+  min_assets: 15
+  force_refresh: false
+  offline: true
+  require_cache: true
+  paper_mode: true
+  min_history_days: 120
+  history_tolerance_days: 60
+  ticker_substitutions: {}
+  quality_params:
+    min_vol_std: 0.0
+    min_max_abs_return: 0.0
+    max_flat_fraction: 1.0
+    max_missing_fraction: 1.0
+env:
+  L: 10
+  Lv: 10
+  c_tc: 0.0005
+  logit_scale: 10.0
+  random_reset_train: false
+  risk_lambda: 0.2
+  risk_penalty_type: r2
+  rebalance_eta: null
+prl:
+  alpha0: 0.2
+  beta: 2.0
+  lambdav: 30.0
+  bias: 0.0
+  center_prob: false
+  alpha_min: 0.01
+  alpha_max: 2.0
+sac:
+  learning_rate: 0.0003
+  batch_size: 32
+  gamma: 0.99
+  tau: 0.005
+  buffer_size: 40000
+  total_timesteps: 15000
+  eval_freq: 1000
+  ent_coef: 0.2
+  log_interval_steps: 100
+  checkpoint_interval: null
+seeds:
+- 0
+- 1

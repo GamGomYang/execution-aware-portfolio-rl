@@ -1,0 +1,108 @@
+{
+  "run_id": "20260216T063347Z_eabe8d4b_seed3_prl_96e6",
+  "seed": 3,
+  "mode": "exp_S5_final",
+  "model_type": "prl",
+  "config_path": "configs/exp/step5/exp_S5_final_baseline_eta010.yaml",
+  "config_hash": "eabe8d4b2733b4759ef285daad3bd8070eefc5a543bb742bbc21c4ecc8ba27d6",
+  "git_commit": "29f10b4956c14453b80fda0d9e9e04fd8c4dae95",
+  "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+  "torch_version": "2.10.0+cu128",
+  "yfinance_version": "1.1.0",
+  "sb3_version": "2.7.1",
+  "packages": {
+    "torch": "2.10.0+cu128",
+    "pandas": "3.0.0",
+    "yfinance": "1.1.0",
+    "stable_baselines3": "2.7.1"
+  },
+  "created_at": "2026-02-16T06:42:40.280632+00:00",
+  "data_manifest_path": "data/processed/data_manifest.json",
+  "data_manifest_hash": "2d8774426203fbf9ab4d551ac6563e8930e7e1ba25452b89c6746d187f3dd9b4",
+  "vol_stats_path": "data/processed/vol_stats_2d877442_Lv10_2016-01-01_2017-12-31.json",
+  "vol_stats_hash": "d03120963ad9c90575a8e9e172ec345dc82ca7bba27852d5876dfa45e9bffd0e",
+  "asset_list": [
+    "AAPL",
+    "AMGN",
+    "AXP",
+    "BA",
+    "CAT",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DIS",
+    "GS",
+    "HD",
+    "HON",
+    "IBM",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KO",
+    "MCD",
+    "MMM",
+    "MRK",
+    "MSFT",
+    "NKE",
+    "PG",
+    "TRV",
+    "UNH",
+    "V",
+    "VZ",
+    "WMT"
+  ],
+  "num_assets": 28,
+  "L": 10,
+  "Lv": 10,
+  "obs_dim_expected": 336,
+  "env_signature_hash": "bc508430856e5e130cd0c35f22955e90c4ffad7a3a1c879e45b263a8ea38785a",
+  "env_signature_version": "v3",
+  "env_params": {
+    "transaction_cost": 0.0005,
+    "risk_lambda": 0.0,
+    "risk_penalty_type": "r2",
+    "rebalance_eta": 0.1,
+    "reward_type": "log_net_minus_r2"
+  },
+  "artifacts": {
+    "model_path": "outputs/exp_runs/step5_final/20260216_060623/models/20260216T063347Z_eabe8d4b_seed3_prl_96e6_final.zip",
+    "train_log_path": "outputs/exp_runs/step5_final/20260216_060623/logs/train_20260216T063347Z_eabe8d4b_seed3_prl_96e6.csv"
+  },
+  "artifact_paths": {
+    "model_path": "outputs/exp_runs/step5_final/20260216_060623/models/20260216T063347Z_eabe8d4b_seed3_prl_96e6_final.zip",
+    "train_log_path": "outputs/exp_runs/step5_final/20260216_060623/logs/train_20260216T063347Z_eabe8d4b_seed3_prl_96e6.csv"
+  },
+  "report_paths": {
+    "trace_path": "outputs/exp_runs/step5_final/20260216_060623/reports/trace_20260216T063347Z_eabe8d4b_seed3_prl_96e6.parquet",
+    "regime_thresholds_path": "outputs/exp_runs/step5_final/20260216_060623/reports/regime_thresholds_20260216T063347Z_eabe8d4b_seed3_prl_96e6.json",
+    "step4_report_path": "outputs/exp_runs/step5_final/20260216_060623/reports/step4_report_20260216T063347Z_eabe8d4b_seed3_prl_96e6.md",
+    "regime_metrics_path": "outputs/exp_runs/step5_final/20260216_060623/reports/regime_metrics.csv",
+    "figures_dir": "outputs/exp_runs/step5_final/20260216_060623/figures/20260216T063347Z_eabe8d4b_seed3_prl_96e6"
+  },
+  "evaluations": {
+    "W1": {
+      "eval_start_date": "2024-01-17",
+      "eval_end_date": "2025-12-30",
+      "eval_num_days": 491,
+      "eval_window": "W1",
+      "trace_path": "outputs/exp_runs/step5_final/20260216_060623/reports/trace_20260216T063347Z_eabe8d4b_seed3_prl_96e6.parquet",
+      "regime_thresholds_path": "outputs/exp_runs/step5_final/20260216_060623/reports/regime_thresholds_20260216T063347Z_eabe8d4b_seed3_prl_96e6.json",
+      "metrics_row_id": 3,
+      "completed_at": "2026-02-16T06:42:41.557711+00:00"
+    }
+  },
+  "eval_start_date": "2024-01-17",
+  "eval_end_date": "2025-12-30",
+  "eval_num_days": 491,
+  "eval_window": "W1",
+  "evaluation": {
+    "eval_start_date": "2024-01-17",
+    "eval_end_date": "2025-12-30",
+    "eval_num_days": 491,
+    "eval_window": "W1",
+    "trace_path": "outputs/exp_runs/step5_final/20260216_060623/reports/trace_20260216T063347Z_eabe8d4b_seed3_prl_96e6.parquet",
+    "regime_thresholds_path": "outputs/exp_runs/step5_final/20260216_060623/reports/regime_thresholds_20260216T063347Z_eabe8d4b_seed3_prl_96e6.json",
+    "metrics_row_id": 3,
+    "completed_at": "2026-02-16T06:42:41.557711+00:00"
+  }
+}

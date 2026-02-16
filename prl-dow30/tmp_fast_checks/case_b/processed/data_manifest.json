@@ -1,0 +1,1 @@
+{"asset_list": ["AAA", "BBB"], "num_assets": 2, "L": 2, "Lv": 2, "obs_dim_expected": 8, "env_schema_version": "v1"}
