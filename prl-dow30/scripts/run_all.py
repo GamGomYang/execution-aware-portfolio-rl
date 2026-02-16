@@ -1,7 +1,9 @@
 import argparse
 import csv
+import hashlib
 import json
 import logging
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -65,6 +67,53 @@ def _mean_std_safe(values: list[float]) -> tuple[float, float]:
     return mean, std
 
 
+def _archive_config_hash(cfg: dict) -> str:
+    payload = {k: v for k, v in cfg.items() if k != "config_path"}
+    blob = json.dumps(payload, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:8]
+
+
+def _archive_exp_id(config_path: str, cfg: dict) -> str:
+    stem = Path(config_path).stem
+    return f"{stem}__{_archive_config_hash(cfg)}"
+
+
+def _next_archive_path(archive_dir: Path, prefix: str, exp_id: str) -> Path:
+    candidate = archive_dir / f"{prefix}_{exp_id}.csv"
+    if not candidate.exists():
+        return candidate
+    idx = 2
+    while True:
+        candidate = archive_dir / f"{prefix}_{exp_id}__{idx}.csv"
+        if not candidate.exists():
+            return candidate
+        idx += 1
+
+
+def _archive_reports(
+    reports_dir: Path,
+    *,
+    config_path: str,
+    cfg: dict,
+) -> dict[str, str]:
+    archive_dir = reports_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    exp_id = _archive_exp_id(config_path, cfg)
+    written: dict[str, str] = {}
+    targets = {
+        "metrics": reports_dir / "metrics.csv",
+        "summary": reports_dir / "summary.csv",
+        "regime_metrics": reports_dir / "regime_metrics.csv",
+    }
+    for prefix, src in targets.items():
+        if not src.exists():
+            continue
+        dst = _next_archive_path(archive_dir, prefix, exp_id)
+        shutil.copy2(src, dst)
+        written[prefix] = str(dst)
+    return written
+
+
 def write_metrics(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
@@ -83,6 +132,10 @@ def write_metrics(path: Path, rows: list[dict]) -> None:
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
@@ -122,6 +175,10 @@ def summarize_metrics(rows: list[dict]) -> list[dict]:
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
@@ -199,6 +256,10 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
         "cumulative_return_net_lin",
         "avg_turnover",
         "total_turnover",
+        "avg_turnover_exec",
+        "total_turnover_exec",
+        "avg_turnover_target",
+        "total_turnover_target",
         "sharpe",
         "sharpe_net_exp",
         "sharpe_net_lin",
@@ -234,6 +295,17 @@ def summarize_seed_stats(rows: list[dict]) -> list[dict]:
             values = group[col].to_numpy(dtype=np.float64)
             row[f"{col}_mean"] = float(np.mean(values)) if values.size else float("nan")
             row[f"{col}_std"] = float(np.std(values, ddof=0)) if values.size else float("nan")
+            if values.size:
+                p25, p50, p75 = np.quantile(values, [0.25, 0.50, 0.75])
+                row[f"{col}_p25"] = float(p25)
+                row[f"{col}_median"] = float(p50)
+                row[f"{col}_p75"] = float(p75)
+                row[f"{col}_iqr"] = float(p75 - p25)
+            else:
+                row[f"{col}_p25"] = float("nan")
+                row[f"{col}_median"] = float("nan")
+                row[f"{col}_p75"] = float("nan")
+                row[f"{col}_iqr"] = float("nan")
             ci_low, ci_high = _bootstrap_ci(values)
             row[f"{col}_ci_low"] = ci_low
             row[f"{col}_ci_high"] = ci_high
@@ -464,6 +536,7 @@ def main():
                     logit_scale=env_cfg["logit_scale"],
                     risk_lambda=env_cfg.get("risk_lambda", 0.0),
                     risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
+                    rebalance_eta=env_cfg.get("rebalance_eta"),
                 )
 
                 assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
@@ -631,6 +704,9 @@ def main():
             indent=2,
         )
     )
+    archived = _archive_reports(reports_dir, config_path=args.config, cfg=cfg)
+    if archived:
+        logging.info("Archived reports for exp_id=%s: %s", _archive_exp_id(args.config, cfg), archived)
     if write_step4 and step4_targets:
         from scripts import make_step4_report
 

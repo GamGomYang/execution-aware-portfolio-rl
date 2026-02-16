@@ -8,8 +8,8 @@ Usage:
     --output-dir outputs/exp_runs/gate2
 
 Decision rule:
-  PASS if (min delta_mid_sharpe_net_exp across windows >= -0.01) AND (turnover <= guardrail)
-  guardrail = 1.2 * ref avg_turnover (per eval_window)
+  PASS if (min delta_mid_sharpe_net_exp across windows >= -0.01) AND (turnover_exec <= guardrail)
+  guardrail = 1.2 * ref avg_turnover_exec (per eval_window)
 """
 
 from __future__ import annotations
@@ -23,6 +23,18 @@ from typing import Iterable, List
 import pandas as pd
 
 from scripts.prl_gate_utils import PRL_GATE_THRESHOLDS, aggregate_prl_gate
+
+
+def _apply_turnover_exec_default(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize turnover column to execution turnover for downstream comparisons."""
+    out = df.copy()
+    if "avg_turnover_exec" in out.columns:
+        out["avg_turnover"] = pd.to_numeric(out["avg_turnover_exec"], errors="coerce")
+    elif "avg_turnover" in out.columns:
+        out["avg_turnover"] = pd.to_numeric(out["avg_turnover"], errors="coerce")
+    else:
+        out["avg_turnover"] = 0.0
+    return out
 
 def _collect_paths(patterns: List[str]) -> List[Path]:
     paths: List[Path] = []
@@ -84,6 +96,8 @@ def main():
     ref_metrics = _load_with_filter(Path(ref_idx["metrics_path"]), ref_run_ids)
     ref_regime = _load_with_filter(Path(ref_idx["regime_metrics_path"]), ref_run_ids)
     ref_regime = ref_regime[ref_regime["regime"] == "mid"].copy()
+    ref_metrics = _apply_turnover_exec_default(ref_metrics)
+    ref_regime = _apply_turnover_exec_default(ref_regime)
 
     cand_paths = _collect_paths(args.candidate_run_indexes)
     if not cand_paths:
@@ -97,6 +111,8 @@ def main():
         metrics = _load_with_filter(metrics_path, run_ids)
         regime = _load_with_filter(Path(idx["regime_metrics_path"]), run_ids)
         regime_mid = regime[regime["regime"] == "mid"].copy()
+        metrics = _apply_turnover_exec_default(metrics)
+        regime_mid = _apply_turnover_exec_default(regime_mid)
 
         all_summary = _compute_summary(ref_metrics, metrics, regime=False)
         mid_summary = _compute_summary(ref_regime, regime_mid, regime=True)
@@ -163,6 +179,7 @@ def main():
     summary_lines.append("")
     summary_lines.append(f"- Reference: {args.reference_run_index}")
     summary_lines.append(f"- Candidates: {len(cand_paths)} run_index files")
+    summary_lines.append("- Turnover metric: avg_turnover_exec (fallback: avg_turnover for old runs).")
     summary_lines.append("- PASS rule: min(delta_mid_sharpe) >= -0.01 and no guardrail breach (turnover > 1.2x ref).")
     summary_lines.append(
         f"- PRL gate: emergency_rate <= {PRL_GATE_THRESHOLDS['emergency_rate_max']}, "

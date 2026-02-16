@@ -38,11 +38,17 @@ class PortfolioMetrics:
     total_reward: float
     avg_reward: float
     cumulative_return: float
+    # Backward-compatible alias: exec turnover.
     avg_turnover: float
+    # Backward-compatible alias: exec turnover.
     total_turnover: float
     sharpe: float
     max_drawdown: float
     steps: int
+    avg_turnover_exec: Optional[float] = None
+    total_turnover_exec: Optional[float] = None
+    avg_turnover_target: Optional[float] = None
+    total_turnover_target: Optional[float] = None
     mean_daily_return_gross: Optional[float] = None
     std_daily_return_gross: Optional[float] = None
     cumulative_return_net_exp: Optional[float] = None
@@ -95,18 +101,25 @@ def compute_metrics(
     portfolio_returns: Iterable[float],
     turnovers: Iterable[float],
     *,
+    turnovers_target: Optional[Iterable[float]] = None,
     net_returns_exp: Optional[Iterable[float]] = None,
     net_returns_lin: Optional[Iterable[float]] = None,
 ) -> PortfolioMetrics:
     rewards_arr = _sanitize_returns(rewards)
     returns_arr = _sanitize_returns(portfolio_returns)
-    turnovers_arr = _sanitize_returns(turnovers)
+    turnovers_exec_arr = _sanitize_returns(turnovers)
+    turnovers_target_arr = _sanitize_returns(turnovers_target) if turnovers_target is not None else None
 
     total_reward = float(rewards_arr.sum())
     avg_reward = float(rewards_arr.mean()) if rewards_arr.size else 0.0
 
-    avg_turnover = float(turnovers_arr.mean()) if turnovers_arr.size else 0.0
-    total_turnover = float(turnovers_arr.sum())
+    avg_turnover_exec = float(turnovers_exec_arr.mean()) if turnovers_exec_arr.size else 0.0
+    total_turnover_exec = float(turnovers_exec_arr.sum())
+    avg_turnover_target = None
+    total_turnover_target = None
+    if turnovers_target_arr is not None:
+        avg_turnover_target = float(turnovers_target_arr.mean()) if turnovers_target_arr.size else 0.0
+        total_turnover_target = float(turnovers_target_arr.sum())
 
     cumulative_return, sharpe, max_drawdown, mean_gross, std_gross = _compute_return_stats(returns_arr)
 
@@ -127,8 +140,12 @@ def compute_metrics(
         total_reward=total_reward,
         avg_reward=avg_reward,
         cumulative_return=cumulative_return,
-        avg_turnover=avg_turnover,
-        total_turnover=total_turnover,
+        avg_turnover=avg_turnover_exec,
+        total_turnover=total_turnover_exec,
+        avg_turnover_exec=avg_turnover_exec,
+        total_turnover_exec=total_turnover_exec,
+        avg_turnover_target=avg_turnover_target,
+        total_turnover_target=total_turnover_target,
         sharpe=sharpe,
         max_drawdown=max_drawdown,
         steps=int(rewards_arr.size),

@@ -1,5 +1,5 @@
 mode: exp_R2_prlmove_nc_bs32
-name: exp_R2_prlmove_nc_bs32_b2_lv30_bias0_noreset
+name: exp_S4_inertia_eta0p05_rl0p00
 dates:
   train_start: '2016-01-01'
   train_end: '2017-12-31'
@@ -38,7 +38,7 @@ env:
   logit_scale: 10.0
   random_reset_train: false
   risk_lambda: 0.0
-  rebalance_eta: 0.10
+  rebalance_eta: 0.05
 prl:
   alpha0: 0.2
   beta: 2.0

@@ -6,12 +6,12 @@ Rules encoded from STEP 2 확장 명세 v1.1:
 - Reference baseline_sac is run once; candidates are PRL-only.
 - Analysis always filters via run_index.json.
 - PASS rules:
-  - T1: avg_turnover <= 0.70 * baseline_ref_avg_turnover AND sharpe_net_exp >= baseline_ref_sharpe_net_exp
+  - T1: avg_turnover_exec <= 0.70 * baseline_ref_avg_turnover_exec AND sharpe_net_exp >= baseline_ref_sharpe_net_exp
   - T2: sharpe_net_exp >= baseline_ref_sharpe_net_exp + 0.10
 - FAIL (hard cut):
   - sharpe_net_exp <= baseline_ref_sharpe_net_exp - 0.05
-  - avg_turnover >= 1.10 * baseline_ref_avg_turnover
-- Score = sharpe_net_exp - 0.25 * abs(max_drawdown_net_exp) - 0.10 * avg_turnover
+  - avg_turnover_exec >= 1.10 * baseline_ref_avg_turnover_exec
+- Score = sharpe_net_exp - 0.25 * abs(max_drawdown_net_exp) - 0.10 * avg_turnover_exec
   - If mid sharpe is worse than baseline mid, apply -0.05 penalty.
 """
 
@@ -30,6 +30,14 @@ import yaml
 from scripts.prl_gate_utils import PRL_GATE_THRESHOLDS, load_prl_gate_for_run_id
 
 LOGGER = logging.getLogger("gate1_leaderboard")
+
+
+def _turnover_exec_default(row: pd.Series) -> float:
+    """Use execution turnover as the default turnover metric when available."""
+    val = row.get("avg_turnover_exec", None)
+    if val is not None and not pd.isna(val):
+        return float(val)
+    return float(row.get("avg_turnover", 0.0))
 
 
 def _read_run_index(path: Path) -> dict:
@@ -81,7 +89,7 @@ def _build_reference(
         seed = int(row["seed"])
         ref_by_seed[seed] = {
             "sharpe_net_exp": float(row.get("sharpe_net_exp", 0.0)),
-            "avg_turnover": float(row.get("avg_turnover", 0.0)),
+            "avg_turnover": _turnover_exec_default(row),
             "max_drawdown_net_exp": float(row.get("max_drawdown_net_exp", 0.0)),
             "cumulative_return_net_exp": float(row.get("cumulative_return_net_exp", 0.0)),
             "timesteps": _load_timesteps(idx.get("config_path", "")),
@@ -187,7 +195,7 @@ def build_leaderboard(
                 "sharpe_net_exp": float(row.get("sharpe_net_exp", 0.0)),
                 "cumulative_return_net_exp": float(row.get("cumulative_return_net_exp", 0.0)),
                 "max_drawdown_net_exp": float(row.get("max_drawdown_net_exp", 0.0)),
-                "avg_turnover": float(row.get("avg_turnover", 0.0)),
+                "avg_turnover": _turnover_exec_default(row),
                 "sharpe_net_exp_mid": None,
                 "cumulative_return_net_exp_mid": None,
             }
@@ -205,12 +213,14 @@ def build_leaderboard(
                 "run_id": run_id,
                 "baseline_ref_sharpe_net_exp": ref["sharpe_net_exp"],
                 "baseline_ref_avg_turnover": ref["avg_turnover"],
+                "baseline_ref_avg_turnover_exec": ref["avg_turnover"],
                 "baseline_ref_max_drawdown_net_exp": ref["max_drawdown_net_exp"],
                 "baseline_ref_cumulative_return_net_exp": ref["cumulative_return_net_exp"],
                 "baseline_ref_sharpe_net_exp_mid": ref.get("sharpe_net_exp_mid"),
                 "baseline_ref_cumret_net_exp_mid": ref.get("cumulative_return_net_exp_mid"),
                 "delta_sharpe_net_exp_vs_ref": cand["sharpe_net_exp"] - ref["sharpe_net_exp"],
                 "delta_turnover_vs_ref": cand["avg_turnover"] - ref["avg_turnover"],
+                "candidate_avg_turnover_exec": cand["avg_turnover"],
                 "prl_gate_pass": prl_gate.passed,
                 "prl_gate_reason": prl_gate.reason,
                 "prl_emergency_rate": prl_gate.emergency_rate,
@@ -257,7 +267,8 @@ def _write_summary(
         f"prl_prob_std >= {PRL_GATE_THRESHOLDS['prl_prob_std_min']}. "
         "(missing PRL logs => FAIL)"
     )
-    lines.append("- Score = sharpe_net_exp - 0.25*|mdd_net_exp| - 0.10*avg_turnover (mid worse than ref -> -0.05 penalty).")
+    lines.append("- Turnover metric: avg_turnover_exec (fallback: avg_turnover for old runs).")
+    lines.append("- Score = sharpe_net_exp - 0.25*|mdd_net_exp| - 0.10*avg_turnover_exec (mid worse than ref -> -0.05 penalty).")
     lines.append("- Gate1 is 방향성 확인 단계: 통계 검정은 참고용이며 판정은 지표/스코어 기반.")
     lines.append("")
     lines.append("## Top candidates (by score)")

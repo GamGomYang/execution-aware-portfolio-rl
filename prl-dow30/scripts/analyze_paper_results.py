@@ -34,7 +34,12 @@ def _try_stats():
 def _collect_metric_columns(df: pd.DataFrame, *, include_turnover: bool = True) -> list[str]:
     base_cols = ["sharpe", "max_drawdown", "cumulative_return"]
     if include_turnover:
-        base_cols.append("avg_turnover")
+        if "avg_turnover_exec" in df.columns:
+            base_cols.append("avg_turnover_exec")
+        elif "avg_turnover" in df.columns:
+            base_cols.append("avg_turnover")
+        if "avg_turnover_target" in df.columns:
+            base_cols.append("avg_turnover_target")
     metric_cols = [col for col in base_cols if col in df.columns]
     for col in sorted(df.columns):
         if col.startswith(("sharpe_net_", "max_drawdown_net_", "cumulative_return_net_")):
@@ -55,6 +60,8 @@ def _metric_label(col: str) -> str:
         "sharpe": "Sharpe",
         "max_drawdown": "Max Drawdown",
         "avg_turnover": "Avg Turnover",
+        "avg_turnover_exec": "Avg Turnover (Exec)",
+        "avg_turnover_target": "Avg Turnover (Target)",
         "cumulative_return": "Cumulative Return",
     }
     return label_map.get(col, col)
@@ -65,6 +72,8 @@ def _delta_col_name(col: str) -> str:
         "sharpe": "delta_sharpe",
         "max_drawdown": "delta_mdd",
         "avg_turnover": "delta_turnover",
+        "avg_turnover_exec": "delta_turnover_exec",
+        "avg_turnover_target": "delta_turnover_target",
         "cumulative_return": "delta_cumret",
     }
     return mapping.get(col, f"delta_{col}")
@@ -170,8 +179,57 @@ def summarize_seed_stats(metrics_df: pd.DataFrame) -> pd.DataFrame:
             vals = group[col].to_numpy(dtype=np.float64)
             row[f"{col}_mean"] = float(np.mean(vals)) if vals.size else float("nan")
             row[f"{col}_std"] = float(np.std(vals, ddof=0)) if vals.size else float("nan")
+            if vals.size:
+                p25, p50, p75 = np.quantile(vals, [0.25, 0.50, 0.75])
+                row[f"{col}_p25"] = float(p25)
+                row[f"{col}_median"] = float(p50)
+                row[f"{col}_p75"] = float(p75)
+                row[f"{col}_iqr"] = float(p75 - p25)
+            else:
+                row[f"{col}_p25"] = float("nan")
+                row[f"{col}_median"] = float("nan")
+                row[f"{col}_p75"] = float("nan")
+                row[f"{col}_iqr"] = float("nan")
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def _qstats(values: np.ndarray) -> tuple[float, float, float]:
+    if values.size == 0:
+        return float("nan"), float("nan"), float("nan")
+    q25, q50, q75 = np.quantile(values, [0.25, 0.50, 0.75])
+    return float(q25), float(q50), float(q75)
+
+
+def _format_median_iqr(values: np.ndarray) -> str:
+    q25, q50, q75 = _qstats(values)
+    return f"{q50:.3f} [{q25:.3f}, {q75:.3f}]"
+
+
+def _build_robust_table(base: pd.DataFrame, prl: pd.DataFrame, diffs: pd.DataFrame, metric_cols: list[str]) -> str:
+    preferred = ["sharpe_net_exp", "cumulative_return_net_exp", "max_drawdown_net_exp"]
+    selected = [m for m in preferred if m in metric_cols and m in base.columns and m in prl.columns]
+    if not selected:
+        return ""
+    lines = [
+        "\\begin{tabular}{lccc}",
+        "\\hline",
+        "Metric & Baseline (median [P25, P75]) & PRL (median [P25, P75]) & $\\Delta$ (median [P25, P75]) \\\\",
+        "\\hline",
+    ]
+    for col in selected:
+        delta_col = _delta_col_name(col)
+        if delta_col not in diffs.columns:
+            continue
+        label = _metric_label(col)
+        base_vals = base[col].to_numpy(dtype=np.float64)
+        prl_vals = prl[col].to_numpy(dtype=np.float64)
+        delta_vals = diffs[delta_col].to_numpy(dtype=np.float64)
+        lines.append(
+            f"{label} & {_format_median_iqr(base_vals)} & {_format_median_iqr(prl_vals)} & {_format_median_iqr(delta_vals)} \\\\"
+        )
+    lines.extend(["\\hline", "\\end{tabular}"])
+    return "\n".join(lines)
 
 
 def _build_table(
@@ -221,12 +279,16 @@ def compute_regime_seed_summary(regime_df: pd.DataFrame, *, n_boot: int = 2000) 
     df = regime_df.copy()
     df = df[df["regime"].isin(["low", "mid", "high"])]
     _validate_regime_labels(df)
+    turnover_exec_col = "avg_turnover_exec" if "avg_turnover_exec" in df.columns else "avg_turnover"
     metric_map = {
         "sharpe": "sharpe",
         "mdd": "max_drawdown",
-        "turnover": "avg_turnover",
+        "turnover": turnover_exec_col,
+        "turnover_exec": turnover_exec_col,
         "cumret": "cumulative_return",
     }
+    if "avg_turnover_target" in df.columns:
+        metric_map["turnover_target"] = "avg_turnover_target"
     for col in df.columns:
         if col.startswith(("sharpe_net_", "max_drawdown_net_", "cumulative_return_net_")):
             metric_map[col] = col
@@ -420,6 +482,42 @@ def analyze_metrics(
     metric_cols = _collect_metric_columns(base)
     table_tex = _build_table(base, prl, diffs, summary_df, metric_cols)
     (output_dir / "table_main.tex").write_text(table_tex)
+    robust_table_tex = _build_robust_table(base, prl, diffs, metric_cols)
+    if robust_table_tex:
+        (output_dir / "table_robust.tex").write_text(robust_table_tex)
+
+    robust_rows = []
+    for col in ["sharpe_net_exp", "cumulative_return_net_exp", "max_drawdown_net_exp"]:
+        if col not in base.columns or col not in prl.columns:
+            continue
+        delta_col = _delta_col_name(col)
+        if delta_col not in diffs.columns:
+            continue
+        base_vals = base[col].to_numpy(dtype=np.float64)
+        prl_vals = prl[col].to_numpy(dtype=np.float64)
+        delta_vals = diffs[delta_col].to_numpy(dtype=np.float64)
+        b25, b50, b75 = _qstats(base_vals)
+        p25, p50, p75 = _qstats(prl_vals)
+        d25, d50, d75 = _qstats(delta_vals)
+        robust_rows.append(
+            {
+                "metric": col,
+                "baseline_p25": b25,
+                "baseline_median": b50,
+                "baseline_p75": b75,
+                "baseline_iqr": b75 - b25,
+                "prl_p25": p25,
+                "prl_median": p50,
+                "prl_p75": p75,
+                "prl_iqr": p75 - p25,
+                "delta_p25": d25,
+                "delta_median": d50,
+                "delta_p75": d75,
+                "delta_iqr": d75 - d25,
+            }
+        )
+    if robust_rows:
+        pd.DataFrame(robust_rows).to_csv(output_dir / "robust_stats_summary.csv", index=False)
 
 
 def analyze_regimes(
@@ -462,7 +560,17 @@ def analyze_regimes(
         figures_dir = Path("outputs/figures/summary")
         _boxplot_by_regime(df, "sharpe", figures_dir / "regime_sharpe_boxplot.png", "Sharpe by Regime", model_types)
         _boxplot_by_regime(df, "max_drawdown", figures_dir / "regime_mdd_boxplot.png", "Max Drawdown by Regime", model_types)
-        _boxplot_by_regime(df, "avg_turnover", figures_dir / "turnover_by_regime.png", "Avg Turnover by Regime", model_types)
+        turnover_plot_col = "avg_turnover_exec" if "avg_turnover_exec" in df.columns else "avg_turnover"
+        turnover_title = "Avg Turnover (Exec) by Regime" if turnover_plot_col == "avg_turnover_exec" else "Avg Turnover by Regime"
+        _boxplot_by_regime(df, turnover_plot_col, figures_dir / "turnover_by_regime.png", turnover_title, model_types)
+        if "avg_turnover_target" in df.columns:
+            _boxplot_by_regime(
+                df,
+                "avg_turnover_target",
+                figures_dir / "turnover_target_by_regime.png",
+                "Avg Turnover (Target) by Regime",
+                model_types,
+            )
         if not diffs.empty:
             _plot_regime_delta_sharpe(diffs, figures_dir / "regime_delta_sharpe_by_seed.png")
 

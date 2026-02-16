@@ -2,10 +2,10 @@
 Gate3 leaderboard with mean/std deltas and guardrails.
 
 Decision:
-  - HARD FAIL if cand_turnover >= ref*hardcut OR delta_sharpe <= fail_delta_sharpe
+  - HARD FAIL if cand_turnover_exec >= ref*hardcut OR delta_sharpe <= fail_delta_sharpe
   - PASS if delta_sharpe >= pass_delta_sharpe AND cand_mdd >= ref_mdd (no worsening)
   - Otherwise BORDERLINE
-Guardrail flag if cand_turnover >= ref*guardrail.
+Guardrail flag if cand_turnover_exec >= ref*guardrail.
 """
 
 from __future__ import annotations
@@ -19,6 +19,18 @@ from typing import Iterable, List
 import pandas as pd
 
 from scripts.prl_gate_utils import PRL_GATE_THRESHOLDS, aggregate_prl_gate
+
+
+def _apply_turnover_exec_default(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize turnover column to execution turnover for downstream comparisons."""
+    out = df.copy()
+    if "avg_turnover_exec" in out.columns:
+        out["avg_turnover"] = pd.to_numeric(out["avg_turnover_exec"], errors="coerce")
+    elif "avg_turnover" in out.columns:
+        out["avg_turnover"] = pd.to_numeric(out["avg_turnover"], errors="coerce")
+    else:
+        out["avg_turnover"] = 0.0
+    return out
 
 def _collect_paths(patterns: List[str]) -> List[Path]:
     paths: List[Path] = []
@@ -106,6 +118,32 @@ def _compute_window_summary(metrics: pd.DataFrame) -> pd.DataFrame:
     return df.reset_index().rename(columns={"eval_window": "window"})
 
 
+def _resolve_output_root(run_index: dict, run_index_path: Path) -> Path:
+    output_root = run_index.get("output_root")
+    if output_root:
+        return Path(output_root)
+    reports_dir = run_index.get("reports_dir")
+    if reports_dir:
+        return Path(reports_dir).parent
+    return run_index_path.parent.parent
+
+
+def _load_step5_gate_result(run_index: dict, run_index_path: Path) -> tuple[Path | None, dict]:
+    output_root = _resolve_output_root(run_index, run_index_path)
+    candidates = [
+        output_root / "reports" / "paper" / "step5" / "step5_gate_result.json",
+        output_root / "reports" / "step5_gate_result.json",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            return path, json.loads(path.read_text())
+        except Exception:
+            continue
+    return None, {}
+
+
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(description="Build Gate3 leaderboard from ref/candidate PACK run indexes.")
     parser.add_argument("--reference-run-index", required=True)
@@ -119,6 +157,7 @@ def main(argv: list[str] | None = None):
 
     ref_idx = _load_run_index(Path(args.reference_run_index))
     ref_metrics = _load_with_filter(Path(ref_idx["metrics_path"]), ref_idx.get("run_ids", []))
+    ref_metrics = _apply_turnover_exec_default(ref_metrics)
     if ref_metrics.empty:
         raise SystemExit("Reference metrics empty after filtering run_ids.")
     ref_summary = _compute_window_summary(ref_metrics)
@@ -136,9 +175,13 @@ def main(argv: list[str] | None = None):
         metrics_path = Path(idx["metrics_path"])
         run_ids = idx.get("run_ids", [])
         metrics = _load_with_filter(metrics_path, run_ids)
+        metrics = _apply_turnover_exec_default(metrics)
         if metrics.empty:
             continue
         prl_gate = aggregate_prl_gate(run_ids, idx, metrics_path)
+        step5_gate_path, step5_gate = _load_step5_gate_result(idx, cand_path)
+        step5_gate_pass = step5_gate.get("step5_gate_pass")
+        step5_gate_reason = step5_gate.get("step5_gate_reason")
         cand_summary = _compute_window_summary(metrics)
         merged = cand_summary.merge(ref_summary, on="window", suffixes=("_cand", "_ref"))
         if merged.empty:
@@ -217,6 +260,9 @@ def main(argv: list[str] | None = None):
                     "prl_prob_std": prl_gate.prl_prob_std,
                     "prl_prob_min": prl_gate.prl_prob_min,
                     "prl_prob_max": prl_gate.prl_prob_max,
+                    "step5_gate_pass": step5_gate_pass,
+                    "step5_gate_reason": step5_gate_reason,
+                    "step5_gate_result_path": str(step5_gate_path) if step5_gate_path is not None else "",
                     "reference_run_index_path": args.reference_run_index,
                     "candidate_run_index_path": str(cand_path),
                     "fail_turnover_hard_cut": hard_fail_turnover,
@@ -235,6 +281,7 @@ def main(argv: list[str] | None = None):
         "# Gate3 summary",
         f"- Reference: {args.reference_run_index}",
         f"- Candidates: {len(cand_paths)}",
+        "- Turnover metric: avg_turnover_exec (fallback: avg_turnover for old runs).",
         f"- Guardrail turnover x{args.turnover_guardrail_mult}, hardcut x{args.hardcut_turnover_mult}",
         f"- PASS if ΔSharpe >= {args.pass_delta_sharpe} AND MDD 악화 없음; hard fail if ΔSharpe <= {args.fail_delta_sharpe} or turnover hardcut.",
         (

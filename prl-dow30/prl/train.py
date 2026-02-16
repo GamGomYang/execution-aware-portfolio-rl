@@ -47,6 +47,7 @@ def build_vec_env(
     random_reset: bool = False,
     risk_lambda: float = 0.0,
     risk_penalty_type: str = "r2",
+    rebalance_eta: float | None = None,
 ) -> DummyVecEnv:
     returns_aligned, vol_aligned = _align_frames(returns, volatility)
     if len(returns_aligned) <= window_size + 1:
@@ -63,6 +64,7 @@ def build_vec_env(
         random_reset=bool(random_reset),
         risk_lambda=float(risk_lambda),
         risk_penalty_type=str(risk_penalty_type),
+        rebalance_eta=float(rebalance_eta) if rebalance_eta is not None else None,
     )
 
     def _init():
@@ -298,10 +300,13 @@ def _write_run_metadata(
     )
     reward_type = "log_net_minus_r2"
     feature_flags["reward_type"] = reward_type
+    rebalance_eta = config.get("env", {}).get("rebalance_eta")
+    feature_flags["action_smoothing"] = rebalance_eta is not None
     # Always compute signature with the configured transaction cost; manifest may carry a different default.
     cost_params_cfg = {
         "transaction_cost": config.get("env", {}).get("c_tc"),
         "risk_lambda": float(config.get("env", {}).get("risk_lambda", 0.0)),
+        "rebalance_eta": float(rebalance_eta) if rebalance_eta is not None else None,
     }
     if asset_list and L is not None and Lv is not None:
         env_signature_hash = compute_env_signature(
@@ -362,11 +367,12 @@ def _write_run_metadata(
         "Lv": Lv,
         "obs_dim_expected": obs_dim_expected,
         "env_signature_hash": env_signature_hash,
-        "env_signature_version": "v2",
+        "env_signature_version": "v3",
         "env_params": {
             "transaction_cost": cost_params_cfg.get("transaction_cost"),
             "risk_lambda": cost_params_cfg.get("risk_lambda", 0.0),
             "risk_penalty_type": config.get("env", {}).get("risk_penalty_type", "r2"),
+            "rebalance_eta": cost_params_cfg.get("rebalance_eta"),
             "reward_type": reward_type,
         },
         "artifacts": {
@@ -453,6 +459,7 @@ def build_env_for_range(
     random_reset: bool = False,
     risk_lambda: float = 0.0,
     risk_penalty_type: str = "r2",
+    rebalance_eta: float | None = None,
 ) -> DummyVecEnv:
     returns_slice = slice_frame(market.returns, start, end)
     vol_slice = slice_frame(features.volatility, start, end)
@@ -468,6 +475,7 @@ def build_env_for_range(
         random_reset=random_reset,
         risk_lambda=risk_lambda,
         risk_penalty_type=risk_penalty_type,
+        rebalance_eta=rebalance_eta,
     )
 
 
@@ -540,6 +548,7 @@ def run_training(
     random_reset_train = bool(env_cfg.get("random_reset_train", False))
     risk_lambda = float(env_cfg.get("risk_lambda", 0.0))
     risk_penalty_type = str(env_cfg.get("risk_penalty_type", "r2"))
+    rebalance_eta = env_cfg.get("rebalance_eta")
     env = build_env_for_range(
         market=market,
         features=features,
@@ -552,6 +561,7 @@ def run_training(
         random_reset=random_reset_train,
         risk_lambda=risk_lambda,
         risk_penalty_type=risk_penalty_type,
+        rebalance_eta=rebalance_eta,
     )
     num_assets = market.returns.shape[1]
     log_dir = Path(logs_dir) if logs_dir is not None else Path("outputs/logs")
