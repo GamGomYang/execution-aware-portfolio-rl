@@ -1,0 +1,42 @@
+{
+  "exp_name": "exp_S5_ablate_prl_etaNone",
+  "timestamp": "2026-02-16T09:12:30.483487+00:00",
+  "config_path": "configs/exp/step5/exp_S5_ablate_prl_etaNone.yaml",
+  "model_types": [
+    "prl"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "eval_windows": {
+    "train_start": "2016-01-01",
+    "train_end": "2017-12-31",
+    "test_start": "2018-01-01",
+    "test_end": "2025-12-31",
+    "windows": [
+      {
+        "name": "W1",
+        "start": "2024-01-01",
+        "end": "2025-12-30"
+      }
+    ]
+  },
+  "run_ids": [
+    "20260216T083433Z_e5ea0aa2_seed0_prl_0ef3",
+    "20260216T084225Z_e5ea0aa2_seed1_prl_73e6",
+    "20260216T085015Z_e5ea0aa2_seed2_prl_ef63",
+    "20260216T085745Z_e5ea0aa2_seed3_prl_8faf",
+    "20260216T090505Z_e5ea0aa2_seed4_prl_c0e8"
+  ],
+  "metrics_path": "outputs/exp_runs/step5_final/20260216_060623/reports/metrics.csv",
+  "regime_metrics_path": "outputs/exp_runs/step5_final/20260216_060623/reports/regime_metrics.csv",
+  "reports_dir": "outputs/exp_runs/step5_final/20260216_060623/reports",
+  "traces_dir": "outputs/exp_runs/step5_final/20260216_060623/traces",
+  "models_dir": "outputs/exp_runs/step5_final/20260216_060623/models",
+  "logs_dir": "outputs/exp_runs/step5_final/20260216_060623/logs",
+  "output_root": "outputs/exp_runs/step5_final/20260216_060623"
+}
