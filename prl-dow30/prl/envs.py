@@ -34,6 +34,11 @@ class EnvConfig:
     risk_lambda: float = 0.0
     risk_penalty_type: str = "r2"
     rebalance_eta: Optional[float] = None
+    eta_mode: str = "legacy"
+    rule_vol_window: int = 20
+    rule_vol_a: float = 1.0
+    eta_clip_min: float = 0.02
+    eta_clip_max: float = 0.5
 
 
 class Dow30PortfolioEnv(Env):
@@ -70,10 +75,29 @@ class Dow30PortfolioEnv(Env):
         assert cfg.logit_scale is not None, "logit_scale must be set"
         if cfg.risk_penalty_type != "r2":
             raise ValueError(f"Unsupported risk_penalty_type: {cfg.risk_penalty_type}")
+        valid_eta_modes = {"legacy", "none", "fixed", "rule_vol"}
+        if cfg.eta_mode not in valid_eta_modes:
+            raise ValueError(f"eta_mode must be one of {valid_eta_modes}, got: {cfg.eta_mode}")
         if cfg.rebalance_eta is not None:
             eta = float(cfg.rebalance_eta)
             if not np.isfinite(eta) or eta <= 0.0 or eta > 1.0:
                 raise ValueError(f"rebalance_eta must satisfy 0 < eta <= 1, got: {cfg.rebalance_eta}")
+        if cfg.eta_mode == "fixed":
+            if cfg.rebalance_eta is None:
+                raise ValueError("rebalance_eta must be set when eta_mode is 'fixed'.")
+            eta = float(cfg.rebalance_eta)
+            if not np.isfinite(eta) or eta <= 0.0 or eta > 1.0:
+                raise ValueError(f"rebalance_eta must satisfy 0 < eta <= 1, got: {cfg.rebalance_eta}")
+        if cfg.eta_mode == "rule_vol":
+            if float(cfg.rule_vol_a) < 0.0:
+                raise ValueError(f"rule_vol_a must be >= 0, got: {cfg.rule_vol_a}")
+            eta_clip_min = float(cfg.eta_clip_min)
+            eta_clip_max = float(cfg.eta_clip_max)
+            if not (0.0 < eta_clip_min <= eta_clip_max <= 1.0):
+                raise ValueError(
+                    "eta_clip bounds must satisfy 0 < eta_clip_min <= eta_clip_max <= 1, "
+                    f"got: eta_clip_min={cfg.eta_clip_min}, eta_clip_max={cfg.eta_clip_max}"
+                )
 
     def seed(self, seed: Optional[int] = None) -> None:  # pragma: no cover - gymnasium compatibility
         np.random.seed(seed)
@@ -119,6 +143,25 @@ class Dow30PortfolioEnv(Env):
         normalized = weights / total
         return normalized.astype(np.float64)
 
+    def _compute_eta_t(self) -> tuple[float, float | None]:
+        mode = self.cfg.eta_mode
+        if mode == "legacy":
+            if self.cfg.rebalance_eta is None:
+                return 1.0, None
+            return float(self.cfg.rebalance_eta), None
+        if mode == "none":
+            return 1.0, None
+        if mode == "fixed":
+            return float(self.cfg.rebalance_eta), None
+        if mode == "rule_vol":
+            sigma_vec = self._get_vol_vector()
+            sigma_t = float(np.mean(sigma_vec))
+            lambda_t = float(self.cfg.rule_vol_a) * sigma_t
+            eta_t = 1.0 / (1.0 + 2.0 * lambda_t)
+            eta_t = float(np.clip(eta_t, self.cfg.eta_clip_min, self.cfg.eta_clip_max))
+            return eta_t, lambda_t
+        raise ValueError(f"Unsupported eta_mode: {mode}")
+
     def step(self, action: np.ndarray):
         z = np.clip(action, self.action_space.low, self.action_space.high)
         w_target = stable_softmax(z, scale=self.cfg.logit_scale).astype(np.float64)
@@ -132,23 +175,48 @@ class Dow30PortfolioEnv(Env):
         prev_weights = self.prev_weights.astype(np.float64)
         assert self.prev_weights.shape == arithmetic_returns.shape == w_target.shape == (self.num_assets,)
 
-        eta = self.cfg.rebalance_eta
-        if eta is None:
-            w_exec = w_target
-        else:
-            eta_f = float(eta)
-            w_exec = (1.0 - eta_f) * prev_weights + eta_f * w_target
+        eta_t, lambda_t = self._compute_eta_t()
+        w_exec = (1.0 - eta_t) * prev_weights + eta_t * w_target
         w_exec = self._safe_normalize_weights(w_exec)
 
         turnover_target = turnover_l1(prev_weights, w_target)
         turnover_exec = turnover_l1(prev_weights, w_exec)
+        assert turnover_exec >= 0.0
+        assert turnover_target >= 0.0
+        assert abs(float(np.sum(w_exec)) - 1.0) < 1e-6
 
         portfolio_return = float(np.dot(w_exec, arithmetic_returns))
-        cost = self.cfg.transaction_cost * turnover_exec
+        cost_exec = self.cfg.transaction_cost * turnover_exec
+        cost_target = self.cfg.transaction_cost * turnover_target
+        net_return_lin_exec = portfolio_return - cost_exec
+        net_return_lin_target = portfolio_return - cost_target
+        tracking_error_l2 = float(np.linalg.norm(w_exec - w_target, ord=2))
 
-        log_argument = max(1.0 + portfolio_return, self.cfg.log_clip)
+        collapse_flag = False
+        collapse_reason = None
+        if not np.isfinite(portfolio_return):
+            collapse_flag = True
+            collapse_reason = "portfolio_return_non_finite"
+
+        raw_log_argument = 1.0 + portfolio_return
+        if not np.isfinite(raw_log_argument):
+            collapse_flag = True
+            if collapse_reason is None:
+                collapse_reason = "log_argument_non_finite"
+            log_argument = float(self.cfg.log_clip)
+        else:
+            log_argument = max(raw_log_argument, self.cfg.log_clip)
+        if not np.isfinite(log_argument) or log_argument <= 0.0:
+            collapse_flag = True
+            if collapse_reason is None:
+                collapse_reason = "log_argument_invalid_after_clip"
+            log_argument = float(self.cfg.log_clip)
+
         log_return_gross = math.log(log_argument)
-        log_return_net = log_return_gross - cost
+        log_return_net = log_return_gross - cost_exec
+        log_return_net_target = log_return_gross - cost_target
+
+        cost = cost_exec
         risk_lambda = float(self.cfg.risk_lambda)
         risk_penalty = risk_lambda * (portfolio_return**2)
         reward = log_return_net - risk_penalty
@@ -166,17 +234,28 @@ class Dow30PortfolioEnv(Env):
             "turnover_target_change": turnover_target,
             "turnover_target": turnover_target,
             "turnover_exec": turnover_exec,
-            "rebalance_eta": eta,
+            "rebalance_eta": self.cfg.rebalance_eta,
+            "eta_mode": self.cfg.eta_mode,
+            "eta_t": eta_t,
+            "lambda_t": lambda_t,
             "w_target_l1": float(np.abs(w_target).sum()),
             "w_exec_l1": float(np.abs(w_exec).sum()),
             "date": step_date,
             "cost": cost,
+            "cost_exec": cost_exec,
+            "cost_target": cost_target,
+            "net_return_lin_exec": net_return_lin_exec,
+            "net_return_lin_target": net_return_lin_target,
+            "tracking_error_l2": tracking_error_l2,
             "log_argument": log_argument,
             "log_return_gross": log_return_gross,
             "log_return_net": log_return_net,
+            "log_return_net_target": log_return_net_target,
             "risk_penalty": risk_penalty,
             "risk_lambda": risk_lambda,
             "reward_no_risk": log_return_net,
+            "collapse_flag": collapse_flag,
+            "collapse_reason": collapse_reason,
         }
         return obs, reward, terminated, truncated, info
 
