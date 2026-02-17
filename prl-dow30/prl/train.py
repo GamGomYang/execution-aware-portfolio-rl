@@ -338,8 +338,13 @@ def _write_run_metadata(
     created_at = now.isoformat()
     asset_list = manifest.get("asset_list") or manifest.get("kept_tickers") or []
     num_assets = int(manifest.get("num_assets", len(asset_list) if asset_list else 0))
-    L = manifest.get("L", config.get("env", {}).get("L"))
-    Lv = manifest.get("Lv", config.get("env", {}).get("Lv"))
+    env_cfg = config.get("env", {}) or {}
+    L = env_cfg.get("L")
+    Lv = env_cfg.get("Lv")
+    if L is None:
+        L = manifest.get("L")
+    if Lv is None:
+        Lv = manifest.get("Lv")
     obs_dim_expected = manifest.get("obs_dim_expected")
     if obs_dim_expected is None and L is not None and num_assets:
         obs_dim_expected = int(num_assets) * (int(L) + 2)

@@ -321,8 +321,8 @@ def build_eval_context(
     cache_only = bool(paper_mode or require_cache_cfg or offline_cfg or resolved_offline)
     session_opts = data_cfg.get("session_opts")
 
-    lv = int(run_meta.get("Lv")) if run_meta and run_meta.get("Lv") is not None else int(env_cfg["Lv"])
-    window_size = int(run_meta.get("L")) if run_meta and run_meta.get("L") is not None else int(env_cfg["L"])
+    lv = int(env_cfg["Lv"]) if env_cfg.get("Lv") is not None else int(run_meta.get("Lv"))
+    window_size = int(env_cfg["L"]) if env_cfg.get("L") is not None else int(run_meta.get("L"))
 
     market, features = prepare_market_and_features(
         config=cfg,
