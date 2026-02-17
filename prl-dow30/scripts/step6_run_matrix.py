@@ -32,6 +32,7 @@ ALLOWED_ENV_KEYS = {
 }
 ALLOWED_RULE_VOL_KEYS = {"window", "a", "a_values", "eta_clip"}
 ALLOWED_ETA_MODES = {"legacy", "none", "fixed", "rule_vol"}
+ALLOWED_SEED_MODEL_MODES = {"independent", "shared"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,6 +51,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-type", choices=["baseline", "prl"], default="prl", help="Model type.")
     parser.add_argument("--model-root", type=str, default="outputs", help="Root containing reports/models.")
     parser.add_argument("--model-path", type=str, help="Optional explicit model path (single-seed only).")
+    parser.add_argument(
+        "--seed-model-mode",
+        choices=sorted(ALLOWED_SEED_MODEL_MODES),
+        default="independent",
+        help="Model resolution mode across seeds.",
+    )
     parser.add_argument("--offline", action="store_true", help="Use cached data without downloading.")
     parser.add_argument("--max-steps", type=int, default=252, help="Max eval steps per run.")
     return parser.parse_args()
@@ -333,6 +340,66 @@ def _build_arm_specs(cfg: dict[str, Any], *, etas: list[float]) -> list[dict[str
     return specs
 
 
+def _resolve_model_path_by_seed(
+    *,
+    args: argparse.Namespace,
+    config_path: Path,
+    seeds: list[int],
+    model_type: str,
+    seed_model_mode: str,
+) -> dict[int, str]:
+    mode = str(seed_model_mode).strip().lower()
+    if mode not in ALLOWED_SEED_MODEL_MODES:
+        raise ValueError(
+            f"Unsupported seed_model_mode: {seed_model_mode}. "
+            f"Allowed={sorted(ALLOWED_SEED_MODEL_MODES)}"
+        )
+
+    if mode == "independent":
+        if args.model_path and len(seeds) > 1:
+            raise ValueError(
+                "--model-path with multiple seeds is incompatible with --seed-model-mode independent. "
+                "Either provide per-seed trained models discoverable by seed, or use --seed-model-mode shared."
+            )
+
+        model_path_by_seed: dict[int, str] = {}
+        for seed in seeds:
+            try:
+                ctx = build_eval_context(
+                    config_path=str(config_path),
+                    model_type=model_type,
+                    seed=int(seed),
+                    model_root=args.model_root,
+                    offline=bool(args.offline),
+                    max_steps=int(args.max_steps),
+                    model_path_arg=None,
+                    prefer_metadata_config=True,
+                )
+            except FileNotFoundError as exc:
+                expected_path = Path(args.model_root) / "models" / f"{model_type}_seed{int(seed)}_final.zip"
+                raise FileNotFoundError(
+                    "Independent seed model resolution failed. "
+                    f"missing_seed={int(seed)}, expected_path={expected_path}, "
+                    "resolution=Train/export this seed model (or run with --seed-model-mode shared)."
+                ) from exc
+            model_path_by_seed[int(seed)] = str(ctx.model_path)
+        return model_path_by_seed
+
+    # Shared eval-only behavior: probe once, reuse across all seeds.
+    model_probe_ctx = build_eval_context(
+        config_path=str(config_path),
+        model_type=model_type,
+        seed=int(seeds[0]),
+        model_root=args.model_root,
+        offline=bool(args.offline),
+        max_steps=int(args.max_steps),
+        model_path_arg=args.model_path,
+        prefer_metadata_config=True,
+    )
+    shared_model_path = str(model_probe_ctx.model_path)
+    return {int(seed): shared_model_path for seed in seeds}
+
+
 def main() -> None:
     args = parse_args()
     config_path = _resolve_config_path(args.config)
@@ -364,6 +431,18 @@ def main() -> None:
     save_cmd = bool(output_cfg.get("save_cmd", True))
     execution_cfg = base_cfg.get("execution", {}) or {}
     enforce_paired = bool(execution_cfg.get("enforce_paired_seeds", True))
+    seed_model_mode = str(
+        _resolve_scalar_from_config(
+            args.seed_model_mode,
+            cfg_value=execution_cfg.get("seed_model_mode"),
+            flag="seed-model-mode",
+        )
+    ).strip().lower()
+    if seed_model_mode not in ALLOWED_SEED_MODEL_MODES:
+        raise ValueError(
+            f"execution.seed_model_mode must be one of {sorted(ALLOWED_SEED_MODEL_MODES)}, "
+            f"got: {seed_model_mode}"
+        )
     experiment_name = str(base_cfg.get("experiment_name", config_path.stem))
     arm_specs = _build_arm_specs(base_cfg, etas=etas)
     if not arm_specs:
@@ -372,18 +451,13 @@ def main() -> None:
     # A) Run sanity first (stop entire run on failure).
     _run_sanity(args, seeds[0], config_path, model_type=model_type)
 
-    # Eval-only frontier: keep one trained model fixed and vary execution layer / env seed.
-    model_probe_ctx = build_eval_context(
-        config_path=str(config_path),
+    model_path_by_seed = _resolve_model_path_by_seed(
+        args=args,
+        config_path=config_path,
+        seeds=seeds,
         model_type=model_type,
-        seed=seeds[0],
-        model_root=args.model_root,
-        offline=bool(args.offline),
-        max_steps=int(args.max_steps),
-        model_path_arg=args.model_path,
-        prefer_metadata_config=True,
+        seed_model_mode=seed_model_mode,
     )
-    shared_model_path = str(model_probe_ctx.model_path)
 
     out_root.mkdir(parents=True, exist_ok=True)
 
@@ -414,6 +488,7 @@ def main() -> None:
                     f"--kappas {' '.join(str(x) for x in kappas)} --etas {' '.join(str(x) for x in etas)} "
                     f"--seeds {' '.join(str(x) for x in seeds)} --out {out_root} "
                     f"--model-type {model_type} --model-root {args.model_root} "
+                    f"--seed-model-mode {seed_model_mode} "
                     f"--max-steps {args.max_steps} --offline {args.offline} "
                     f"[per-run kappa={kappa}, arm={arm_spec['dir_name']}, seed={seed}]"
                 )
@@ -427,9 +502,10 @@ def main() -> None:
                     model_root=args.model_root,
                     offline=bool(args.offline),
                     max_steps=int(args.max_steps),
-                    model_path_arg=shared_model_path,
+                    model_path_arg=model_path_by_seed[int(seed)],
                     prefer_metadata_config=False,
                 )
+                (seed_dir / "model_resolved_path.txt").write_text(str(ctx.model_path) + "\n")
 
                 eta_mode_run = str(run_cfg["env"].get("eta_mode", "legacy"))
                 rebalance_eta_run = run_cfg["env"].get("rebalance_eta")

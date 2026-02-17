@@ -7,6 +7,44 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+MAIN_BASELINE_PAIRED_COLUMNS = [
+    "seed",
+    "kappa",
+    "eta_main",
+    "eta_baseline",
+    "run_id",
+    "baseline_run_id",
+    "delta_sharpe",
+    "delta_cagr",
+    "delta_maxdd",
+]
+
+LEGACY_KAPPA0_PAIRED_COLUMNS = [
+    "seed",
+    "kappa",
+    "eta",
+    "run_id",
+    "baseline_run_id",
+    "delta_sharpe",
+    "delta_cagr",
+    "delta_maxdd",
+]
+
+RULEVOL_FIXED_PAIRED_COLUMNS = [
+    "seed",
+    "kappa",
+    "eta",
+    "run_id",
+    "baseline_run_id",
+    "delta_sharpe",
+    "delta_cagr",
+    "delta_maxdd",
+    "arm_pair",
+    "eta_rule",
+    "eta_fixed",
+    "rule_vol_a",
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build Step6 production reports.")
@@ -135,67 +173,98 @@ def _build_aggregate(runs: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values(sort_cols).reset_index(drop=True)
 
 
-def _build_paired_delta(runs: pd.DataFrame) -> pd.DataFrame:
-    # EXP-1: paired baseline vs main within each kappa/seed.
-    if "arm" in runs.columns and {"main", "baseline"} <= set(runs["arm"].dropna().unique().tolist()):
-        main_rows = runs[runs["arm"] == "main"].copy()
-        baseline_rows = runs[runs["arm"] == "baseline"].copy()
-        if not main_rows.empty and not baseline_rows.empty:
-            baseline_index = baseline_rows.set_index(["kappa", "seed"])
-            rows = []
-            for _, row in main_rows.iterrows():
-                key = (float(row["kappa"]), int(row["seed"]))
-                if key not in baseline_index.index:
-                    continue
-                base = baseline_index.loc[key]
-                rows.append(
-                    {
-                        "seed": int(row["seed"]),
-                        "kappa": float(row["kappa"]),
-                        "eta_main": float(row.get("pair_eta", np.nan)),
-                        "eta_baseline": float(base.get("pair_eta", np.nan)),
-                        "run_id": row.get("run_id"),
-                        "baseline_run_id": base.get("run_id"),
-                        "delta_sharpe": float(row.get("sharpe_net_lin", np.nan)) - float(base.get("sharpe_net_lin", np.nan)),
-                        "delta_cagr": float(row.get("cagr", np.nan)) - float(base.get("cagr", np.nan)),
-                        "delta_maxdd": float(row.get("maxdd", np.nan)) - float(base.get("maxdd", np.nan)),
-                    }
-                )
-            if rows:
-                return pd.DataFrame(rows).sort_values(["seed", "kappa"]).reset_index(drop=True)
+def _build_paired_delta_main_vs_baseline(runs: pd.DataFrame) -> pd.DataFrame:
+    main_rows = runs[runs["arm"] == "main"].copy()
+    baseline_rows = runs[runs["arm"] == "baseline"].copy()
+    if main_rows.empty or baseline_rows.empty:
+        return pd.DataFrame(columns=MAIN_BASELINE_PAIRED_COLUMNS)
 
-    # Existing behavior: paired against kappa=0 baseline by seed+eta.
+    baseline_index = baseline_rows.set_index(["kappa", "seed"])
+    rows = []
+    for _, row in main_rows.iterrows():
+        key = (float(row["kappa"]), int(row["seed"]))
+        if key not in baseline_index.index:
+            continue
+        base = baseline_index.loc[key]
+        if isinstance(base, pd.DataFrame):
+            base = base.iloc[0]
+        rows.append(
+            {
+                "seed": int(row["seed"]),
+                "kappa": float(row["kappa"]),
+                "eta_main": float(row.get("pair_eta", np.nan)),
+                "eta_baseline": float(base.get("pair_eta", np.nan)),
+                "run_id": row.get("run_id"),
+                "baseline_run_id": base.get("run_id"),
+                "delta_sharpe": float(row.get("sharpe_net_lin", np.nan)) - float(base.get("sharpe_net_lin", np.nan)),
+                "delta_cagr": float(row.get("cagr", np.nan)) - float(base.get("cagr", np.nan)),
+                "delta_maxdd": float(row.get("maxdd", np.nan)) - float(base.get("maxdd", np.nan)),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(columns=MAIN_BASELINE_PAIRED_COLUMNS)
+    out = pd.DataFrame(rows).sort_values(["seed", "kappa"]).reset_index(drop=True)
+    return out.reindex(columns=MAIN_BASELINE_PAIRED_COLUMNS)
+
+
+def _build_paired_delta_rulevol_vs_fixed(runs: pd.DataFrame) -> pd.DataFrame:
+    fixed_rows = runs[runs["arm"] == "fixed_comparison"].copy()
+    rule_rows = runs[runs["arm"] == "rule_vol"].copy()
+    if fixed_rows.empty or rule_rows.empty:
+        return pd.DataFrame(columns=RULEVOL_FIXED_PAIRED_COLUMNS)
+
+    fixed_index = fixed_rows.set_index(["kappa", "seed"])
+    rows = []
+    for _, row in rule_rows.iterrows():
+        key = (float(row["kappa"]), int(row["seed"]))
+        if key not in fixed_index.index:
+            continue
+        fixed = fixed_index.loc[key]
+        if isinstance(fixed, pd.DataFrame):
+            fixed = fixed.iloc[0]
+
+        eta_rule = float(row.get("pair_eta", np.nan))
+        if not np.isfinite(eta_rule):
+            eta_rule = float(row.get("eta", np.nan))
+        eta_fixed = float(fixed.get("pair_eta", np.nan))
+        if not np.isfinite(eta_fixed):
+            eta_fixed = float(fixed.get("eta", np.nan))
+
+        rows.append(
+            {
+                "seed": int(row["seed"]),
+                "kappa": float(row["kappa"]),
+                "eta": eta_rule,
+                "run_id": row.get("run_id"),
+                "baseline_run_id": fixed.get("run_id"),
+                "delta_sharpe": float(row.get("sharpe_net_lin", np.nan))
+                - float(fixed.get("sharpe_net_lin", np.nan)),
+                "delta_cagr": float(row.get("cagr", np.nan)) - float(fixed.get("cagr", np.nan)),
+                "delta_maxdd": float(row.get("maxdd", np.nan)) - float(fixed.get("maxdd", np.nan)),
+                "arm_pair": "rule_vol_vs_fixed",
+                "eta_rule": eta_rule,
+                "eta_fixed": eta_fixed,
+                "rule_vol_a": float(row.get("rule_vol_a", np.nan)),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(columns=RULEVOL_FIXED_PAIRED_COLUMNS)
+    out = pd.DataFrame(rows).sort_values(["seed", "kappa", "rule_vol_a", "eta_rule"]).reset_index(drop=True)
+    return out.reindex(columns=RULEVOL_FIXED_PAIRED_COLUMNS)
+
+
+def _build_paired_delta_vs_kappa0(runs: pd.DataFrame) -> pd.DataFrame:
     baseline = runs[np.isclose(pd.to_numeric(runs["kappa"], errors="coerce"), 0.0, atol=1e-15)]
     if baseline.empty:
-        return pd.DataFrame(
-            columns=[
-                "seed",
-                "kappa",
-                "eta",
-                "run_id",
-                "baseline_run_id",
-                "delta_sharpe",
-                "delta_cagr",
-                "delta_maxdd",
-            ]
-        )
+        return pd.DataFrame(columns=LEGACY_KAPPA0_PAIRED_COLUMNS)
     base_by_seed_eta = baseline.set_index(["seed", "pair_eta"])
 
     pair_keys = sorted({(int(row.seed), float(row.pair_eta)) for row in runs.itertuples()})
     missing_baseline = [key for key in pair_keys if key not in base_by_seed_eta.index]
     if missing_baseline:
-        return pd.DataFrame(
-            columns=[
-                "seed",
-                "kappa",
-                "eta",
-                "run_id",
-                "baseline_run_id",
-                "delta_sharpe",
-                "delta_cagr",
-                "delta_maxdd",
-            ]
-        )
+        return pd.DataFrame(columns=LEGACY_KAPPA0_PAIRED_COLUMNS)
 
     rows = []
     for _, row in runs.iterrows():
@@ -205,6 +274,8 @@ def _build_paired_delta(runs: pd.DataFrame) -> pd.DataFrame:
         if np.isclose(kappa, 0.0, atol=1e-15):
             continue
         base = base_by_seed_eta.loc[(seed, eta)]
+        if isinstance(base, pd.DataFrame):
+            base = base.iloc[0]
         rows.append(
             {
                 "seed": seed,
@@ -218,19 +289,21 @@ def _build_paired_delta(runs: pd.DataFrame) -> pd.DataFrame:
             }
         )
     if not rows:
-        return pd.DataFrame(
-            columns=[
-                "seed",
-                "kappa",
-                "eta",
-                "run_id",
-                "baseline_run_id",
-                "delta_sharpe",
-                "delta_cagr",
-                "delta_maxdd",
-            ]
-        )
-    return pd.DataFrame(rows).sort_values(["seed", "eta", "kappa"]).reset_index(drop=True)
+        return pd.DataFrame(columns=LEGACY_KAPPA0_PAIRED_COLUMNS)
+    out = pd.DataFrame(rows).sort_values(["seed", "eta", "kappa"]).reset_index(drop=True)
+    return out.reindex(columns=LEGACY_KAPPA0_PAIRED_COLUMNS)
+
+
+def _build_paired_delta(runs: pd.DataFrame) -> pd.DataFrame:
+    arms = set(runs["arm"].dropna().unique().tolist()) if "arm" in runs.columns else set()
+
+    if {"main", "baseline"} <= arms:
+        return _build_paired_delta_main_vs_baseline(runs)
+
+    if {"rule_vol", "fixed_comparison"} <= arms:
+        return _build_paired_delta_rulevol_vs_fixed(runs)
+
+    return _build_paired_delta_vs_kappa0(runs)
 
 
 def _build_collapse_report(root: Path, runs: pd.DataFrame) -> None:
