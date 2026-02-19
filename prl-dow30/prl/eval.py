@@ -48,6 +48,11 @@ def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | Non
     obs_dim = int(base_env.observation_space.shape[0])
     window_size = int(getattr(base_env, "window_size", 0))
     env_params = run_metadata.get("env_params", {}) or {}
+    metadata_feature_flags = run_metadata.get("feature_flags", {}) or {}
+    expected_signal_state = bool(metadata_feature_flags.get("signal_state", False))
+    expected_signal_names = [str(name) for name in metadata_feature_flags.get("signal_names", [])]
+    actual_signal_state = bool(getattr(base_env, "signal_state", False))
+    actual_signal_names = [str(name) for name in (getattr(base_env, "signal_names", []) or [])]
     sig_version = run_metadata.get("env_signature_version")
     if sig_version == "v3" or "rebalance_eta" in env_params or "eta_mode" in env_params:
         rebalance_eta = getattr(base_env.cfg, "rebalance_eta", None)
@@ -98,6 +103,9 @@ def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | Non
     else:
         cost_params = {"transaction_cost": getattr(base_env.cfg, "transaction_cost", None)}
         feature_flags = {"returns_window": True, "volatility": True, "prev_weights": True}
+    if actual_signal_state:
+        feature_flags["signal_state"] = True
+        feature_flags["signal_names"] = actual_signal_names
 
     expected_obs_dim = run_metadata.get("obs_dim_expected")
     expected_num_assets = run_metadata.get("num_assets")
@@ -134,6 +142,10 @@ def assert_env_compatible(env: DummyVecEnv, run_metadata: Dict, *, Lv: int | Non
         errors.append("asset_list_order_mismatch=true")
     if expected_env_signature and current_signature and expected_env_signature != current_signature:
         errors.append(f"env_signature_expected={expected_env_signature} got={current_signature}")
+    if expected_signal_state != actual_signal_state:
+        errors.append(f"signal_state_expected={expected_signal_state} got={actual_signal_state}")
+    if expected_signal_state and expected_signal_names != actual_signal_names:
+        errors.append(f"signal_names_expected={expected_signal_names} got={actual_signal_names}")
 
     if errors:
         raise ValueError("ENV_COMPATIBILITY_MISMATCH: " + " | ".join(errors))

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from prl.train import run_training
+from prl.train import resolve_signal_configuration, run_training
 
 
 def parse_args():
@@ -26,6 +26,7 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     cfg["config_path"] = args.config
+    resolve_signal_configuration(cfg)
     data_cfg = cfg.get("data", {})
     paper_mode = data_cfg.get("paper_mode", False)
     require_cache_cfg = data_cfg.get("require_cache", False)

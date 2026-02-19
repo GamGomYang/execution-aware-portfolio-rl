@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 from prl.eval import assert_env_compatible, load_model, run_backtest_episode
-from prl.train import build_env_for_range, create_scheduler, prepare_market_and_features
+from prl.train import build_env_for_range, build_signal_features, create_scheduler, prepare_market_and_features
 
 
 def parse_args():
@@ -178,6 +178,7 @@ def main():
         cache_only=cache_only,
         session_opts=session_opts,
     )
+    signal_features, _ = build_signal_features(market, config=cfg)
 
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for evaluation.")
@@ -193,6 +194,7 @@ def main():
         risk_lambda=env_cfg.get("risk_lambda", 0.0),
         risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
         rebalance_eta=env_cfg.get("rebalance_eta"),
+        signal_features=signal_features,
     )
 
     output_root = Path(args.output_root)

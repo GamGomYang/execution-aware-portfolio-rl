@@ -24,17 +24,88 @@ from .envs import Dow30PortfolioEnv, EnvConfig
 from .features import VolatilityFeatures, compute_volatility_features, load_vol_stats
 from .prl import PRLAlphaScheduler, PRLConfig
 from .sb3_prl_sac import PRLSAC
+from .signals import compute_signal_frames, parse_signal_list
 from .utils.signature import canonical_json, compute_env_signature, sha256_bytes
 
 LOGGER = logging.getLogger(__name__)
+FIXED_SELECTED_SIGNALS = ["reversal_5d", "short_term_reversal"]
 
 
-def _align_frames(returns: pd.DataFrame, volatility: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def _resolve_config_relative_path(config: Dict[str, Any], raw_path: str | None) -> Path | None:
+    if not raw_path:
+        return None
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path
+    config_path = config.get("config_path")
+    if config_path:
+        return (Path(config_path).resolve().parent / path).resolve()
+    return path.resolve()
+
+
+def resolve_signal_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
+    signals_cfg = config.get("signals", {}) or {}
+    enabled = bool(signals_cfg.get("enabled", signals_cfg.get("signal_state", False)))
+    selected_path_raw = signals_cfg.get("selected_signals_path")
+    selected_path = _resolve_config_relative_path(config, selected_path_raw)
+
+    requested_names = (
+        signals_cfg.get("signal_names")
+        or signals_cfg.get("selected_signals")
+        or signals_cfg.get("names")
+    )
+    if requested_names is None and selected_path is not None and selected_path.exists():
+        payload = json.loads(selected_path.read_text())
+        if isinstance(payload, dict):
+            requested_names = payload.get("selected_signals")
+        elif isinstance(payload, list):
+            requested_names = payload
+
+    signal_names = parse_signal_list(requested_names) if requested_names is not None else list(FIXED_SELECTED_SIGNALS)
+    if enabled and signal_names != FIXED_SELECTED_SIGNALS:
+        raise ValueError(
+            "Signal selection is fixed for this experiment. "
+            f"Expected={FIXED_SELECTED_SIGNALS}, got={signal_names}"
+        )
+    if not enabled:
+        signal_names = []
+    return {
+        "enabled": enabled,
+        "signal_names": signal_names,
+        "selected_signals_path": str(selected_path) if selected_path is not None else selected_path_raw,
+    }
+
+
+def build_signal_features(market: MarketData, *, config: Dict[str, Any]) -> tuple[pd.DataFrame | None, Dict[str, Any]]:
+    spec = resolve_signal_configuration(config)
+    if not spec["enabled"]:
+        return None, spec
+
+    signal_names = list(spec["signal_names"])
+    signal_frames = compute_signal_frames(market.prices, market.returns, signals=signal_names)
+    asset_order = list(market.returns.columns)
+    ordered_blocks = {
+        name: signal_frames[name].reindex(index=market.returns.index, columns=asset_order) for name in signal_names
+    }
+    signal_features = pd.concat(ordered_blocks, axis=1)
+    return signal_features, spec
+
+
+def _align_frames(
+    returns: pd.DataFrame,
+    volatility: pd.DataFrame,
+    signal_features: pd.DataFrame | None = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None]:
     vol_clean = volatility.dropna()
     idx = returns.index.intersection(vol_clean.index)
+    signal_aligned: pd.DataFrame | None = None
+    if signal_features is not None:
+        signal_clean = signal_features.dropna()
+        idx = idx.intersection(signal_clean.index)
+        signal_aligned = signal_clean.loc[idx]
     returns_aligned = returns.loc[idx]
     vol_aligned = vol_clean.loc[idx]
-    return returns_aligned, vol_aligned
+    return returns_aligned, vol_aligned, signal_aligned
 
 
 def _parse_step6_env_params(env_cfg: Dict[str, Any]) -> Dict[str, Any]:
@@ -95,8 +166,9 @@ def build_vec_env(
     rule_vol_a: float = 1.0,
     eta_clip_min: float = 0.02,
     eta_clip_max: float = 0.5,
+    signal_features: pd.DataFrame | None = None,
 ) -> DummyVecEnv:
-    returns_aligned, vol_aligned = _align_frames(returns, volatility)
+    returns_aligned, vol_aligned, signal_aligned = _align_frames(returns, volatility, signal_features)
     if len(returns_aligned) <= window_size + 1:
         raise ValueError("Not enough data after alignment to build environment.")
     if logit_scale is None:
@@ -117,6 +189,7 @@ def build_vec_env(
         rule_vol_a=float(rule_vol_a),
         eta_clip_min=float(eta_clip_min),
         eta_clip_max=float(eta_clip_max),
+        signal_features=signal_aligned,
     )
 
     def _init():
@@ -326,6 +399,9 @@ def _write_run_metadata(
     model_path: Path,
     log_path: Path,
     vol_stats_path: Path | None = None,
+    signal_spec: Dict[str, Any] | None = None,
+    asset_list_override: List[str] | None = None,
+    obs_dim_expected_override: int | None = None,
 ) -> Path:
     manifest_path = Path(config.get("data", {}).get("processed_dir", "data/processed")) / "data_manifest.json"
     manifest = {}
@@ -336,8 +412,9 @@ def _write_run_metadata(
     config_hash_val = _config_hash(config)
     config_path = config.get("config_path", "")
     created_at = now.isoformat()
-    asset_list = manifest.get("asset_list") or manifest.get("kept_tickers") or []
-    num_assets = int(manifest.get("num_assets", len(asset_list) if asset_list else 0))
+    manifest_asset_list = manifest.get("asset_list") or manifest.get("kept_tickers") or []
+    asset_list = list(asset_list_override) if asset_list_override is not None else list(manifest_asset_list)
+    num_assets = int(len(asset_list) if asset_list else manifest.get("num_assets", 0))
     env_cfg = config.get("env", {}) or {}
     L = env_cfg.get("L")
     Lv = env_cfg.get("Lv")
@@ -345,9 +422,13 @@ def _write_run_metadata(
         L = manifest.get("L")
     if Lv is None:
         Lv = manifest.get("Lv")
-    obs_dim_expected = manifest.get("obs_dim_expected")
-    if obs_dim_expected is None and L is not None and num_assets:
+    if obs_dim_expected_override is not None:
+        obs_dim_expected = int(obs_dim_expected_override)
+    elif L is not None and num_assets:
+        # Keep expected observation dimension tied to the configured runtime window.
         obs_dim_expected = int(num_assets) * (int(L) + 2)
+    else:
+        obs_dim_expected = manifest.get("obs_dim_expected")
     env_signature_hash = manifest.get("env_signature_hash")
     feature_flags = dict(
         manifest.get(
@@ -355,6 +436,14 @@ def _write_run_metadata(
             {"returns_window": True, "volatility": True, "prev_weights": True},
         )
     )
+    signal_state = bool(signal_spec.get("enabled", False)) if signal_spec else False
+    signal_names = list(signal_spec.get("signal_names", [])) if signal_spec else []
+    if signal_state:
+        feature_flags["signal_state"] = True
+        feature_flags["signal_names"] = signal_names
+    else:
+        feature_flags.pop("signal_state", None)
+        feature_flags.pop("signal_names", None)
     reward_type = "log_net_minus_r2"
     feature_flags["reward_type"] = reward_type
     step6 = _parse_step6_env_params(config.get("env", {}))
@@ -377,6 +466,11 @@ def _write_run_metadata(
                 "rule_vol_a": float(step6["rule_vol_a"]),
             }
         )
+    if signal_state and num_assets and obs_dim_expected_override is None:
+        if obs_dim_expected is None and L is not None:
+            obs_dim_expected = int(num_assets) * (int(L) + 2)
+        if obs_dim_expected is not None:
+            obs_dim_expected = int(obs_dim_expected) + int(num_assets) * len(signal_names)
     if asset_list and L is not None and Lv is not None:
         env_signature_hash = compute_env_signature(
             asset_list,
@@ -437,12 +531,18 @@ def _write_run_metadata(
         "obs_dim_expected": obs_dim_expected,
         "env_signature_hash": env_signature_hash,
         "env_signature_version": "v3",
+        "feature_flags": feature_flags,
         "env_params": {
             "transaction_cost": cost_params_cfg.get("transaction_cost"),
             "risk_lambda": cost_params_cfg.get("risk_lambda", 0.0),
             "risk_penalty_type": config.get("env", {}).get("risk_penalty_type", "r2"),
             "rebalance_eta": cost_params_cfg.get("rebalance_eta"),
             "reward_type": reward_type,
+        },
+        "signals": {
+            "enabled": signal_state,
+            "signal_names": signal_names if signal_state else [],
+            "selected_signals_path": signal_spec.get("selected_signals_path") if signal_spec else None,
         },
         "artifacts": {
             "model_path": str(model_path),
@@ -534,9 +634,13 @@ def build_env_for_range(
     rule_vol_a: float = 1.0,
     eta_clip_min: float = 0.02,
     eta_clip_max: float = 0.5,
+    signal_features: pd.DataFrame | None = None,
 ) -> DummyVecEnv:
     returns_slice = slice_frame(market.returns, start, end)
     vol_slice = slice_frame(features.volatility, start, end)
+    signal_slice = None
+    if signal_features is not None:
+        signal_slice = slice_frame(signal_features, start, end)
     if logit_scale is None:
         logit_scale = EnvConfig.logit_scale
     return build_vec_env(
@@ -555,6 +659,7 @@ def build_env_for_range(
         rule_vol_a=rule_vol_a,
         eta_clip_min=eta_clip_min,
         eta_clip_max=eta_clip_max,
+        signal_features=signal_slice,
     )
 
 
@@ -620,6 +725,7 @@ def run_training(
         session_opts=session_opts,
         cache_only=cache_only,
     )
+    signal_features, signal_spec = build_signal_features(market, config=config)
 
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for training.")
@@ -646,6 +752,7 @@ def run_training(
         rule_vol_a=step6["rule_vol_a"],
         eta_clip_min=step6["eta_clip_min"],
         eta_clip_max=step6["eta_clip_max"],
+        signal_features=signal_features,
     )
     num_assets = market.returns.shape[1]
     log_dir = Path(logs_dir) if logs_dir is not None else Path("outputs/logs")
@@ -677,6 +784,15 @@ def run_training(
     model_path = output_path / f"{run_id}_final.zip"
     model.save(model_path)
     reports_path = Path(reports_dir) if reports_dir is not None else Path("outputs/reports")
+    runtime_asset_list = list(market.returns.columns)
+    runtime_obs_dim_expected = None
+    base_env = env.envs[0] if hasattr(env, "envs") and getattr(env, "envs") else env
+    runtime_returns = getattr(base_env, "returns", None)
+    if runtime_returns is not None:
+        runtime_asset_list = list(runtime_returns.columns)
+    runtime_obs_space = getattr(base_env, "observation_space", None)
+    if runtime_obs_space is not None and getattr(runtime_obs_space, "shape", None):
+        runtime_obs_dim_expected = int(runtime_obs_space.shape[0])
     _write_run_metadata(
         reports_path,
         config,
@@ -687,5 +803,8 @@ def run_training(
         model_path,
         log_path,
         vol_stats_path=features.stats_path,
+        signal_spec=signal_spec,
+        asset_list_override=runtime_asset_list,
+        obs_dim_expected_override=runtime_obs_dim_expected,
     )
     return model_path

@@ -23,6 +23,7 @@ from prl.eval import (
 from prl.features import load_vol_stats
 from prl.train import (
     build_env_for_range,
+    build_signal_features,
     create_scheduler,
     prepare_market_and_features,
     run_training,
@@ -463,6 +464,7 @@ def main():
         session_opts=session_opts,
         cache_only=cache_only,
     )
+    signal_features, _ = build_signal_features(market, config=cfg)
 
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for training/evaluation.")
@@ -537,6 +539,7 @@ def main():
                     risk_lambda=env_cfg.get("risk_lambda", 0.0),
                     risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
                     rebalance_eta=env_cfg.get("rebalance_eta"),
+                    signal_features=signal_features,
                 )
 
                 assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))
