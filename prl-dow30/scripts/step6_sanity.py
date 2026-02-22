@@ -21,7 +21,12 @@ from prl.envs import EnvConfig
 from prl.eval import load_model, run_backtest_episode_detailed, trace_dict_to_frame
 from prl.features import VolatilityFeatures
 from prl.prl import PRLAlphaScheduler
-from prl.train import build_env_for_range, create_scheduler, prepare_market_and_features
+from prl.train import (
+    build_env_for_range,
+    build_signal_features,
+    create_scheduler,
+    prepare_market_and_features,
+)
 from prl.utils.signature import compute_env_signature
 
 
@@ -42,6 +47,9 @@ class EvalContext:
     lv: int
     market: MarketData
     features: VolatilityFeatures
+    signal_state: bool
+    signal_names: list[str]
+    signal_features: pd.DataFrame | None
     eval_start: str
     eval_end: str
 
@@ -174,6 +182,35 @@ def _subset_universe(
         std=features.std,
     )
     return market_sub, features_sub
+
+
+def _prepare_signal_payload(
+    *,
+    market: MarketData,
+    cfg: dict[str, Any],
+    run_meta: dict[str, Any] | None,
+) -> tuple[pd.DataFrame | None, bool, list[str]]:
+    signal_cfg = dict(cfg)
+    signals = dict(cfg.get("signals", {}) or {})
+
+    meta_flags = ((run_meta or {}).get("feature_flags", {}) or {})
+    if "signal_state" in meta_flags:
+        meta_state = bool(meta_flags.get("signal_state", False))
+        signals["enabled"] = meta_state
+        signals["signal_state"] = meta_state
+    meta_signal_names = meta_flags.get("signal_names")
+    if isinstance(meta_signal_names, (list, tuple)) and meta_signal_names:
+        signals["signal_names"] = list(meta_signal_names)
+
+    if signals:
+        signal_cfg["signals"] = signals
+
+    signal_features, signal_spec = build_signal_features(market, config=signal_cfg)
+    signal_state = bool(signal_spec.get("enabled", False))
+    signal_names = list(signal_spec.get("signal_names", []))
+    if not signal_state:
+        return None, False, []
+    return signal_features, True, signal_names
 
 
 def _compute_action_smoothing_flag(*, eta_mode: str, rebalance_eta: float | None) -> bool:
@@ -336,6 +373,7 @@ def build_eval_context(
     )
     expected_assets = list(run_meta.get("asset_list") or []) if run_meta else []
     market, features = _subset_universe(market, features, expected_assets)
+    signal_features, signal_state, signal_names = _prepare_signal_payload(market=market, cfg=cfg, run_meta=run_meta)
 
     dates = cfg["dates"]
     eval_start, eval_end = _clip_eval_window(
@@ -364,18 +402,20 @@ def build_eval_context(
         lv=lv,
         market=market,
         features=features,
+        signal_state=signal_state,
+        signal_names=signal_names,
+        signal_features=signal_features,
         eval_start=eval_start,
         eval_end=eval_end,
     )
 
 
-def run_eval_case(
+def _build_eval_env(
     ctx: EvalContext,
     *,
     eta_mode: str,
     rebalance_eta: float | None,
     transaction_cost: float,
-    eval_tag: str,
 ):
     env_cfg = ctx.env_cfg
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
@@ -383,8 +423,9 @@ def run_eval_case(
     rule_vol_window, rule_vol_a, eta_clip_min, eta_clip_max = _parse_rule_vol_env(env_cfg)
     risk_lambda = float(env_cfg.get("risk_lambda", 0.0))
     risk_penalty_type = str(env_cfg.get("risk_penalty_type", "r2"))
+    signal_payload = ctx.signal_features if ctx.signal_state else None
 
-    env = build_env_for_range(
+    return build_env_for_range(
         market=ctx.market,
         features=ctx.features,
         start=ctx.eval_start,
@@ -402,6 +443,57 @@ def run_eval_case(
         rule_vol_a=rule_vol_a,
         eta_clip_min=eta_clip_min,
         eta_clip_max=eta_clip_max,
+        signal_features=signal_payload,
+    )
+
+
+def _assert_expected_obs_dim_matches_env(ctx: EvalContext) -> None:
+    expected_obs_dim = (ctx.run_meta or {}).get("obs_dim_expected")
+    if expected_obs_dim is None:
+        return
+
+    env_cfg = ctx.env_cfg
+    eta_mode = str(env_cfg.get("eta_mode", EnvConfig.eta_mode))
+    rebalance_eta = env_cfg.get("rebalance_eta")
+    rebalance_eta = float(rebalance_eta) if rebalance_eta is not None else None
+    tc = _get_transaction_cost(env_cfg)
+
+    env = _build_eval_env(
+        ctx,
+        eta_mode=eta_mode,
+        rebalance_eta=rebalance_eta,
+        transaction_cost=tc,
+    )
+    try:
+        obs_shape = tuple(int(x) for x in (env.observation_space.shape or ()))
+        actual_obs_dim = int(np.prod(obs_shape)) if obs_shape else None
+        expected_obs_dim_i = int(expected_obs_dim)
+        if actual_obs_dim != expected_obs_dim_i:
+            meta_flags = ((ctx.run_meta or {}).get("feature_flags", {}) or {})
+            signal_shape = tuple(int(x) for x in ctx.signal_features.shape) if ctx.signal_features is not None else None
+            raise AssertionError(
+                "Observation dim guard failed before sanity run: "
+                f"expected_obs_dim={expected_obs_dim_i}, actual_obs_shape={obs_shape}, actual_obs_dim={actual_obs_dim}, "
+                f"signal_state={ctx.signal_state}, signal_names={ctx.signal_names}, signal_features_shape={signal_shape}, "
+                f"meta_signal_state={meta_flags.get('signal_state')}, meta_signal_names={meta_flags.get('signal_names')}"
+            )
+    finally:
+        env.close()
+
+
+def run_eval_case(
+    ctx: EvalContext,
+    *,
+    eta_mode: str,
+    rebalance_eta: float | None,
+    transaction_cost: float,
+    eval_tag: str,
+):
+    env = _build_eval_env(
+        ctx,
+        eta_mode=eta_mode,
+        rebalance_eta=rebalance_eta,
+        transaction_cost=transaction_cost,
     )
 
     scheduler: PRLAlphaScheduler | None = None
@@ -432,6 +524,8 @@ def _check_turnover(df: pd.DataFrame, label: str) -> None:
 
 
 def run_sanity(ctx: EvalContext) -> None:
+    _assert_expected_obs_dim_matches_env(ctx)
+
     base_tc = _get_transaction_cost(ctx.env_cfg)
 
     _, _, df_eta1, _ = run_eval_case(

@@ -22,10 +22,20 @@ def parse_args():
     parser.add_argument(
         "--output-root",
         type=str,
-        default="outputs",
-        help="Base directory for reports/models/logs (default: outputs).",
+        default=None,
+        help="Base directory for reports/models/logs (default: config.output.root or outputs).",
     )
     return parser.parse_args()
+
+
+def _resolve_output_root(cli_output_root: str | None, cfg: dict) -> Path:
+    if cli_output_root:
+        return Path(cli_output_root)
+    output_cfg = cfg.get("output", {}) or {}
+    cfg_root = output_cfg.get("root")
+    if cfg_root:
+        return Path(cfg_root)
+    return Path("outputs")
 
 
 def write_metrics(path: Path, row: dict):
@@ -154,6 +164,7 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     cfg["config_path"] = args.config
+    output_root = _resolve_output_root(args.output_root, cfg)
     dates = cfg["dates"]
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
@@ -197,7 +208,6 @@ def main():
         signal_features=signal_features,
     )
 
-    output_root = Path(args.output_root)
     reports_dir = output_root / "reports"
     models_dir = output_root / "models"
 
