@@ -567,6 +567,18 @@ def run_sanity(ctx: EvalContext) -> None:
     )
     avg_turnover_eta1 = float(pd.to_numeric(df_eta1["turnover_exec"], errors="coerce").mean())
     avg_turnover_eta02 = float(pd.to_numeric(df_eta02["turnover_exec"], errors="coerce").mean())
+    ratio = (avg_turnover_eta02 / avg_turnover_eta1) if avg_turnover_eta1 != 0.0 else float("inf")
+    print(
+        "STEP6_SANITY_METRICS "
+        + json.dumps(
+            {
+                "avg_turnover_exec_eta02": avg_turnover_eta02,
+                "avg_turnover_exec_eta1": avg_turnover_eta1,
+                "test2_ratio": ratio,
+            },
+            sort_keys=True,
+        )
+    )
     if not (np.isfinite(avg_turnover_eta02) and np.isfinite(avg_turnover_eta1) and avg_turnover_eta02 < 0.5 * avg_turnover_eta1):
         raise AssertionError(
             "TEST2 failed: avg_turnover_exec_eta02 must be < 0.5 * avg_turnover_exec_eta1 "

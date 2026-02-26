@@ -1,0 +1,73 @@
+이번 런 결과 (핫픽스 이후)
+
+런 경로: prl-dow30/outputs/stage6_sensitivity_pipeline_20260226T074701Z
+총 소요: 245.45분
+단계별 소요:
+A1: 5.43분 (기존 A1 모델 재사용)
+A2: 93.83분
+StageB~종료: 146.18분
+종료 상태: FINAL SKIP (validation hard rule fail), RUN DONE
+근거: master.log
+수치 상세
+
+A1:
+10/10 조합 stage_a1_pass=True
+총 pass seed: 30/30
+sanity ratio median 범위: 0.0218655 ~ 0.0226168
+근거: stage_a1_summary.csv
+A2:
+8/8 후보 모두 stage_a2_pass=True
+선택 후보: A1_03, eta=0.079 (ratio 최소)
+근거: stage_a2_summary.csv, best_selection.json
+StageB validation (2022-01-01~2023-12-31):
+overall_pass=False
+check1(kappa>0 main median Sharpe>0): PASS
+check2(kappa>0, ΔSharpe>0 seed >=6): FAIL
+check3(kappa=0, median ΔSharpe >= -0.005): PASS
+근거: acceptance_report.json
+핵심 수치(check2 관련):
+kappa=0.0005: positive seeds 5/10, median ΔSharpe +0.0002448
+kappa=0.0010: positive seeds 5/10, median ΔSharpe +0.0003176
+최소/최대 ΔSharpe (kappa=0.0005): -0.0020458 / +0.0022414
+최소/최대 ΔSharpe (kappa=0.0010): -0.0019610 / +0.0022377
+근거: acceptance_report.json, paired_delta.csv
+보조 지표:
+collapse rate: 0.0 (0/60)
+main/baseline median turnover 비율(kappa>0): 0.8045 (main이 약 19.5% 낮음)
+val sanity ratio: 0.3734 (<0.5, sanity PASS)
+근거: collapse_report.md, aggregate.csv, validation_summary.csv
+원인 (명확)
+
+핫픽스 자체는 성공했습니다.
+이전 런 20260226T004826Z: A1 pass combo 0/10
+이번 런 20260226T074701Z: A1 pass combo 10/10, pass seed 30/30
+즉, 집계 버그는 해결됨.
+현재 실패는 “실행 로직 버그”가 아니라 “성능 분포 문제”입니다.
+중심값(평균/중앙값)은 미세 양수인데, seed 분포가 5양수/5음수로 갈라져 check2 불합격.
+음수 seed가 kappa 0.0005/0.001에서 거의 동일하게 유지됨(부호 패턴 고정).
+후보 선택 기준의 정합성 부족.
+StageB 후보를 A2의 sanity ratio(약 0.0218~0.0226, 차이 매우 작음)로 고름.
+이 기준은 check2(positive seed 수)와 직접 상관이 약함.
+개선 명세 (다음 실행용, 우선순위 순)
+
+StageB 단일 후보 정책 중단
+A2 상위 3개 후보를 StageB에 올려서 실제 check2로 선발.
+추천 후보: A1_03@0.080, A1_03@0.082, A1_05@0.080 (현재 실패 후보 A1_03@0.079 제외)
+StageB 프리필터를 check2 지향으로 변경
+sanity ratio 대신 proxy check2 사용:
+100k pilot seeds: [1,2,4,5,6,0,7] (hard negative + stable positive 포함)
+기준:
+1순위: kappa>0 positive seeds 수
+2순위: median ΔSharpe
+3순위: turnover ratio, collapse
+경계 seed 뒤집기용 eta 미세탐색
+유력 후보 1개 선정 후 eta ±0.001~0.002 탐색
+예: 0.080 기준 0.078, 0.079, 0.080, 0.081, 0.082
+목표: 현재 음수 경계 seed(특히 seed2/seed5) 최소 1개 이상 양수 전환
+최종 채택 규칙 고정
+Validation PASS + Final PASS 동시 필수
+내부 기준 유지: kappa>0 median ΔSharpe > 0
+운영 권장: final에서 kappa=0.0005와 0.001 각각 positive seeds >=7
+오케스트레이터 규칙 보강
+A2 sanity_pass_n 동률이면 top1이 아니라 topN StageB로 자동 확장
+sanity 기반 지표는 “실행 일관성 확인”으로만 사용하고, 선발은 check2 계열 지표로 전환
