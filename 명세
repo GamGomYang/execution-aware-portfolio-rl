@@ -1,73 +1,494 @@
-이번 런 결과 (핫픽스 이후)
+저번주 작업 복원 명세 (업데이트: 2026-03-07 UTC)
 
-런 경로: prl-dow30/outputs/stage6_sensitivity_pipeline_20260226T074701Z
-총 소요: 245.45분
-단계별 소요:
-A1: 5.43분 (기존 A1 모델 재사용)
-A2: 93.83분
-StageB~종료: 146.18분
-종료 상태: FINAL SKIP (validation hard rule fail), RUN DONE
-근거: master.log
-수치 상세
+문서 목적
+- 2026-02-16 ~ 2026-02-26까지 진행한 실험/개선 내용을 복원한다.
+- "어디까지 끝났는지"와 "지금부터 뭘 해야 하는지"를 실행 가능한 수준으로 정리한다.
 
-A1:
-10/10 조합 stage_a1_pass=True
-총 pass seed: 30/30
-sanity ratio median 범위: 0.0218655 ~ 0.0226168
-근거: stage_a1_summary.csv
-A2:
-8/8 후보 모두 stage_a2_pass=True
-선택 후보: A1_03, eta=0.079 (ratio 최소)
-근거: stage_a2_summary.csv, best_selection.json
-StageB validation (2022-01-01~2023-12-31):
-overall_pass=False
-check1(kappa>0 main median Sharpe>0): PASS
-check2(kappa>0, ΔSharpe>0 seed >=6): FAIL
-check3(kappa=0, median ΔSharpe >= -0.005): PASS
-근거: acceptance_report.json
-핵심 수치(check2 관련):
-kappa=0.0005: positive seeds 5/10, median ΔSharpe +0.0002448
-kappa=0.0010: positive seeds 5/10, median ΔSharpe +0.0003176
-최소/최대 ΔSharpe (kappa=0.0005): -0.0020458 / +0.0022414
-최소/최대 ΔSharpe (kappa=0.0010): -0.0019610 / +0.0022377
-근거: acceptance_report.json, paired_delta.csv
-보조 지표:
-collapse rate: 0.0 (0/60)
-main/baseline median turnover 비율(kappa>0): 0.8045 (main이 약 19.5% 낮음)
-val sanity ratio: 0.3734 (<0.5, sanity PASS)
-근거: collapse_report.md, aggregate.csv, validation_summary.csv
-원인 (명확)
+1) 현재 코드/브랜치 스냅샷
+- 현재 브랜치: testing/improve-sharpe-testing
+- HEAD: f12f953 (2026-02-26, sanity 출력 보강 + 본 명세 최초 작성)
+- main 대비 앞선 커밋: 9개
+  - bb9dc0d, e63b839, f1f4af1, 7a984c4, cc3c223, a060811, d31274b, 2ae6d51, f12f953
+- 현재 저장소에는 Step6 실험 산출물(aggregate/paired/acceptance 등)이 남아있지 않음
+  - prl-dow30/outputs 디렉터리는 정리됨
+  - 따라서 2/26 수치는 "기존 메모 기록값"으로만 확인 가능
 
-핫픽스 자체는 성공했습니다.
-이전 런 20260226T004826Z: A1 pass combo 0/10
-이번 런 20260226T074701Z: A1 pass combo 10/10, pass seed 30/30
-즉, 집계 버그는 해결됨.
-현재 실패는 “실행 로직 버그”가 아니라 “성능 분포 문제”입니다.
-중심값(평균/중앙값)은 미세 양수인데, seed 분포가 5양수/5음수로 갈라져 check2 불합격.
-음수 seed가 kappa 0.0005/0.001에서 거의 동일하게 유지됨(부호 패턴 고정).
-후보 선택 기준의 정합성 부족.
-StageB 후보를 A2의 sanity ratio(약 0.0218~0.0226, 차이 매우 작음)로 고름.
-이 기준은 check2(positive seed 수)와 직접 상관이 약함.
-개선 명세 (다음 실행용, 우선순위 순)
+2) 저번주까지 실제 진행 타임라인 (날짜순)
 
-StageB 단일 후보 정책 중단
-A2 상위 3개 후보를 StageB에 올려서 실제 check2로 선발.
-추천 후보: A1_03@0.080, A1_03@0.082, A1_05@0.080 (현재 실패 후보 A1_03@0.079 제외)
-StageB 프리필터를 check2 지향으로 변경
-sanity ratio 대신 proxy check2 사용:
-100k pilot seeds: [1,2,4,5,6,0,7] (hard negative + stable positive 포함)
-기준:
-1순위: kappa>0 positive seeds 수
-2순위: median ΔSharpe
-3순위: turnover ratio, collapse
-경계 seed 뒤집기용 eta 미세탐색
-유력 후보 1개 선정 후 eta ±0.001~0.002 탐색
-예: 0.080 기준 0.078, 0.079, 0.080, 0.081, 0.082
-목표: 현재 음수 경계 seed(특히 seed2/seed5) 최소 1개 이상 양수 전환
-최종 채택 규칙 고정
-Validation PASS + Final PASS 동시 필수
-내부 기준 유지: kappa>0 median ΔSharpe > 0
-운영 권장: final에서 kappa=0.0005와 0.001 각각 positive seeds >=7
-오케스트레이터 규칙 보강
-A2 sanity_pass_n 동률이면 top1이 아니라 topN StageB로 자동 확장
-sanity 기반 지표는 “실행 일관성 확인”으로만 사용하고, 선발은 check2 계열 지표로 전환
+[2026-02-16] Step5 결과 정리 + Step6 기반 구축
+- 87ad533 (분석/게이트 결과)
+  - step5 final gate 분석 코드 추가/정비
+  - 핵심: step5에서 median sharpe delta가 음수로 탈락
+  - 근거 파일: prl-dow30/analysis/step5_final_gate.py, prl-dow30/tmp_fast_real_out/.../step5_gate_result.*
+- 8c39464 (Step6 Commit-1)
+  - env 실행 계층(step6) 게이트 스크립트 추가
+  - 근거 파일: prl-dow30/scripts/step6_commit1_gate.py, prl-dow30/prl/envs.py
+- df0f2ce (Add signal diagnostics)
+  - signal 진단/eta frontier/step6 sanity 파이프라인 기능 확장
+  - 근거 파일: prl-dow30/scripts/step6_eta_frontier_eval.py, step6_sanity.py, step6_run_matrix.py
+- 7322ed7 (rule_vol clip 완화 테스팅)
+  - rule_vol clip 및 step6 설정/리포트 로직 튜닝
+  - 근거 파일: prl-dow30/configs/step6_rule_vol*.yaml, scripts/step6_build_reports.py
+
+[2026-02-17] Step6 리포트/판정 고도화
+- c05b0ad
+  - _build_paired_delta_rulevol_vs_fixed() 추가
+  - rule_vol vs fixed 비교 페어링 로직/테스트 추가
+  - 근거 파일: prl-dow30/scripts/step6_build_reports.py, tests/test_step6_build_reports_rulevol_pairing.py
+- 0c753bc
+  - step6 rule_vol 실제 테스트 반영
+  - 근거 파일: prl-dow30/prl/train.py, prl-dow30/scripts/step6_sanity.py
+- ebd5c1f
+  - eta-frontier/paired-delta/sign-test/rule-vol 음수구간 요약을 paper pack으로 생성
+  - 근거 파일: prl-dow30/scripts/step6_make_paper_pack.py
+
+[2026-02-19] 신호(state) 반영 + seed10 재학습 라인 완성
+- bb9dc0d
+  - 신호 생성 모듈 신설(prl/signals.py)
+  - 진단 단계에서 IC/t-stat + long-short 샤프 기반 screening 추가
+  - "통과 신호만" 선택하는 로직 추가
+  - 근거 파일: prl-dow30/prl/signals.py, prl-dow30/prl/diagnostics.py, scripts/diagnose_root_causes.py
+- e63b839
+  - RL observation에 signal_state 반영 (obs_dim 확장)
+  - metadata/env_signature에 signal_state/signal_names 포함
+  - eval 호환성 검사에 signal_state mismatch 검사 추가
+  - 근거 파일: prl-dow30/prl/envs.py, prl-dow30/prl/train.py, prl-dow30/prl/eval.py
+- f1f4af1
+  - u27 세팅 기준 seed 0~9 재학습 라인 및 audit 스크립트 추가
+  - 근거 파일: prl-dow30/configs/prl_100k_signals_u27.yaml, scripts/run_u27_seed10_and_audit.sh
+
+[2026-02-22] 안정성/경로 이슈 핫픽스
+- 7a984c4
+  - sanity 시작 전에 expected_obs_dim 검사(사전 fail-fast) 추가
+  - run_train/run_eval/run_all에 output-root fallback 정책 추가
+    - CLI 없으면 config.output.root 사용
+  - 근거 파일: prl-dow30/scripts/step6_sanity.py, run_train.py, run_eval.py, run_all.py
+
+[2026-02-24 ~ 2026-02-25] eta 그리드 확장 및 acceptance 기준 명문화
+- cc3c223
+  - step6_check_acceptance.py 추가
+    - check1: kappa>0 main median sharpe>0
+    - check2: kappa>0에서 positive delta seed 개수 기준
+    - check3: kappa=0 median delta 하한
+  - fixed eta / rule_vol 대규모 config 세트 생성 시작
+- a060811
+  - eta 0.06~0.15 영역(특히 0.08/0.10/0.12) configs 확장
+- d31274b
+  - eta 0.079~0.089 미세탐색 configs 확장
+- 근거 파일: prl-dow30/configs/step6_fixedeta_*_seed10.yaml, step6_rulevol_*_seed10.yaml, scripts/step6_check_acceptance.py
+
+[2026-02-26] 런 결과 기록 + 데이터 정리
+- 2ae6d51
+  - 불필요 outputs 모델/로그 정리
+  - 결과: 현재 저장소에는 step6 런 산출물이 없음
+- f12f953
+  - sanity에서 TEST2 turnover ratio를 JSON으로 출력하도록 보강
+  - 본 문서(명세) 최초 작성
+  - 근거 파일: prl-dow30/scripts/step6_sanity.py, 명세
+
+3) 마지막으로 확인된 실험 결과 (기록 기반)
+
+중요 안내
+- 아래 수치는 2026-02-26 당시 기록된 값이며, 원본 산출물 파일은 현재 저장소에 없다.
+- 출처: 본 파일의 이전 버전(커밋 f12f953에 추가된 메모 텍스트).
+
+런 식별
+- 런 경로(당시): prl-dow30/outputs/stage6_sensitivity_pipeline_20260226T074701Z
+- 총 소요: 245.45분
+- 종료 상태: FINAL SKIP (validation hard rule fail), RUN DONE
+
+판정 요약
+- A1: 10/10 조합 통과, pass seed 30/30
+- A2: 8/8 후보 통과, 선택 후보 A1_03 eta=0.079
+- StageB validation (2022-01-01~2023-12-31):
+  - check1 PASS
+  - check2 FAIL
+  - check3 PASS
+  - overall FAIL
+
+핵심 수치 (check2 실패 원인)
+- kappa=0.0005: positive seeds 5/10, median delta sharpe +0.0002448
+- kappa=0.0010: positive seeds 5/10, median delta sharpe +0.0003176
+- collapse rate: 0.0 (0/60)
+- turnover는 개선(main이 baseline 대비 약 19.5% 낮음)이지만,
+  "양수 seed 수" 조건을 못 채워 하드룰 실패
+
+해석
+- 로직 버그보다는 "성능 분포 문제"가 핵심
+- 평균/중앙값은 미세 양수이나 seed 부호가 5:5로 갈려 check2 불합격
+- 후보 선발 기준(sanity ratio)이 check2 목표(positive seed 수)와 정렬되지 않음
+
+4) 저번주까지 개선 완료된 항목 vs 미완료 항목
+
+완료된 항목 (코드상 반영 완료)
+- signal 진단/스크리닝 파이프라인 구현
+- signal_state를 RL observation + metadata + signature까지 일관 반영
+- eval/sanity에서 obs_dim 및 signature 호환성 fail-fast
+- step6 보고서(aggregate/paired/collapse/fig) 생성 자동화
+- acceptance 체크 스크립트 분리(check1/2/3)
+- eta/rule_vol 대규모 실험 config 세트 구축
+
+미완료/잔여 항목
+- StageB 후보 자동확장(topN) 오케스트레이터 코드 없음
+  - "sanity_pass_n 동률 시 topN 확장"은 메모상 제안만 있고 코드화 안 됨
+- 2/26 런 산출물 미보존 상태
+  - 같은 결론 재확인하려면 재실행 필요
+- check2를 직접 최적화하는 후보 선발 루틴 부재
+  - 현재는 수동으로 config를 여러 개 돌려 비교하는 방식
+
+5) 지금 시점의 실제 블로커 (재실행 전 확인 필수)
+
+블로커 A: 모델 파일 위치 불일치 가능성
+- 2/22 이후 run_train은 config.output.root를 우선 사용
+- 예: prl_100k_signals_u27.yaml은 output.root=outputs/step3_u27
+- 따라서 step6 실행 시 기본 --model-root outputs 를 쓰면 모델 미탐색 가능
+- 대응: step6_run_matrix 실행 시 --model-root를 명시
+
+블로커 B: max-steps 기본값 252
+- step6_run_matrix 기본 --max-steps=252
+- full window(예: 2022-01-01~2023-12-31)를 보려면 --max-steps 0으로 설정 필요
+
+블로커 C: 2/26 원본 결과 파일 부재
+- acceptance_report.json/paired_delta.csv/aggregate.csv가 현재 없음
+- 재현 런으로 근거를 다시 생성해야 함
+
+6) 앞으로 해야 할 일 (우선순위 + 실행 단위)
+
+P0. 실험 재현 기반 복구 (반드시 먼저)
+- 목적: seed 0~9 모델 + metadata를 step6에서 읽을 수 있는 상태로 맞춤
+- 작업
+  1) 모델/메타 유무 확인
+  2) 없으면 u27 seed10 재학습 수행
+  3) step6에서 사용할 model-root 확정
+
+P1. Validation 구간 재검증 (2022-01-01~2023-12-31)
+- 목적: check2 양수 seed 수 개선 후보를 선발
+- 대상 eta
+  - 우선: 0.080, 0.082
+  - 비교 기준: 0.079 (기존 실패 후보)
+  - 필요시 미세탐색: 0.078, 0.081 (0.078은 config 추가 필요)
+- 판정기준
+  - 1순위: kappa>0 positive seed 수
+  - 2순위: median delta sharpe
+  - 3순위: turnover, collapse
+
+P2. Final 구간 검증 (2024-01-01~2025-12-31)
+- 목적: validation 통과 후보가 final에서도 유지되는지 확인
+- 조건
+  - validation PASS + final PASS 동시 만족
+  - 운영 권장: kappa=0.0005, 0.001에서 각각 positive seeds >= 7
+
+P3. 룰 정착/자동화
+- step6 candidate selection 로직을 check2 지향으로 코드화
+- stage 오케스트레이터에 topN 확장 규칙 반영
+
+7) 실행 커맨드 템플릿 (재시작용)
+
+7-1. 모델 유무 확인
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+find outputs -maxdepth 4 -type f -name "*_seed*_final.zip"
+find outputs -maxdepth 4 -type f -name "run_metadata_*.json"
+
+7-2. seed 0~9 재학습 (필요시)
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+for s in 0 1 2 3 4 5 6 7 8 9; do
+  PYTHONPATH=. python scripts/run_train.py --config configs/prl_100k_signals_u27.yaml --model-type prl --seed $s --offline
+done
+
+7-3. Validation 런 (예: eta 0.080)
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+PYTHONPATH=. python scripts/step6_run_matrix.py \
+  --config configs/step6_fixedeta_tune_2022_2023_eta080_seed10.yaml \
+  --model-type prl \
+  --model-root outputs/step3_u27 \
+  --seed-model-mode independent \
+  --offline \
+  --max-steps 0
+
+PYTHONPATH=. python scripts/step6_check_acceptance.py \
+  --paired outputs/step6_fixedeta_tune_2022_2023_eta080/paired_delta.csv \
+  --aggregate outputs/step6_fixedeta_tune_2022_2023_eta080/aggregate.csv \
+  --check2-min-positive-seeds 6
+
+7-4. Final 런 (validation 통과 eta로 실행)
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+PYTHONPATH=. python scripts/step6_run_matrix.py \
+  --config configs/step6_fixedeta_final_test_eta080_seed10.yaml \
+  --model-type prl \
+  --model-root outputs/step3_u27 \
+  --seed-model-mode independent \
+  --offline \
+  --max-steps 0
+
+PYTHONPATH=. python scripts/step6_check_acceptance.py \
+  --paired outputs/step6_fixedeta_final_test_eta080/paired_delta.csv \
+  --aggregate outputs/step6_fixedeta_final_test_eta080/aggregate.csv \
+  --check2-min-positive-seeds 6
+
+8) 완료(Definition of Done) 기준
+- DoD-1: validation(2022-2023) acceptance PASS
+- DoD-2: final(2024-2025) acceptance PASS
+- DoD-3: kappa>0에서 positive seed 수 기준 충족(최소 6, 권장 7)
+- DoD-4: collapse_rate=0 유지
+- DoD-5: 결과 파일 보존
+  - aggregate.csv
+  - paired_delta.csv
+  - acceptance_report.json/md
+  - run 명령(cmd.txt) + model_resolved_path.txt
+
+9) 한 줄 결론
+- 저번주까지 "인프라/검증 체계"는 거의 완성됐고, 핵심 병목은 "seed 분포(check2) 안정화"다.
+- 다음 작업의 본질은 코드 수정보다, check2 정렬된 후보 선발과 validation/final 재실행으로 결정 규칙을 확정하는 것이다.
+
+10) 앞으로 해야 할 일 상세 실행 명세 (Spec-A ~ Spec-H)
+
+10-0. 공통 운영 원칙 (모든 Spec 공통)
+- 실행 기준일: 2026-03-07 UTC
+- 기본 작업 디렉터리: /workspace/execution-aware-portfolio-rl/prl-dow30
+- 모든 실행은 로그를 남긴다.
+  - 권장 로그 루트: outputs/logs/next_run_$(date -u +%Y%m%dT%H%M%SZ)
+- 모든 런은 "config 원본 + 실행 커맨드 + 결과 csv/json"을 동일 루트에 보관한다.
+- acceptance 판정은 반드시 scripts/step6_check_acceptance.py 결과(json/md)로 확정한다.
+- 실험 비교는 같은 seed 집합(0~9)에서만 한다.
+- 파라미터 2개 이상 변경 금지.
+  - 한 번에 eta만 바꾸거나, 구간만 바꾸거나, 하나만 바꾼다.
+
+Spec-A. 실행 인벤토리 복구 및 사전 점검
+- 목적
+  - 지금 당장 실행 가능한 상태(모델/메타/경로/설정)를 확정한다.
+- 선행조건
+  - 브랜치가 testing/improve-sharpe-testing인지 확인
+- 입력
+  - configs/prl_100k_signals_u27.yaml
+  - step6_fixedeta_*_seed10.yaml 계열
+- 절차
+  1) 브랜치/HEAD 확인
+     - git branch --show-current
+     - git rev-parse --short HEAD
+  2) 모델/메타 파일 존재 확인
+     - find outputs -maxdepth 5 -type f -name "*_final.zip"
+     - find outputs -maxdepth 5 -type f -name "run_metadata_*.json"
+  3) 설정 경로 확인
+     - u27 학습 config output.root 확인
+       - rg -n "output:|root:" configs/prl_100k_signals_u27.yaml
+     - step6 config들의 output.root 확인
+       - rg -n "output:|root:" configs/step6_fixedeta_*_seed10.yaml
+  4) model-root 결정
+     - 후보: outputs/step3_u27, outputs/step3_u27_eta*
+     - seed 0~9가 전부 있는 경로를 우선 선택
+- 산출물
+  - outputs/reports/next_run_inventory_<TS>.md (직접 작성)
+    - 사용 model-root
+    - 발견된 seed 목록
+    - 누락 seed 목록
+- 통과 기준
+  - seed 0~9 모델 파일 + metadata 파일 경로를 명시할 수 있어야 함
+- 실패 시 조치
+  - seed 누락이면 Spec-B로 넘어가기 전에 Spec-B-1(재학습) 선실행
+- 예상 소요
+  - 15~30분
+
+Spec-B. 학습 자산 보강 (필요 시에만 실행)
+- 목적
+  - step6가 요구하는 seed 0~9 모델/메타를 완비한다.
+- 선행조건
+  - Spec-A에서 seed 누락 확인됨
+- 입력
+  - configs/prl_100k_signals_u27.yaml
+- 절차
+  1) seed 루프 학습
+     - for s in 0 1 2 3 4 5 6 7 8 9; do PYTHONPATH=. python scripts/run_train.py --config configs/prl_100k_signals_u27.yaml --model-type prl --seed $s --offline; done
+  2) 학습 후 검증
+     - run_metadata 최신 10개가 seed 0~9인지 점검
+     - model_path가 실제 존재하는지 점검
+  3) 품질 빠른 점검(옵션)
+     - scripts/run_u27_seed10_and_audit.sh 참고하여 최소 메타 체크 수행
+- 산출물
+  - outputs/reports/next_run_seed10_audit_<TS>.json
+    - seed 완전성
+    - obs_dim_expected 일관성
+    - env_signature_hash 일관성
+- 통과 기준
+  - seed 0~9 메타 전부 존재
+  - model_path exists = true
+- 실패 시 조치
+  - 개별 seed 재학습 재시도
+  - 특정 seed 반복 실패 시 해당 seed 로그를 별도 보관하고 원인 분리
+- 예상 소요
+  - 6~12시간 (환경 성능 의존)
+
+Spec-C. Validation 후보군 1차 실행 (2022-01-01 ~ 2023-12-31)
+- 목적
+  - check2(positive seed 수) 기준으로 후보 eta를 정량 선발한다.
+- 선행조건
+  - Spec-A/B 완료, model-root 확정
+- 입력
+  - configs/step6_fixedeta_tune_2022_2023_eta079_seed10.yaml
+  - configs/step6_fixedeta_tune_2022_2023_eta080_seed10.yaml
+  - configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml
+- 실행 규칙
+  - --seed-model-mode independent 고정
+  - --max-steps 0 고정 (전체 validation window 평가)
+  - --offline 고정
+- 절차
+  1) eta=0.079 실행/판정
+  2) eta=0.080 실행/판정
+  3) eta=0.082 실행/판정
+  4) 각 eta에 대해 acceptance_report.json 생성
+  5) 3개 eta 결과를 단일 비교표로 합치기
+     - 항목: check2 n_positive, median_delta_sharpe, collapse_rate, median_turnover_exec
+- 권장 커맨드 패턴
+  - PYTHONPATH=. python scripts/step6_run_matrix.py --config <CFG> --model-type prl --model-root <MODEL_ROOT> --seed-model-mode independent --offline --max-steps 0
+  - PYTHONPATH=. python scripts/step6_check_acceptance.py --paired <RUN_ROOT>/paired_delta.csv --aggregate <RUN_ROOT>/aggregate.csv --check2-min-positive-seeds 6
+- 산출물
+  - outputs/reports/validation_eta_compare_<TS>.csv
+  - outputs/reports/validation_eta_compare_<TS>.md
+- 통과 기준
+  - 최소 1개 eta가 validation acceptance PASS
+  - 또는 PASS 미달이어도 check2 n_positive가 기존(5/10)보다 개선
+- 실패 시 조치
+  - Spec-D(미세탐색)로 진행
+- 예상 소요
+  - 3~6시간
+
+Spec-D. Validation 경계 구간 미세탐색 (필요 시)
+- 목적
+  - check2 경계 seed(특히 음수 고정 seed)를 양수로 뒤집어 validation PASS 도달
+- 선행조건
+  - Spec-C에서 PASS 후보 부재 또는 근소 미달
+- 입력
+  - 신규/기존 config: eta 0.078, 0.079, 0.080, 0.081, 0.082
+- 절차
+  1) eta 0.081 config 추가 (필요 시 0.078도 추가)
+     - 기준 템플릿: step6_fixedeta_tune_2022_2023_eta080_seed10.yaml
+  2) 5개 eta를 동일 조건으로 실행
+  3) paired_delta.csv에서 seed별 부호 패턴 비교
+     - kappa 0.0005/0.001 각각에서 seed 부호 변화 추적
+  4) 최종 1개 eta 선택
+     - 우선순위: n_positive > median_delta_sharpe > turnover/collapse
+- 산출물
+  - outputs/reports/validation_eta_finegrid_<TS>.csv
+  - outputs/reports/seed_sign_flip_analysis_<TS>.md
+- 통과 기준
+  - check2 n_positive >= 6 (권장 7)
+- 실패 시 조치
+  - eta 탐색 범위를 0.076~0.084로 확장
+  - rule_vol 비교 실험을 병행하여 대체 후보 확보
+- 예상 소요
+  - 4~8시간
+
+Spec-E. Final 구간 검증 (2024-01-01 ~ 2025-12-31)
+- 목적
+  - validation 통과 eta가 final에서도 유지되는지 검증한다.
+- 선행조건
+  - Spec-C 또는 Spec-D에서 대표 eta 1개 선정
+- 입력
+  - configs/step6_fixedeta_final_test_etaXXX_seed10.yaml (선정 eta)
+- 절차
+  1) final run_matrix 실행
+  2) acceptance 판정(check1/2/3)
+  3) validation 결과와 final 결과를 나란히 비교
+  4) 후보 확정 또는 반려 결정
+- 산출물
+  - outputs/reports/final_eta_result_<TS>.json
+  - outputs/reports/validation_vs_final_<TS>.md
+- 통과 기준
+  - validation PASS + final PASS 동시 만족
+  - 권장: kappa 0.0005/0.001 각각 n_positive >= 7
+- 실패 시 조치
+  - validation runner-up eta를 final로 재검증 (최대 2개)
+  - 둘 다 실패 시 Spec-F(자동화 개선) 전에 파라미터 재설계
+- 예상 소요
+  - 2~4시간
+
+Spec-F. 후보 선발 자동화 로직 구현
+- 목적
+  - 수동 선발을 제거하고 check2 지향 자동 선발로 고정한다.
+- 선행조건
+  - Spec-C~E 결과 1회 이상 누적
+- 코드 변경 범위(제안)
+  - scripts/step6_run_matrix.py
+  - 신규 스크립트: scripts/step6_select_candidates.py
+  - 필요 시 scripts/step6_check_acceptance.py 출력 확장
+- 구현 요구사항
+  1) 입력: 다수 run root
+  2) 출력: ranking table + topN 추천
+  3) 정렬 규칙
+     - primary: check2 n_positive (kappa>0 합산 또는 최소값)
+     - secondary: median delta sharpe
+     - tertiary: collapse_rate, turnover
+  4) 동률 처리
+     - sanity_pass_n 동률일 때 top1 고정 금지, topN 확장
+  5) 결정 로그 저장
+     - 왜 이 후보를 뽑았는지 json에 남김
+- 산출물
+  - scripts/step6_select_candidates.py
+  - outputs/reports/candidate_ranking_<TS>.csv/json
+- 통과 기준
+  - 동일 입력에서 동일 결과(결정론적) 재현
+  - 수동 계산과 자동 계산이 일치
+- 실패 시 조치
+  - 정렬 규칙/가중치 분리(설정파일화) 후 재검증
+- 예상 소요
+  - 구현 2~4시간 + 검증 1~2시간
+
+Spec-G. 산출물 보존/재현성 체계
+- 목적
+  - "결과 파일 유실" 재발 방지
+- 선행조건
+  - Spec-C~F 중 최소 1개 완료
+- 절차
+  1) 런 종료 즉시 스냅샷
+     - aggregate.csv, paired_delta.csv, acceptance_report.*, collapse_report.md, config.yaml, cmd.txt
+  2) run root 단위 보존 규칙 고정
+     - outputs/step6_archive/<YYYYMMDD_HHMMSS>/<run_name>/
+  3) 재현 manifest 작성
+     - git commit, config hash, model-root, seeds, command line 기록
+  4) 보존 검증
+     - 필수 파일 누락 검사 스크립트 1회 실행
+- 산출물
+  - outputs/step6_archive/...
+  - outputs/reports/repro_manifest_<TS>.json
+- 통과 기준
+  - 신규 런 1회에 대해 "결과 재설명 가능한 최소셋"이 모두 존재
+- 실패 시 조치
+  - 누락 파일 즉시 재복사/재생성
+- 예상 소요
+  - 30~60분
+
+Spec-H. 최종 의사결정 문서화
+- 목적
+  - 팀/미래 본인이 즉시 이해 가능한 최종 결론 문서를 만든다.
+- 선행조건
+  - Spec-E 완료
+- 절차
+  1) 후보별 validation/final 핵심지표 표 작성
+  2) 채택/반려 사유를 check1/2/3 기준으로 명시
+  3) 남은 리스크와 다음 실험 제안 1~2개만 남김
+- 산출물
+  - outputs/reports/final_decision_step6_<TS>.md
+  - outputs/reports/final_decision_step6_<TS>.csv
+- 통과 기준
+  - "왜 이 eta를 채택했는지"가 수치 근거로 설명 가능
+- 실패 시 조치
+  - Spec-C~E 결과 테이블 재작성 후 문서 갱신
+- 예상 소요
+  - 1~2시간
+
+11) 실행 우선순위 요약 (즉시 실행 순서)
+- 1순위: Spec-A
+- 2순위: Spec-B (필요 시)
+- 3순위: Spec-C
+- 4순위: Spec-D (필요 시)
+- 5순위: Spec-E
+- 6순위: Spec-F
+- 7순위: Spec-G
+- 8순위: Spec-H
+
+12) 첫 실행 체크리스트 (오늘 바로 시작용)
+- [ ] Spec-A 인벤토리 완료
+- [ ] model-root 확정
+- [ ] validation 대상 eta 3개(079/080/082) 실행
+- [ ] acceptance_report 3개 생성
+- [ ] eta 비교표 작성
+- [ ] next action 결정 (Spec-D 진입 여부)
