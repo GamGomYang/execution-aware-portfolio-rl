@@ -1,6 +1,10 @@
 # Local virtual environments
 .venv/
 venv/
+env/
+**/.venv/
+**/venv/
+**/env/
 
 # Python cache / tooling cache
 __pycache__/

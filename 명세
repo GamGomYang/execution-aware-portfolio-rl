@@ -492,3 +492,208 @@ Spec-H. 최종 의사결정 문서화
 - [ ] acceptance_report 3개 생성
 - [ ] eta 비교표 작성
 - [ ] next action 결정 (Spec-D 진입 여부)
+
+13) 2026-03-08 재시작 실행 명세 (즉시 실행본)
+- 목적
+  - 끊긴 지점(Spec-B)부터 재시작해서 validation eta 0.079/0.080/0.082까지 자동 실행
+- 실행 전 고정값
+  - 작업 디렉터리: /workspace/execution-aware-portfolio-rl/prl-dow30
+  - train config: configs/prl_100k_signals_u27.yaml
+  - model-root: outputs/step3_u27
+  - check2 기준: positive seeds >= 6
+- 단계
+  1) 의존성/venv 준비
+     - python3 -m venv /workspace/execution-aware-portfolio-rl/.venv
+     - /workspace/execution-aware-portfolio-rl/.venv/bin/pip install -U pip
+     - /workspace/execution-aware-portfolio-rl/.venv/bin/pip install -r prl-dow30/requirements.txt
+  2) detached 실행
+     - tmux new-session -d -s step6_resume_20260308 'cd /workspace/execution-aware-portfolio-rl/prl-dow30 && PYTHON_BIN=/workspace/execution-aware-portfolio-rl/.venv/bin/python scripts/run_step6_resume_detached.sh'
+  3) 진행 모니터링
+     - tmux ls
+     - tmux capture-pane -pt step6_resume_20260308 | tail -n 80
+     - tail -n 80 outputs/logs/step6_resume_*/master.log
+  4) 완료 후 확인 파일
+     - outputs/reports/next_run_inventory_<TS>.md
+     - outputs/reports/validation_eta_compare_<TS>.csv
+     - outputs/reports/validation_eta_compare_<TS>.md
+     - outputs/step6_fixedeta_tune_2022_2023_eta079/acceptance_report.json
+     - outputs/step6_fixedeta_tune_2022_2023_eta080/acceptance_report.json
+     - outputs/step6_fixedeta_tune_2022_2023_eta082/acceptance_report.json
+- 판정/분기
+  - 분기 A: eta 중 1개라도 validation PASS면 Spec-E(final)로 진행
+  - 분기 B: 전부 FAIL이면 eta 0.078/0.081 추가 실행 후 Spec-D 진행
+    - 0.078 config: configs/step6_fixedeta_tune_2022_2023_eta078_seed10.yaml
+    - final용 0.078 config: configs/step6_fixedeta_final_test_eta078_seed10.yaml
+
+14) 결과 분석 로그 운영 규칙 (루프 방지용)
+- 로그 파일(고정): /workspace/execution-aware-portfolio-rl/결과 분석
+- 생성/갱신 스크립트: prl-dow30/scripts/update_result_analysis_log.py
+- 원칙
+  - 실험 시작/seed 완료/eta acceptance 완료/최종 요약 시점마다 snapshot을 1회 남긴다.
+  - snapshot에는 아래를 반드시 포함한다.
+    - 과거 동형 실험 4회 수치(archive summary + seed 단위 지표)
+    - 2026-02-26 Stage6 기록(명세 기반 복원 수치)
+    - 현재 런 진행률(seed 완료 목록, 남은 seed, 현재 단계)
+    - eta별 acceptance/check2/kappa 상세
+  - 다음 실험으로 넘어가기 전에 `결과 분석` 파일의 마지막 snapshot 기준으로 분기 결정을 한다.
+
+15) 모델 교체 실험 매트릭스 실행 명세 (PRL/SAC/PPO/TD3 + 1/N/MinVar)
+- 목적
+  - "execution eta 튜닝 문제"와 "기저 모델(alpha) 문제"를 분리해서 확인한다.
+  - 동일 validation 구간(2022-01-01~2023-12-31)에서 PRL/SAC/PPO/TD3와 규칙 기반(1/N, MinVar)을 같은 지표로 비교한다.
+- 실행 디렉터리
+  - /workspace/execution-aware-portfolio-rl/prl-dow30
+- 핵심 산출물 루트
+  - outputs/model_swap_matrix_<TS>/
+  - 주요 보고서:
+    - reports/model_swap_runs.csv
+    - reports/model_swap_rl_aggregate.csv
+    - reports/model_swap_rule_aggregate.csv
+    - reports/model_swap_vs_sac.csv
+    - reports/model_swap_summary.md
+
+Spec-M0. 빠른 진단 매트릭스 (즉시 시작용)
+- 목적
+  - 최소 시간으로 "모델 교체 필요성" 유무를 먼저 판정.
+- 설정
+  - algos: prl sac ppo td3
+  - seeds: 0 1 2
+  - etas: 0.079 0.080 0.082
+  - kappas: 0.0005 0.001
+  - rl_timesteps: 30000
+  - eval window: 2022-01-01 ~ 2023-12-31
+  - rule baselines: 1/N, MinVar(lookback 252)
+- 판정 포인트
+  - RL median sharpe_net_lin 순위
+  - n_positive_sharpe (seed 개수)
+  - vs SAC median delta sharpe / n_positive_delta
+  - 1/N, MinVar 대비 우위/열위
+
+Spec-M1. 상세 비교(필요 시)
+- 조건
+  - M0 결과가 근소하거나 seed 부호가 갈리는 경우.
+- 확장
+  - seeds 0~9
+  - rl_timesteps 100000
+  - 필요 시 eta 0.078, 0.081 추가
+
+Spec-M2. 최종 분기 규칙
+- 분기 A(기저 모델 문제 가능성 높음)
+  - PRL/SAC/PPO/TD3 전부가 1/N 또는 MinVar보다 일관 열위.
+  - 조치: 모델 구조/학습기 교체 우선.
+- 분기 B(모델 교체 효과 있음)
+  - PPO/TD3 중 하나가 SAC 대비 delta 양수 seed 우세.
+  - 조치: 해당 모델을 Step6 베이스로 승격 후 eta 재탐색.
+- 분기 C(eta/실행 레이어 이슈 우세)
+  - RL 모델 간 차이가 작고 eta 변화 민감도가 더 큼.
+  - 조치: 기존 모델 유지 + eta/selection rule 보강.
+
+실행 커맨드 (수동 1회 실행)
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+PYTHONPATH=. /workspace/execution-aware-portfolio-rl/.venv/bin/python scripts/run_model_swap_matrix.py \
+  --config configs/prl_100k_signals_u27.yaml \
+  --output-root outputs/model_swap_matrix_manual_$(date -u +%Y%m%dT%H%M%SZ) \
+  --algos prl sac ppo td3 \
+  --seeds 0 1 2 \
+  --etas 0.079 0.080 0.082 \
+  --kappas 0.0005 0.001 \
+  --rl-timesteps 30000 \
+  --eval-start 2022-01-01 \
+  --eval-end 2023-12-31 \
+  --minvar-lookback 252 \
+  --offline \
+  --append-result-analysis \
+  --result-analysis-file /workspace/execution-aware-portfolio-rl/결과\ 분석
+
+detached 실행 (권장)
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+tmux new-session -d -s model_swap_matrix_20260308 \
+  'cd /workspace/execution-aware-portfolio-rl/prl-dow30 && PYTHON_BIN=/workspace/execution-aware-portfolio-rl/.venv/bin/python WAIT_SESSION=step6_resume_20260308 scripts/run_model_swap_matrix_detached.sh'
+
+진행 확인
+- tmux capture-pane -pt model_swap_matrix_20260308 | tail -n 120
+- tail -n 120 outputs/logs/model_swap_matrix_*/master.log
+
+완료 기준 (DoD-Matrix)
+- DoD-M1: PRL/SAC/PPO/TD3 + 1/N/MinVar 결과 csv/md 생성
+- DoD-M2: eta(0.079/0.080/0.082), kappa(0.0005/0.001) 조합별 순위 확인 가능
+- DoD-M3: `결과 분석` 파일에 model-swap snapshot 1회 이상 기록
+
+## [2026-03-09T06:19:33Z] Step6 Gate Pipeline START (20260309T061933Z)
+- pipeline_log: outputs/logs/step6_gate_final_20260309T061933Z/master.log
+- primary_etas: 0.079, 0.080, 0.082
+- expand_etas_if_needed: 0.078, 0.081
+- final_eta_default: 0.082
+- check2_threshold: 6
+- objective: resume step6 validation -> gate -> optional expansion -> final test
+
+## [2026-03-09T06:23:19Z] Step6 Resume Reentry Completed (20260309T061933Z)
+- step6_resume_rc: 0
+- step6_resume_log: outputs/logs/step6_resume_20260309T061933Z/master.log
+- note: if primary eta outputs are missing, manual fallback validation will run.
+
+## [2026-03-09T06:23:19Z] Primary Gate Decision (20260309T061933Z)
+- qualified_count: 0
+- best_eta_primary: <none>
+- report_csv: outputs/reports/step6_gate_primary_20260309T061933Z.csv
+- report_md: outputs/reports/step6_gate_primary_20260309T061933Z.md
+
+## [2026-03-09T06:25:58Z] Expanded Gate Decision (20260309T061933Z)
+- expanded: true
+- qualified_count: 0
+- best_eta_expanded: <none>
+- report_csv: outputs/reports/step6_gate_expanded_20260309T061933Z.csv
+- report_md: outputs/reports/step6_gate_expanded_20260309T061933Z.md
+
+## [2026-03-09T06:27:14Z] Step6 Final Test Completed (20260309T061933Z)
+- final_eta_selected: 0.082
+- final_config: configs/step6_fixedeta_final_test_eta082_seed10.yaml
+- final_root: outputs/step6_fixedeta_final_test_eta082
+- final_acceptance_json: outputs/step6_fixedeta_final_test_eta082/acceptance_report.json
+- pipeline_log: outputs/logs/step6_gate_final_20260309T061933Z/master.log
+
+## [2026-03-09T06:48:52Z] Step6 Gate/Final 실행 결과 확정 (job=20260309T061933Z)
+- 요약 리포트: /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/step6_gate_final_summary_20260309T061933Z.md
+- 핵심 결론:
+  - tune(2022~2023) eta 0.078/0.079/0.080/0.081/0.082 모두 overall_pass=False
+  - 실패 공통 원인: check2(min positive seeds >= 6) 미충족, 실제 3/10
+  - expanded gate(0.078, 0.081)까지 포함해도 qualified eta = 0
+  - final(2024~2025, eta=0.082)도 overall_pass=False (check2=5/10)
+- 정량 포인트:
+  - tune kappa>0 median delta sharpe: 대체로 -0.00053 ~ -0.00033
+  - final eta=0.082 kappa>0 median delta sharpe: +0.000053 / +0.000100
+  - collapse_rate: 전 구간 0.0
+  - turnover(main): baseline 대비 약 38~40% 감소
+- 의사결정:
+  - 현 acceptance hard-rule(>=6) 기준으로는 채택 가능한 eta 없음
+  - 다음 사이클은 모델/특징/학습설정 개선 없이는 eta 미세조정 반복 금지
+
+## [2026-03-09T06:50:45Z] Acceptance 임계치 민감도 확인 (Final eta=0.082)
+- 실행: step6_check_acceptance --check2-min-positive-seeds 5
+- 결과: PASS (overall_pass=True)
+- 산출물:
+  - /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/step6_fixedeta_final_test_eta082/acceptance_report_min5.json
+  - /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/step6_fixedeta_final_test_eta082/acceptance_report_min5.md
+- 해석:
+  - 현재 hard rule(>=6)에서는 FAIL, 완화 rule(>=5)에서는 PASS
+  - 즉 실패 원인은 모델 붕괴가 아니라 "seed 일관성 임계치 1개 부족"에 가까움
+
+## [2026-03-09T07:03:39Z] Spec-N1 정책 고정 (20260309T070339Z)
+- hard rule (논문/최종보고): check2_min_positive_seeds >= 6 유지
+- soft rule (탐색 전용 라벨): check2_min_positive_seeds >= 5 병행 기록
+- 보고 원칙:
+  - 본 결론은 hard rule(>=6) 기준으로 작성
+  - soft rule(>=5)은 보조 신호로만 표기
+
+## [2026-03-09T07:06:13Z] Spec-N2 실행 완료 (20260309T070339Z)
+- summary_md: outputs/reports/spec_n2_final_eta_compare_20260309T070339Z.md
+- summary_csv: outputs/reports/spec_n2_final_eta_compare_20260309T070339Z.csv
+- summary_json: outputs/reports/spec_n2_final_eta_compare_20260309T070339Z.json
+- hard6는 최종 기준, soft5는 탐색 라벨로 병행 기록 완료
+
+## [2026-03-09T07:06:13Z] Spec-N3 파일럿 시작 (20260309T070339Z)
+- pilot_session: model_swap_final_pilot_20260309
+- watch_session: model_swap_final_pilot_log_20260309
+- command: PRL/SAC, seeds=0,1,2, eta=0.082, kappa=0.0005/0.001, eval=2024~2025, RL_TIMESTEPS=100000
+- progress_logging: 결과 분석 파일에 600초 간격 append
+- stop_rule(Spec-N4): check2<6이면 eta 추가탐색 중단, 모델/신호/학습설정 변경 없는 반복 금지
