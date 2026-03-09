@@ -697,3 +697,121 @@ tmux new-session -d -s model_swap_matrix_20260308 \
 - command: PRL/SAC, seeds=0,1,2, eta=0.082, kappa=0.0005/0.001, eval=2024~2025, RL_TIMESTEPS=100000
 - progress_logging: 결과 분석 파일에 600초 간격 append
 - stop_rule(Spec-N4): check2<6이면 eta 추가탐색 중단, 모델/신호/학습설정 변경 없는 반복 금지
+## [2026-03-09T11:05:55Z] Spec-N3 파일럿 진행 현황 + 완료 직후 실행 명세
+- 상태: model_swap_final_pilot_20260309 실행 중 (완료 아님)
+- run_log: outputs/logs/model_swap_matrix_20260309T070613Z/master.log
+- out_root: outputs/model_swap_matrix_20260309T070613Z
+- 학습 완료 모델: 5/6
+  - prl seed0: 47.61분
+  - prl seed1: 48.78분
+  - prl seed2: 47.41분
+  - sac(baseline) seed0: 41.39분
+  - sac(baseline) seed1: 40.04분
+- 진행 중 모델: sac(baseline) seed2
+  - 최신 로그 기준: total_timesteps 23688/100000 (2026-03-09T11:01:38Z)
+- 예상 잔여: 약 45~60분 (남은 학습 + eval/summary 생성 포함)
+
+완료 직후 실행 명세 (즉시 수행)
+1) 완료 판정
+- 로그에 [DONE] model-swap detached matrix completed 확인
+- reports/model_swap_summary.md, model_swap_runs.csv, model_swap_rl_aggregate.csv, model_swap_vs_sac.csv 생성 확인
+
+2) 파일럿 acceptance 비교 (PRL vs SAC를 동일 잣대로)
+- step6_run_matrix로 model_type=prl / baseline 각각 실행 (seed 0,1,2 / eta 0.082 / kappa 0.0005,0.001)
+- step6_check_acceptance에서 파일럿 기준 check2_min_positive_seeds=2 적용
+
+3) 의사결정 게이트
+- baseline(SAC) 하드2 통과 + PRL 대비 우세면: SAC 10-seed 확장
+- 둘 다 유사하거나 PRL 우세면: PRL 유지 후 hard6 최종 점검
+
+4) 10-seed 확장 조건부 실행
+- 조건 충족 시 model_swap_final_full_20260309 세션으로 seeds=0..9 확장
+- 확장 완료 후 hard6(>=6/10)로 최종 채택 여부 확정
+
+## [2026-03-09T11:48:09Z] Model-Swap Pilot Final Summary
+- out_root: outputs/model_swap_matrix_20260309T070613Z
+- summary_md: outputs/reports/model_swap_final_pilot_summary_20260309T114808Z.md
+- summary_json: outputs/reports/model_swap_final_pilot_summary_20260309T114808Z.json
+## [2026-03-09T13:46:36Z] Spec-N3 파일럿 완료 결과 + Spec-N5 다음 명세
+N3 파일럿 완료 (model_swap_matrix_20260309T070613Z)
+- 완료 시각(UTC): 2026-03-09T11:40:30Z
+- 로그: outputs/logs/model_swap_matrix_20260309T070613Z/master.log
+- 핵심 산출물:
+  - outputs/model_swap_matrix_20260309T070613Z/reports/model_swap_summary.md
+  - outputs/model_swap_matrix_20260309T070613Z/reports/model_swap_rl_aggregate.csv
+  - outputs/model_swap_matrix_20260309T070613Z/reports/model_swap_vs_sac.csv
+
+정량 결과 요약 (eta=0.082)
+- RL aggregate (kappa=0.0005):
+  - PRL median_sharpe_net_lin = 1.174891 (3/3 positive)
+  - SAC median_sharpe_net_lin = 1.170551 (3/3 positive)
+  - PRL - SAC median delta = +0.004341 (2/3 seeds 양수)
+- RL aggregate (kappa=0.001):
+  - PRL median_sharpe_net_lin = 1.174809 (3/3 positive)
+  - SAC median_sharpe_net_lin = 1.170486 (3/3 positive)
+  - PRL - SAC median delta = +0.004323 (2/3 seeds 양수)
+- Rule baseline 비교:
+  - 1/N sharpe = 1.184622 (RL 둘 다 미만)
+  - MinVar sharpe = 0.957027/0.945529 (RL 둘 다 이상)
+
+Step6 acceptance 파일럿(동일 잣대) 결과
+- 실행 산출물:
+  - outputs/step6_modelswap_pilot_prl_eta082_k0/acceptance_report_hard2.json
+  - outputs/step6_modelswap_pilot_baseline_eta082_k0/acceptance_report_hard2.json
+- 기준: 3-seed 파일럿 대응 hard2(check2_min_positive_seeds=2), kappa=0/0.0005/0.001
+- PRL: PASS
+  - check2: kappa 0.0005 = 2/3, kappa 0.001 = 2/3
+  - check3(kappa=0): PASS, median_delta_sharpe=+0.0001157
+- SAC(baseline): FAIL
+  - check2: kappa 0.0005 = 0/3, kappa 0.001 = 0/3
+  - check3(kappa=0): PASS, median_delta_sharpe=-0.0003687
+
+결론
+- 모델 교체(SAC)가 hard-check 관점에서 개선을 만들지 못함.
+- 현 시점 우선순위는 PRL 유지 + 10-seed 재검증이며, SAC는 보조 후보로 후순위.
+
+Spec-N5 다음 실행 명세
+1) PRL 10-seed 재학습/평가 (최종 윈도우, eta=0.082)
+- tmux new-session -d -s prl_final_full10_20260309 \
+  'cd /workspace/execution-aware-portfolio-rl/prl-dow30 && \
+   PYTHON_BIN=/workspace/execution-aware-portfolio-rl/.venv/bin/python \
+   WAIT_SESSION="" ALGOS="prl" SEEDS="0 1 2 3 4 5 6 7 8 9" ETAS="0.082" KAPPAS="0 0.0005 0.001" \
+   EVAL_START=2024-01-01 EVAL_END=2025-12-31 RL_TIMESTEPS=100000 \
+   scripts/run_model_swap_matrix_detached.sh'
+
+2) 완료 후 Step6 acceptance(hard6) 판정
+- MODEL_ROOT=outputs/model_swap_matrix_<새로운TS>
+- /workspace/execution-aware-portfolio-rl/.venv/bin/python scripts/step6_run_matrix.py \
+  --config configs/step6_fixedeta_final_test_eta082_seed10.yaml \
+  --model-type prl --model-root "$MODEL_ROOT" --seed-model-mode independent \
+  --seeds 0 1 2 3 4 5 6 7 8 9 --etas 0.082 --kappas 0 0.0005 0.001 \
+  --out outputs/step6_prl_retrained_final_eta082 --offline --max-steps 0
+- /workspace/execution-aware-portfolio-rl/.venv/bin/python scripts/step6_check_acceptance.py \
+  --paired outputs/step6_prl_retrained_final_eta082/paired_delta.csv \
+  --aggregate outputs/step6_prl_retrained_final_eta082/aggregate.csv \
+  --check2-min-positive-seeds 6 \
+  --out-md outputs/step6_prl_retrained_final_eta082/acceptance_report_hard6.md \
+  --out-json outputs/step6_prl_retrained_final_eta082/acceptance_report_hard6.json \
+  --no-fail-exit
+
+3) 중단 규칙
+- hard6 미통과 시 eta 추가 미세탐색 중단.
+- 동일 모델/동일 설정 반복 금지, 다음 축(신호/학습설정)으로 이동.
+
+
+네, 지금 적은 Spec-N5를 “마지막 확인 1회”로 실행하면 됩니다.
+그리고 그 1회에서도 hard6 미통과면, 말씀하신 대로 이 축은 중단하는 게 맞습니다 (2주 반복이면 충분히 검증됨).
+
+권장 의사결정 규칙을 딱 이렇게 고정하세요.
+
+hard6 통과 (check2 >= 6/10 at kappa=0.0005, 0.001)
+계속 진행 (최종 리포트 단계)
+hard6 미통과
+PRL/eta 반복 실험 즉시 종료
+같은 모델/같은 설정 재실행 금지
+결과는 “음성 결론(negative result)”로 문서화하고 다음 축으로 이동
+다음 축(짧게)
+신호/학습설정 변경 실험만 3-seed 파일럿으로 먼저 스크리닝
+통과 후보 1개만 10-seed 확장
+여기서도 실패면 주제/가설 자체를 피벗 또는 종료
+즉, 지금은 “한 번 더 확인 후 결론 내리는 단계”이고, 또 미통과면 그만하는 판단이 합리적입니다.
