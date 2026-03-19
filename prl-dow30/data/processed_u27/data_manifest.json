@@ -1,14 +1,14 @@
 {
-  "created_at": "2026-02-19T11:56:33.107315+00:00",
+  "created_at": "2026-03-19T11:23:46.589546+00:00",
   "start": "2010-01-01",
-  "end": "2025-12-31",
+  "end": "2026-03-19",
   "universe_policy": "fixed_list",
   "calendar_freq": "B",
-  "market_closed_days_removed": 151,
-  "market_closed_fraction_removed": 0.03617632965979876,
+  "market_closed_days_removed": 154,
+  "market_closed_fraction_removed": 0.03640661938534279,
   "market_closed_rule": "drop_all_nan_rows_before_missing_fraction",
-  "total_days_before_drop": 4174,
-  "total_days_after_drop": 4023,
+  "total_days_before_drop": 4230,
+  "total_days_after_drop": 4076,
   "requested_tickers": [
     "AAPL",
     "AMGN",
@@ -116,8 +116,8 @@
   "source": "yfinance_only",
   "price_type": "adj_close",
   "processed_hashes": {
-    "prices.parquet": "5f6dde2750b4a90f3d36806d92083b7f09439b63b97073724a305ec2469f5358",
-    "returns.parquet": "69d0f17e79daf107888b826d9be9a0ee68f69dd4f31c4084f70ed9a48c9fe0cf"
+    "prices.parquet": "c1cacd1670f16e3291f7148cf2abefd8bd5c2b97761c3758d8ca4d166eb9e2d2",
+    "returns.parquet": "5c549af1b174cd744b1a80550af37a040f969c318f3ca3cceb49a5afbbcfc250"
   },
   "quality_params": {
     "min_vol_std": 0.005,
@@ -130,5 +130,5 @@
   "history_tolerance_days": 30,
   "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
   "yfinance_version": "1.2.0",
-  "data_manifest_hash": "1d7f2197dd559ca5642bcfd601384f178d483c9ac76edc62bc1d8d448f3aa997"
+  "data_manifest_hash": "3af360c25a4553442dbe2c10068966346b972030c9b0b61aeb4958e28dda7f09"
 }

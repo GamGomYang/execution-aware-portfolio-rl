@@ -13,6 +13,8 @@ CHECK2_SOFT="${CHECK2_SOFT:-5}"
 MAX_STEPS="${MAX_STEPS:-252}"
 RUN_FULL_AUDIT="${RUN_FULL_AUDIT:-0}"
 FULL_AUDIT_MAX_STEPS="${FULL_AUDIT_MAX_STEPS:-0}"
+EVAL_START="${EVAL_START:-2022-01-01}"
+EVAL_END="${EVAL_END:-2023-12-31}"
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
   echo "[ERROR] Python executable not found: $PYTHON_BIN"
@@ -79,6 +81,8 @@ log "[INFO] phasec_config=${PHASEC_CONFIG}"
 log "[INFO] full_seeds=${FULL_SEEDS[*]}"
 log "[INFO] max_steps=${MAX_STEPS}"
 log "[INFO] run_full_audit=${RUN_FULL_AUDIT}"
+log "[INFO] eval_start=${EVAL_START}"
+log "[INFO] eval_end=${EVAL_END}"
 
 run_step "modelswap_${PHASEC_TAG}" \
   "$PYTHON_BIN" scripts/run_model_swap_matrix.py \
@@ -89,8 +93,8 @@ run_step "modelswap_${PHASEC_TAG}" \
     --etas 0.082 \
     --kappas 0.0 0.0005 0.001 \
     --rl-timesteps 100000 \
-    --eval-start 2022-01-01 \
-    --eval-end 2023-12-31 \
+    --eval-start "${EVAL_START}" \
+    --eval-end "${EVAL_END}" \
     --offline
 
 run_step "step6_${PHASEC_TAG}" \

@@ -1,0 +1,10 @@
+{
+  "tag": "u27_eta082_alpha_cs61_20k_r1",
+  "label": "control_plus_cs_mom_6_1",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "cs_mom_6_1"
+  ],
+  "notes": "Add medium-horizon momentum with near-zero correlation to control reversals."
+}

@@ -1,0 +1,553 @@
+# Next TODO
+
+Snapshot UTC: 2026-03-19 16:40~16:45
+Workspace root: `/workspace/execution-aware-portfolio-rl`
+Primary repo root: `/workspace/execution-aware-portfolio-rl/prl-dow30`
+
+## 1. 지금 큰 그림
+
+현재 프로젝트 상태는 아래처럼 구분해서 이해하면 된다.
+
+1. execution-aware recipe 선정 단계
+- 사실상 완료됨.
+- 공식 incumbent는 이미 채택되어 있음.
+- official incumbent config:
+  - `prl-dow30/configs/prl_100k_signals_u27_eta082_current.yaml`
+- immutable winner config:
+  - `prl-dow30/configs/prl_100k_signals_u27_eta082_20260319_m070_cg03_lr1e4.yaml`
+
+2. 2026 forward / operational audit 단계
+- 이미 완료됨.
+- 해석은 “execution은 건강, relative delta는 유지, absolute alpha는 부족”으로 정리됨.
+- 즉, 다음 병목은 execution이 아니라 alpha라고 판단함.
+
+3. alpha first batch 연구 단계
+- 오늘 새로 구현함.
+- 실행까지 실제로 붙였음.
+- full batch는 시작했다가 서버 종료 전 깔끔하게 중단함.
+- 내일 여기서 다시 시작하면 됨.
+
+## 2. 왜 이제 alpha를 보는가
+
+핵심 결론:
+- execution 레시피는 이미 충분히 정리됨.
+- `eta`, `mid_plasticity_multiplier`, `cvar_penalty_gamma`, `learning_rate`를 또 만지는 게 우선순위가 아님.
+- 2026 audit에서 보인 문제는 execution 붕괴가 아니라 absolute sharpe 음수 유지였음.
+- 따라서 이제는 signal / alpha source를 확장해서 absolute profitability를 회복할 수 있는지를 보는 게 맞음.
+
+쉽게 말하면:
+- 브레이크와 핸들 세팅은 거의 끝났고,
+- 이제 엔진(alpha)을 더 좋게 바꿔봐야 하는 단계임.
+
+## 3. 오늘 실제로 구현한 것
+
+### 3-1. 연구용 signal override 경로 추가
+기존 코드에는 signal selection이 사실상 고정돼 있었음.
+이를 “research mode”에서만 열어둠.
+
+수정 파일:
+- `prl-dow30/prl/train.py`
+- `prl-dow30/scripts/step6_sanity.py`
+
+핵심 변경:
+- 기본 incumbent / 기존 실험 동작은 그대로 유지
+- `signals.selection_policy: alpha_research` 또는 `signals.allow_nonfixed_selection: true`일 때만
+  non-fixed signal selection 허용
+- Step6 eval 시 metadata의 signal_names를 연구용 config로 정상 복원 가능하게 보강
+
+의미:
+- 이제 alpha 후보별로 서로 다른 signal set을 config에서 안전하게 지정 가능
+- train과 Step6 eval이 같은 signal set을 일관되게 사용 가능
+
+### 3-2. alpha first batch materializer 추가
+새 파일:
+- `prl-dow30/scripts/materialize_u27_alpha_first_batch_configs.py`
+
+역할:
+- signal manifest 4개 생성
+- alpha candidate config 4개 생성
+- signal rationale CSV/MD 생성
+- candidate metadata JSON 생성
+
+### 3-3. alpha first batch phaseA runner 추가
+새 파일:
+- `prl-dow30/scripts/run_u27_alpha_first_batch_phaseA.sh`
+
+역할:
+- materialize
+- 20k / 4-seed 학습
+- validation Step6 (2022~2023)
+- acceptance report 생성
+- summary CSV/MD 생성
+
+### 3-4. detached launcher 연결
+수정 파일:
+- `prl-dow30/scripts/launch_u27_eta082_detached.sh`
+
+새 phase:
+- `alphaA`
+
+이제 아래 명령으로 batch 재시작 가능:
+```bash
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+bash scripts/launch_u27_eta082_detached.sh alphaA
+```
+
+## 4. 오늘 만든 alpha first batch 후보
+
+고정한 execution recipe:
+- `eta = 0.082`
+- `mid_plasticity_multiplier = 0.70`
+- `cvar_penalty_gamma = 0.3`
+- `learning_rate = 1e-4`
+- `L = 30`
+- `Lv = 30`
+- `c_tc = 0.0005`
+- `logit_scale = 10.0`
+- universe = U27 fixed list
+
+이번 배치에서 바꾼 것은 signal set뿐임.
+
+후보 4개:
+
+1. control
+- tag: `u27_eta082_alpha_ctrl_20k_r1`
+- signals:
+  - `reversal_5d`
+  - `short_term_reversal`
+- 의미:
+  - 현재 incumbent의 mean-reversion control basket
+
+2. cs61 challenger
+- tag: `u27_eta082_alpha_cs61_20k_r1`
+- signals:
+  - `reversal_5d`
+  - `short_term_reversal`
+  - `cs_mom_6_1`
+- 의미:
+  - control에 중기 momentum을 추가하는 orthogonal 확장
+
+3. vsmom challenger
+- tag: `u27_eta082_alpha_vsmom_20k_r1`
+- signals:
+  - `reversal_5d`
+  - `short_term_reversal`
+  - `vol_scaled_mom`
+- 의미:
+  - control과 반대 성격이 강한 volatility-scaled momentum 혼합
+
+4. residual momentum challenger
+- tag: `u27_eta082_alpha_resid_20k_r1`
+- signals:
+  - `reversal_5d`
+  - `short_term_reversal`
+  - `residual_mom_beta_neutral`
+- 의미:
+  - beta-neutral residual momentum을 섞어서 orthogonal alpha 추가
+
+관련 파일:
+- configs:
+  - `prl-dow30/configs/exp/u27_eta082_alpha_ctrl_20k_r1.yaml`
+  - `prl-dow30/configs/exp/u27_eta082_alpha_cs61_20k_r1.yaml`
+  - `prl-dow30/configs/exp/u27_eta082_alpha_vsmom_20k_r1.yaml`
+  - `prl-dow30/configs/exp/u27_eta082_alpha_resid_20k_r1.yaml`
+- manifests:
+  - `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_ctrl.json`
+  - `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_cs61.json`
+  - `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_vsmom.json`
+  - `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_residmom.json`
+
+## 5. 왜 이 3개 challenger를 골랐는가
+
+signal rationale 리포트:
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.md`
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.csv`
+
+control 대비 상관성 기준으로 선택했음.
+
+핵심 수치:
+- `cs_mom_6_1`
+  - corr(reversal_5d) = `-0.0033`
+  - corr(short_term_reversal) = `-0.0005`
+- `vol_scaled_mom`
+  - corr(reversal_5d) = `-0.2513`
+  - corr(short_term_reversal) = `-0.3572`
+- `residual_mom_beta_neutral`
+  - corr(reversal_5d) = `-0.2537`
+  - corr(short_term_reversal) = `-0.3628`
+
+해석:
+- `cs_mom_6_1`은 control과 거의 독립적인 momentum 추가 후보
+- `vol_scaled_mom`과 `residual_mom_beta_neutral`은 reversal basket과 반대 방향 성격이 강해서 diversification test에 적합
+
+## 6. 오늘 실제로 검증한 것
+
+### 6-1. config / script 검증
+완료:
+- `run_u27_alpha_first_batch_phaseA.sh` shell syntax check 통과
+- `materialize_u27_alpha_first_batch_configs.py` py_compile 통과
+- 4개 alpha config 모두 `resolve_signal_configuration()`에서 정상 해석 확인
+- sample candidate로 signal feature build 확인
+
+샘플 feature build:
+- sample config: `u27_eta082_alpha_vsmom_20k_r1`
+- signal feature shape: `(4075, 81)`
+- 해석: 27 assets x 3 signals = 81 columns로 기대와 일치
+
+### 6-2. 실제 smoke run 완료
+단일 후보로 실제 end-to-end smoke를 실행함.
+
+실행 후보:
+- `u27_eta082_alpha_vsmom_20k_r1`
+- seed: `0`
+- timesteps: `20k`
+- validation Step6 window: `2022-01-01 ~ 2023-12-31`
+
+관련 산출물:
+- smoke summary:
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_20260319T162855Z.md`
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_20260319T162855Z.csv`
+- model:
+  - `prl-dow30/outputs/u27_eta082_alpha_vsmom_20k_r1/models/20260319T162857Z_4fe2b5f2_seed0_prl_91bb_final.zip`
+- metadata:
+  - `prl-dow30/outputs/u27_eta082_alpha_vsmom_20k_r1/reports/run_metadata_20260319T162857Z_4fe2b5f2_seed0_prl_91bb.json`
+- step6 root:
+  - `prl-dow30/outputs/step6_u27_eta082_alpha_vsmom_20k_r1/`
+
+핵심 결과:
+- Step6 sanity: `PASS`
+- `avg_turnover_exec_eta02 = 0.019890149694048148`
+- `avg_turnover_exec_eta1 = 0.7085330131408251`
+- `test2_ratio = 0.02807229772664787`
+
+1-seed delta:
+- `kappa=0.0005 delta_sharpe = +0.23931011642927474`
+- `kappa=0.001 delta_sharpe = +0.6519023429198376`
+
+main median sharpe:
+- `kappa=0.0005 = 0.523106199049237`
+- `kappa=0.001 = 0.4685611518211237`
+
+acceptance 보고서:
+- `prl-dow30/outputs/step6_u27_eta082_alpha_vsmom_20k_r1/acceptance_report_hard3.md`
+
+중요한 해석:
+- hard3/soft2는 `FAIL`이지만, 이건 나빠서라기보다 `seed 1개`라 threshold를 구조적으로 못 넘어서임.
+- smoke 목적 자체는 성공:
+  - train 성공
+  - Step6 성공
+  - sanity 통과
+  - delta 양수 확인
+
+## 7. 오늘 full alpha batch에서 어디까지 갔나
+
+오늘 detached full batch를 실제로 띄웠다가, 서버 종료 전 정리 차원에서 수동 중단함.
+
+세션 이름:
+- `u27_eta082_alphaA_20260319T163331Z`
+
+상태:
+- 지금은 이미 종료시킴
+- 현재 active tmux session에는 없음
+
+시작 로그:
+- `prl-dow30/outputs/logs/u27_alpha_first_batch_phaseA_20260319T163331Z/master.log`
+
+마지막 확인 시점:
+- candidate: `u27_eta082_alpha_ctrl_20k_r1`
+- seed: `0`
+- training 진행 중
+- 대략 `11844 / 20000` step 로그까지 남음
+
+현재 남아 있는 partial artifact:
+- control candidate partial log만 존재
+  - `prl-dow30/outputs/u27_eta082_alpha_ctrl_20k_r1/logs/train_20260319T163334Z_2ee5ed2a_seed0_prl_511e.csv`
+- control candidate final model / metadata는 아직 없음
+
+중요:
+- 즉, full batch는 사실상 아주 초반에 멈춤
+- 실제로 완주한 건 vsmom 단일 smoke뿐임
+
+## 8. 지금 서버 끄기 전 상태
+
+tmux 상태:
+- alpha batch session은 내가 이미 종료함
+- 현재 남은 건 일반 `ssh_tmux` 세션뿐임
+
+따라서 서버를 꺼도 괜찮음.
+추가 정리 작업은 필요 없음.
+
+## 9. 내일 가장 먼저 해야 할 일
+
+추천 순서:
+
+### Step 1. 작업 폴더 들어가기
+```bash
+cd /workspace/execution-aware-portfolio-rl
+```
+
+### Step 2. 현재 변경 상태 확인
+```bash
+git status --short
+```
+
+주의:
+- 아직 commit 안 된 변경이 꽤 있음.
+- 특히 alpha batch 관련 파일들뿐 아니라, adoption/forward 작업 중 만들어진 파일도 같이 남아 있음.
+- 내일도 바로 작업 이어갈 수는 있지만, 중간에 되돌리거나 청소할 때 조심해야 함.
+
+### Step 3. alpha batch 문서 한 번 빠르게 다시 보기
+우선순위 문서:
+- 이 파일: `/workspace/execution-aware-portfolio-rl/nexttodo`
+- signal rationale:
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.md`
+- materialization meta:
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_materialization.json`
+
+### Step 4. alpha full batch 재시작
+가장 간단한 재시작 명령:
+```bash
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+bash scripts/launch_u27_eta082_detached.sh alphaA
+```
+
+기대 결과:
+- 새 tmux session이 생성됨
+- session 이름이 출력됨
+- 4 candidates x 4 seeds phaseA가 다시 시작됨
+
+### Step 5. 로그 모니터링
+예시:
+```bash
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+tmux ls
+```
+
+그리고 생성된 session 이름에 맞는 로그 확인:
+```bash
+tail -f outputs/logs/<새세션로그디렉터리>/master.log
+```
+
+## 10. 내일 재시작 시 주의할 점
+
+### 10-1. output root 재사용 이슈
+현재 alpha candidate output root는 고정돼 있음.
+예:
+- `outputs/u27_eta082_alpha_ctrl_20k_r1`
+- `outputs/u27_eta082_alpha_cs61_20k_r1`
+- `outputs/u27_eta082_alpha_vsmom_20k_r1`
+- `outputs/u27_eta082_alpha_resid_20k_r1`
+
+그리고 오늘 smoke run으로 인해 아래 root에는 이미 seed0 결과가 존재함.
+- `outputs/u27_eta082_alpha_vsmom_20k_r1`
+- `outputs/step6_u27_eta082_alpha_vsmom_20k_r1`
+
+또 오늘 full batch 초반에 control partial log도 조금 남아 있음.
+
+### 10-2. 이걸 어떻게 볼 것인가
+두 가지 선택지가 있음.
+
+선택지 A. 그냥 그대로 재시작
+- 추천: 가장 간단함
+- 이유:
+  - 스크립트는 다시 train을 수행함
+  - seed별 최신 metadata가 나중 run으로 갱신되면 Step6가 최신 결과를 사용함
+- 단점:
+  - 디렉터리 안에 오늘 smoke 흔적과 내일 run 결과가 같이 남음
+  - audit trail이 아주 깔끔하진 않음
+
+선택지 B. 더 깔끔하게 재시작
+- 내일 시작 전에 아래 디렉터리를 백업명으로 옮기거나 정리
+  - `outputs/u27_eta082_alpha_ctrl_20k_r1`
+  - `outputs/u27_eta082_alpha_cs61_20k_r1`
+  - `outputs/u27_eta082_alpha_vsmom_20k_r1`
+  - `outputs/u27_eta082_alpha_resid_20k_r1`
+  - `outputs/step6_u27_eta082_alpha_ctrl_20k_r1`
+  - `outputs/step6_u27_eta082_alpha_cs61_20k_r1`
+  - `outputs/step6_u27_eta082_alpha_vsmom_20k_r1`
+  - `outputs/step6_u27_eta082_alpha_resid_20k_r1`
+- 장점:
+  - 결과 해석이 가장 깨끗함
+- 단점:
+  - 사람이 한 번 더 손대야 함
+
+내 추천:
+- 내일 빨리 시작하려면 A로 충분함
+- 만약 report를 아주 깔끔하게 남기고 싶으면 B 선택
+
+## 11. alpha phaseA 목표와 통과 기준
+
+이번 phaseA는 official final test가 아니라 validation screen임.
+
+평가 window:
+- train: `2010-01-01 ~ 2021-12-31`
+- validation Step6: `2022-01-01 ~ 2023-12-31`
+
+사용 config:
+- `prl-dow30/configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml`
+
+seeds:
+- `0 2 5 6`
+
+phaseA 목표:
+- 빠르게 나쁜 alpha 후보 제거
+- top 2 후보 선발
+
+우선 통과 기준:
+- `hard3 pass`
+- 또는 최소한 `kappa=0.001`에서 `3/4 positive`
+- `collapse_rate = 0`
+
+랭킹 기준:
+1. `hard_pass`
+2. `kappa=0.001 positive seeds`
+3. `kappa=0.001 mean delta_sharpe`
+4. `kappa=0.0005 positive seeds`
+5. `kappa=0.0005 mean delta_sharpe`
+
+결론적으로:
+- phaseA 끝나면 top 2만 phaseB로 올리는 것이 목표
+
+## 12. phaseA가 끝나면 바로 해야 할 일
+
+### 12-1. summary 파일 확인
+새로 생길 파일:
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_<timestamp>.md`
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_<timestamp>.csv`
+
+먼저 볼 것:
+- 각 candidate의 `k001_positive`
+- `k001_mean_delta_sharpe`
+- `hard_pass`
+- negative seed 유무
+
+### 12-2. phaseB 후보 2개 확정
+추천 규칙:
+- hard3 pass 후보가 2개 이상이면 상위 2개 선발
+- hard3 pass가 부족하면 k001 기준 top 2 선발
+
+### 12-3. next implementation
+내일 phaseA 완료 후 바로 해야 할 개발은 아래 중 하나임.
+
+우선순위 1:
+- `run_u27_alpha_first_batch_phaseB.sh` 구현
+- 20k / 10-seed shadow confirm 자동화
+
+phaseB spec:
+- candidates: phaseA top 2 + control 유지 여부는 상황 보고 결정
+- seeds: `0 1 2 3 4 5 6 7 8 9`
+- Step6 config: 여전히 `2022~2023` tune window
+- thresholds:
+  - hard6 = 6
+  - soft5 = 5
+- ranking:
+  - hard6 pass
+  - soft5 pass
+  - k001 mean delta
+  - negative seeds
+  - collapse_rate
+
+우선순위 2:
+- 필요 시 phaseC alpha challenger smoke 설계
+- 단, phaseB 통과 후보가 나온 뒤로 미루는 것이 맞음
+
+## 13. 내일 바로 사용할 실행 명령 모음
+
+### 13-1. alpha phaseA 재시작
+```bash
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+bash scripts/launch_u27_eta082_detached.sh alphaA
+```
+
+### 13-2. detached 대신 foreground로 직접 실행하고 싶을 때
+```bash
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+bash scripts/run_u27_alpha_first_batch_phaseA.sh
+```
+
+### 13-3. candidate 하나만 빠르게 smoke 재실행하고 싶을 때
+예시: vsmom 1-seed
+```bash
+cd /workspace/execution-aware-portfolio-rl/prl-dow30
+CANDIDATES='u27_eta082_alpha_vsmom_20k_r1' \
+PILOT_SEEDS='0' \
+MAX_STEPS='0' \
+MATERIALIZE='0' \
+bash scripts/run_u27_alpha_first_batch_phaseA.sh
+```
+
+## 14. 관련 주요 파일 목록
+
+### alpha batch 구현 관련
+- `prl-dow30/prl/train.py`
+- `prl-dow30/scripts/step6_sanity.py`
+- `prl-dow30/scripts/materialize_u27_alpha_first_batch_configs.py`
+- `prl-dow30/scripts/run_u27_alpha_first_batch_phaseA.sh`
+- `prl-dow30/scripts/launch_u27_eta082_detached.sh`
+
+### alpha batch config / manifest
+- `prl-dow30/configs/exp/u27_eta082_alpha_ctrl_20k_r1.yaml`
+- `prl-dow30/configs/exp/u27_eta082_alpha_cs61_20k_r1.yaml`
+- `prl-dow30/configs/exp/u27_eta082_alpha_vsmom_20k_r1.yaml`
+- `prl-dow30/configs/exp/u27_eta082_alpha_resid_20k_r1.yaml`
+- `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_ctrl.json`
+- `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_cs61.json`
+- `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_vsmom.json`
+- `prl-dow30/configs/signal_sets/alpha_first_batch/alpha_residmom.json`
+
+### 리포트
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_materialization.json`
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.md`
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.csv`
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_20260319T162855Z.md`
+- `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_20260319T162855Z.csv`
+
+### smoke 산출물
+- `prl-dow30/outputs/u27_eta082_alpha_vsmom_20k_r1/models/20260319T162857Z_4fe2b5f2_seed0_prl_91bb_final.zip`
+- `prl-dow30/outputs/u27_eta082_alpha_vsmom_20k_r1/reports/run_metadata_20260319T162857Z_4fe2b5f2_seed0_prl_91bb.json`
+- `prl-dow30/outputs/step6_u27_eta082_alpha_vsmom_20k_r1/acceptance_report_hard3.md`
+- `prl-dow30/outputs/step6_u27_eta082_alpha_vsmom_20k_r1/aggregate.csv`
+- `prl-dow30/outputs/step6_u27_eta082_alpha_vsmom_20k_r1/paired_delta.csv`
+
+### full batch 중단 로그
+- `prl-dow30/outputs/logs/u27_alpha_first_batch_phaseA_20260319T163331Z/master.log`
+
+## 15. 현재 git 상태 메모
+
+오늘 기준 `git status --short`에서 눈에 띄는 항목:
+
+수정됨:
+- cache 관련 processed parquet / manifest / quality_summary
+- `prl-dow30/prl/train.py`
+- `prl-dow30/scripts/build_cache.py`
+- `prl-dow30/scripts/launch_u27_eta082_detached.sh`
+- `prl-dow30/scripts/run_u27_eta082_current_phaseC.sh`
+- `prl-dow30/scripts/run_u27_eta082_phaseC.sh`
+- `prl-dow30/scripts/step6_sanity.py`
+- `결과 분석`
+- `명세`
+
+새 파일:
+- alpha batch configs / manifests / scripts
+- adoption materialization scripts
+- forward / post-adoption scripts
+- 일부 vol stats json
+
+즉:
+- 아직 작업 트리는 꽤 더럽다.
+- 내일 phaseA 끝나고 나면 alpha batch 관련 변경만 별도 정리해서 commit 범위를 신중히 잡는 게 좋다.
+
+## 16. 내일 딱 한 줄로 뭘 하면 되나
+
+가장 짧은 재시작 답:
+
+1. `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+2. `bash scripts/launch_u27_eta082_detached.sh alphaA`
+3. phaseA summary 나온 뒤 top 2 뽑기
+4. 그다음 `phaseB runner` 구현하고 10-seed shadow confirm으로 넘어가기
+
+## 17. 마지막 메모
+
+- 서버 끄기 전 alpha detached session은 이미 종료했음.
+- 따라서 지금은 “안전하게 멈춘 상태”임.
+- 내일은 그냥 위 순서대로 재시작하면 된다.

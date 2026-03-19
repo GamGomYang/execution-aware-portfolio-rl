@@ -201,6 +201,8 @@ def _prepare_signal_payload(
     meta_signal_names = meta_flags.get("signal_names")
     if isinstance(meta_signal_names, (list, tuple)) and meta_signal_names:
         signals["signal_names"] = list(meta_signal_names)
+        signals["selection_policy"] = "research"
+        signals["allow_nonfixed_selection"] = True
 
     if signals:
         signal_cfg["signals"] = signals

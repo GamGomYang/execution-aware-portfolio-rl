@@ -1,0 +1,10 @@
+{
+  "tag": "u27_eta082_alpha_resid_20k_r1",
+  "label": "control_plus_residual_mom",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "residual_mom_beta_neutral"
+  ],
+  "notes": "Add beta-neutral residual momentum to test orthogonal cross-sectional alpha."
+}

@@ -29,6 +29,7 @@ from .utils.signature import canonical_json, compute_env_signature, sha256_bytes
 
 LOGGER = logging.getLogger(__name__)
 FIXED_SELECTED_SIGNALS = ["reversal_5d", "short_term_reversal"]
+RESEARCH_SIGNAL_SELECTION_POLICIES = {"research", "configurable", "dynamic", "alpha_research"}
 
 
 def _resolve_config_relative_path(config: Dict[str, Any], raw_path: str | None) -> Path | None:
@@ -46,6 +47,9 @@ def _resolve_config_relative_path(config: Dict[str, Any], raw_path: str | None) 
 def resolve_signal_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
     signals_cfg = config.get("signals", {}) or {}
     enabled = bool(signals_cfg.get("enabled", signals_cfg.get("signal_state", False)))
+    selection_policy = str(signals_cfg.get("selection_policy", "fixed_experiment")).strip().lower()
+    allow_nonfixed_selection = bool(signals_cfg.get("allow_nonfixed_selection", False))
+    allow_research_override = allow_nonfixed_selection or (selection_policy in RESEARCH_SIGNAL_SELECTION_POLICIES)
     selected_path_raw = signals_cfg.get("selected_signals_path")
     selected_path = _resolve_config_relative_path(config, selected_path_raw)
 
@@ -62,7 +66,7 @@ def resolve_signal_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
             requested_names = payload
 
     signal_names = parse_signal_list(requested_names) if requested_names is not None else list(FIXED_SELECTED_SIGNALS)
-    if enabled and signal_names != FIXED_SELECTED_SIGNALS:
+    if enabled and signal_names != FIXED_SELECTED_SIGNALS and not allow_research_override:
         raise ValueError(
             "Signal selection is fixed for this experiment. "
             f"Expected={FIXED_SELECTED_SIGNALS}, got={signal_names}"
@@ -73,6 +77,8 @@ def resolve_signal_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
         "enabled": enabled,
         "signal_names": signal_names,
         "selected_signals_path": str(selected_path) if selected_path is not None else selected_path_raw,
+        "selection_policy": selection_policy,
+        "allow_nonfixed_selection": allow_research_override,
     }
 
 

@@ -6528,3 +6528,126 @@ Spec-N5 다음 실행 명세
 - 지금 최종 채택 후보는 `mid_plasticity_multiplier=0.70`, `cvar_penalty_gamma=0.3`, `learning_rate=1e-4` 조합이다.
 - 해석상으로는 `100k 장기 학습에서 execution-aware 성질이 죽지 않도록 학습률을 낮추고, 중간 강도의 plasticity 억제 + 약한 CVaR 패널티를 준 조합`이 가장 안정적으로 보였다.
 - 현 시점 기준으로는 이 후보를 `official incumbent replacement candidate`로 보는 것이 타당하다.
+
+## Snapshot UTC 2026-03-19T15:12:00+00:00
+
+### 0) 구간 역할 정정
+- 공식 채택 실험의 역할 구분은 아래와 같다.
+  - 학습(train): `2010-01-01 ~ 2021-12-31`
+  - 내부 검증(validation / model-swap eval): `2022-01-01 ~ 2023-12-31`
+  - 공식 최종 테스트(final test / acceptance 기준): `2024-01-01 ~ 2025-12-31`
+  - 추가 보조 점검(forward audit): `2026-01-01 ~ 2026-03-18`
+- 즉 `2026` 구간은 winner 채택의 공식 판정 구간이 아니라, 채택 이후에 붙인 supplementary forward audit이다.
+- 따라서 `2026 YTD` 결과만으로 incumbent를 즉시 폐기하거나 execution 하이퍼파라미터를 재튜닝하면 안 된다.
+
+### 1) 채택 상태 재확인
+- official incumbent:
+  - config: `/workspace/execution-aware-portfolio-rl/prl-dow30/configs/prl_100k_signals_u27_eta082_current.yaml`
+  - immutable winner: `/workspace/execution-aware-portfolio-rl/prl-dow30/configs/prl_100k_signals_u27_eta082_20260319_m070_cg03_lr1e4.yaml`
+- 공식 채택 근거는 `2024-01-01 ~ 2025-12-31` final test에서의 hard6/soft5 통과다.
+- 이 채택 상태는 그대로 유지한다.
+
+### 2) 2026 Forward Audit 결과
+- summary: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/u27_eta082_forward_summary_20260319T112337Z.md`
+- release_root: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/releases/u27_eta082_forward_2026ytd`
+- evaluation_window: `2026-01-01 ~ 2026-03-18`
+- hard6_pass: `False`
+- soft5_pass: `False`
+
+핵심 수치
+- `kappa=0.001`
+  - positive delta seeds: `8/10`
+  - mean delta_sharpe: `+0.0528494091`
+  - median delta_sharpe: `+0.0537738758`
+  - main median sharpe: `-5.8830763601`
+  - baseline median sharpe: `-5.9324041294`
+  - negative seeds: `[2, 7]`
+  - collapse_rate: `0.0`
+- `kappa=0.0005`
+  - positive delta seeds: `7/10`
+  - mean delta_sharpe: `+0.0294093231`
+  - median delta_sharpe: `+0.0312567021`
+  - main median sharpe: `-5.8801684935`
+  - baseline median sharpe: `-5.9062054001`
+  - negative seeds: `[2, 7, 9]`
+  - collapse_rate: `0.0`
+
+해석
+- forward audit에서 execution-aware 상대 우위는 유지되었다.
+- 다만 `kappa>0 main median sharpe > 0` 조건을 만족하지 못해 공식 acceptance는 fail이다.
+- 즉, 모델이 망가진 것이 아니라 `절대 성과는 음수인데 baseline보다 덜 나쁜 상태`로 해석하는 것이 맞다.
+
+### 3) 2026 Operational Retrain 결과
+- summary: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/u27_eta082_phaseC_summary_20260319T112414Z.md`
+- release_root: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/releases/u27_eta082_operational_2026q1`
+- evaluation_window: `2026-01-01 ~ 2026-03-18`
+- hard6_pass: `False`
+- soft5_pass: `False`
+- sanity: `PASS`
+  - eta02 turnover: `0.0008837730`
+  - eta1 turnover: `0.0261074573`
+  - ratio: `0.0338513624`
+
+핵심 수치
+- `kappa=0.001`
+  - positive delta seeds: `8/10`
+  - mean delta_sharpe: `+0.0609113508`
+  - median delta_sharpe: `+0.0532299205`
+  - main median sharpe: `-5.8778888950`
+  - baseline median sharpe: `-5.9309340985`
+  - negative seeds: `[2, 7]`
+  - collapse_rate: `0.0`
+- `kappa=0.0005`
+  - positive delta seeds: `8/10`
+  - mean delta_sharpe: `+0.0329349537`
+  - median delta_sharpe: `+0.0264668305`
+  - main median sharpe: `-5.8748013096`
+  - baseline median sharpe: `-5.9013898440`
+  - negative seeds: `[2, 7]`
+  - collapse_rate: `0.0`
+- `kappa=0`
+  - positive delta seeds: `5/10`
+  - mean delta_sharpe: `+0.0049492356`
+  - median delta_sharpe: `-0.0002979030`
+  - main median sharpe: `-5.8717136942`
+  - baseline median sharpe: `-5.8718439378`
+
+forward 대비 변화
+- `kappa=0.001 mean delta_sharpe`
+  - forward: `+0.0528494091`
+  - operational: `+0.0609113508`
+  - change: `+0.0080619416`
+- `kappa=0.0005 positive delta seeds`
+  - forward: `7/10`
+  - operational: `8/10`
+
+해석
+- operational retrain은 frozen forward audit보다 소폭 개선되었다.
+- 하지만 절대 sharpe가 계속 음수라 공식 acceptance는 여전히 fail이다.
+- 즉, execution recipe 자체는 건강하지만 `2026 YTD 절대 수익성 회복`은 확인되지 않았다.
+
+### 4) 현재 결론
+- incumbent는 유지한다.
+- `2026` 결과만 보고 execution hyperparameter(`eta`, `mid_plasticity_multiplier`, `cvar_penalty_gamma`, `learning_rate`)를 다시 튜닝하지 않는다.
+- 현재 가장 타당한 해석은:
+  - `execution-aware layer`: 성공
+  - `relative delta vs baseline`: 성공
+  - `absolute alpha / profitability`: 부족
+- 따라서 다음 연구의 병목은 execution이 아니라 `alpha`다.
+
+### 5) 지금부터의 원칙
+- `2026-01-01 ~ 2026-03-18`는 selection set이 아니라 audit set으로만 사용한다.
+- 새로운 실험 후보는 반드시 pre-2026 데이터에서만 selection한다.
+- next incumbent challenger는 아래 funnel을 재사용한다.
+  - `20k / 4-seed balanced screen`
+  - `20k / 10-seed shadow confirm`
+  - `100k / seed0 smoke`
+  - `100k / 10-seed full confirm`
+  - 마지막에만 `2026 forward audit`
+
+### 6) 다음 작업 우선순위
+1. incumbent 유지
+2. 월별 forward monitoring
+3. 분기별 operational retrain
+4. alpha 연구 트랙 시작
+5. execution recipe는 고정
