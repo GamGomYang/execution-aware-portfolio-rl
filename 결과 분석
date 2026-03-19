@@ -6408,3 +6408,123 @@ Spec-N5 다음 실행 명세
 3) 중단 규칙
 - hard6 미통과 시 eta 추가 미세탐색 중단.
 - 동일 모델/동일 설정 반복 금지, 다음 축(신호/학습설정)으로 이동.
+## Model-Swap Snapshot UTC 2026-03-18T10:33:32Z
+
+### Matrix Spec
+- output_root: outputs/model_swap_matrix_20260318T070607Z
+- config: configs/prl_100k_signals_u27.yaml
+- algos: ['prl']
+- seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+- etas: [0.082]
+- kappas: [0.0, 0.0005, 0.001]
+- rl_timesteps: 100000
+- eval_window: 2024-01-01~2025-12-31
+
+### Artifacts
+- runs_csv: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_runs.csv
+- rl_aggregate_csv: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_rl_aggregate.csv
+- rule_aggregate_csv: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_rule_aggregate.csv
+- vs_sac_csv: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_vs_sac.csv
+- summary_md: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_summary.md
+
+---
+
+---
+
+## Snapshot UTC 2026-03-19T10:01:02+00:00
+
+### 0) 이번 라운드 최종 결론
+- final_winner: `u27_eta082_m070_cg03_lr1e4_100k_r1`
+- final_status: `ACCEPT`
+- official_phase: `Phase C complete`
+- hard6_pass: `True`
+- soft5_pass: `True`
+- summary_md: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/u27_eta082_phaseC_summary_20260319T061859Z.md`
+- acceptance_md: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/step6_u27_eta082_m070_cg03_lr1e4_100k_r1/acceptance_report_hard6.md`
+- master_log: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/logs/u27_eta082_phaseC_20260319T061859Z/master.log`
+
+### 1) 한 줄 요약
+- `m085`, `m070_cg06`는 100k 단계에서 execution-aware 성질이 무너져 final sanity에서 탈락했다.
+- `m070_cg03_lr1e4`는 100k seed0 smoke에서 sanity를 통과했고, 이후 10-seed full Phase C에서도 hard6/soft5를 모두 통과했다.
+- 최종적으로 `kappa=0.001`에서 `10/10 positive`, `mean delta_sharpe=+0.045366`, `negative seed=[]`, `collapse_rate=0.0`를 기록했다.
+
+### 2) 단계별 요약
+#### 2-1) Phase A 20k / 4-seed screen
+- summary: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/u27_eta082_phaseA_summary_20260318T145033Z.md`
+- top_candidate: `u27_eta082_m085_20k_r1`
+- pass candidates:
+  - `u27_eta082_m085_20k_r1`
+  - `u27_eta082_m070_cg06_20k_r1`
+  - `u27_eta082_m070_cg03_20k_r1`
+- fail candidates:
+  - `u27_eta082_ctrl20k_r1`
+  - `u27_eta082_m070_20k_r1`
+
+#### 2-2) Phase B 20k / 10-seed shadow confirm
+- summary: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/u27_eta082_phaseB_summary_20260318T163812Z.md`
+- ranking:
+  - `u27_eta082_m085_20k_r1_full10`: hard6=True, soft5=True, k001_mean_delta=1.562758
+  - `u27_eta082_m070_cg06_20k_r1_full10`: hard6=True, soft5=True, k001_mean_delta=1.409455
+  - `u27_eta082_ctrl20k_r1_full10`: hard6=True, soft5=True, k001_mean_delta=1.392349
+- auto-promoted candidate at that point: `u27_eta082_m085_100k_r1`
+
+#### 2-3) 100k sanity smoke 결과
+- `u27_eta082_m085_100k_r1`: fail
+  - reason: Step6 sanity TEST2 fail
+  - eta02 turnover=0.0002002851, eta1 turnover=0.0002025730, ratio=0.988706
+- `u27_eta082_m070_cg06_100k_r1`: fail
+  - reason: Step6 sanity TEST2 fail
+  - eta02 turnover=0.0001745075, eta1 turnover=0.0002416509, ratio=0.722147
+- `u27_eta082_m070_cg03_lr1e4_100k_r1`: pass
+  - smoke summary: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/reports/u27_eta082_phaseC_smoke_summary_20260319T052245Z.md`
+  - eta02 turnover=0.0006564493, eta1 turnover=0.0252559883, ratio=0.025992
+  - 1-seed Step6 at kappa=0.001: delta_sharpe=+0.086039, main_median_sharpe=1.213257, baseline_median_sharpe=1.127218
+
+### 3) 최종 Phase C 공식 결과
+- phasec_tag: `u27_eta082_m070_cg03_lr1e4_100k_r1`
+- modelswap_root: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/modelswap_u27_eta082_m070_cg03_lr1e4_100k_r1`
+- step6_root: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/step6_u27_eta082_m070_cg03_lr1e4_100k_r1`
+- full_audit_root: `/workspace/execution-aware-portfolio-rl/prl-dow30/outputs/step6_u27_eta082_m070_cg03_lr1e4_100k_r1_fullwindow`
+
+#### 3-1) 공식 acceptance
+- hard6_pass: `True`
+- soft5_pass: `True`
+- kappa>0 main median sharpe > 0: `PASS`
+- check2 min positive seeds >= 6: `PASS`
+- kappa0 median delta floor >= -0.005: `PASS`
+
+#### 3-2) 핵심 수치
+- `kappa=0.0005`
+  - positive delta_sharpe seeds: `10/10`
+  - mean delta_sharpe: `+0.0226297153`
+  - median delta_sharpe: `+0.0177491910`
+  - min delta_sharpe: `+0.0050817432`
+  - max delta_sharpe: `+0.0589334512`
+  - main median sharpe: `1.2170602381`
+  - collapse_rate: `0.0`
+- `kappa=0.001`
+  - positive delta_sharpe seeds: `10/10`
+  - mean delta_sharpe: `+0.0453661840`
+  - median delta_sharpe: `+0.0398320027`
+  - min delta_sharpe: `+0.0283074493`
+  - max delta_sharpe: `+0.0860394243`
+  - main median sharpe: `1.2144193235`
+  - baseline median sharpe: `1.1588142155`
+  - main_minus_base: `+0.0556051080`
+  - negative seeds: `[]`
+  - collapse_rate: `0.0`
+- `kappa=0`
+  - median delta_sharpe: `-0.0041112968`
+  - threshold: `-0.005`
+  - result: `PASS (아주 근소한 여유로 통과)`
+
+### 4) 아주 쉽게 설명하면
+- 이전 후보들은 `100k`로 길게 학습시키면, execution-aware 효과가 거의 사라졌다.
+- 이번 최종 후보는 `100k`에서도 그 효과가 유지됐다.
+- 그리고 `10개 seed 전부`에서 baseline보다 더 좋은 결과가 나왔다.
+- 즉, 이번 후보는 `우연히 한두 seed만 좋았던 것`이 아니라, 현재 기준에서는 `일관되게 더 나은 쪽`으로 확인됐다.
+
+### 5) 실무적 해석
+- 지금 최종 채택 후보는 `mid_plasticity_multiplier=0.70`, `cvar_penalty_gamma=0.3`, `learning_rate=1e-4` 조합이다.
+- 해석상으로는 `100k 장기 학습에서 execution-aware 성질이 죽지 않도록 학습률을 낮추고, 중간 강도의 plasticity 억제 + 약한 CVaR 패널티를 준 조합`이 가장 안정적으로 보였다.
+- 현 시점 기준으로는 이 후보를 `official incumbent replacement candidate`로 보는 것이 타당하다.
