@@ -1,0 +1,1346 @@
+이 논문은 문제의식은 좋고, 핵심 아이디어도 분명하다.
+특히 target portfolio와 executed portfolio를 분리하고, 비용은 executed turnover로 계산해야 한다는 중심 메시지는 꽤 선명하다. 또 수식 정의도 비교적 정리돼 있고, 실험도 최소한의 일관성은 있다. 다만 현재 초고는 “좋은 아이디어를 가진 기술 노트/워크숍 초안” 느낌이 강하고, 아직은 강한 empirical paper로 설득하기엔 부족하다. 이유는 간단하다. 지금 결과는 “새로운 RL 방법이 정말 더 낫다”를 보여주기보다, 고정된 policy 위에 execution smoothing arm을 얹었을 때 turnover와 cost가 줄어드는 구조적 효과를 보여주는 데 더 가깝기 때문이다. 그런데 원고의 초록, 도입, 결론은 그보다 약간 더 큰 주장을 하고 있다. 이 간극을 줄여야 한다.
+
+1. 가장 큰 문제부터: 이 논문이 지금 어디까지 입증했는가
+
+현재 논문이 실제로 강하게 입증한 것은 대체로 이 정도다.
+
+입증된 것
+
+execution rule 
+𝑤
+𝑡
+𝑒
+𝑥
+𝑒
+𝑐
+=
+(
+1
+−
+𝜂
+𝑡
+)
+𝑤
+𝑡
+−
+1
+𝑒
+𝑥
+𝑒
+𝑐
++
+𝜂
+𝑡
+𝑤
+𝑡
+𝑡
+𝑔
+𝑡
+w
+t
+exec
+	
+
+=(1−η
+t
+	
+
+)w
+t−1
+exec
+	
+
++η
+t
+	
+
+w
+t
+tgt
+	
+
+ 아래에서
+𝜂
+η를 줄이면 executed turnover가 줄고
+transaction cost가 있을 때는 net Sharpe가 좋아질 수 있으며
+target-based cost accounting은 잘못될 수 있다.
+
+반면 현재 버전이 아직 강하게 입증하지 못한 것은 이거다.
+
+execution-aware training이 실제로 학습 자체를 더 좋게 만든다
+제안 방법이 외부 baseline 대비 우월하다
+κ=0에서도 regularization 효과가 robust하다
+η=0.082가 principled하게 선택된 값이다
+misalignment diagnostic이 실제로 meaningful하다
+
+즉, 지금은 “framework paper”처럼 쓰여 있는데, 실험은 사실상 frozen-policy execution study다. 이게 현재 가장 큰 구조적 약점이다.
+
+2. 제목과 초록
+2-1. 제목은 괜찮지만, 부제가 살짝 과장돼 보인다
+
+제목 자체는 나쁘지 않다.
+다만 **“Correct Cost Alignment and Implicit Regularization”**는 지금 증거 강도를 생각하면 조금 세다. cost alignment는 맞다. 하지만 implicit regularization은 아직 강한 증거보다는 가능성과 약한 실험적 징후 수준이다. 특히 κ=0 결과가 아주 강하지 않기 때문이다.
+
+더 보수적으로 가려면 부제를 약간 낮추는 게 좋다. 예를 들면:
+
+... for Cost-Aligned Evaluation and Execution Stabilization
+... for Cost-Aligned Portfolio Control
+... Separating Target and Executed Portfolios under Transaction Costs
+2-2. 초록은 지금 “잘 쓴 초록”이 아니라 “강하게 말한 초록”
+
+초록의 문제는 세 가지다.
+
+첫째, 정말 입증한 것보다 한 단계 크게 말한다.
+초록은 “execution-as-regularization—even at κ=0, execution attenuates over-reactive target updates and can improve risk-adjusted outcomes”라고 말한다. 그런데 실제 κ=0 결과는 η=0.082에서 paired median ΔSharpe +0.0008, win-rate 0.60이고, η=0.02에서는 오히려 -0.0002다. 이건 “regularization 효과가 강하게 입증됐다”가 아니라, 약한 stabilization evidence 정도다.
+
+둘째, η=0.082를 너무 전면에 내세운다.
+초록에서 대표값처럼 말하지만, 표를 보면 κ>0에서 η=0.05, η=0.02도 비슷하거나 더 좋다. 그래서 리뷰어는 바로 “왜 0.082인가?”를 묻는다. 초록에서 0.082를 남기더라도, 본문에 selection rule이 아주 명확해야 한다. 지금은 부족하다.
+
+셋째, 결과 해석이 너무 깨끗하다.
+“both with 100% seed win-rates”는 눈에 확 들어오지만, 오히려 너무 매끈해서 seed 수가 적거나 분산 정보가 숨겨진 느낌을 줄 수 있다. 이건 초록에서 강조할수록 검정 통계가 없으면 약점이 된다.
+
+초록 수정 방향
+
+초록은 이렇게 톤을 낮추는 게 좋다.
+
+cost alignment는 강하게 유지
+κ>0에서 improvement는 main empirical finding으로 유지
+κ=0은 “stabilization-consistent evidence” 정도로 낮추기
+η=0.082는 “validation-selected operating point”로만 쓰기
+100% win-rate는 p-value, sign test, CI 없이 너무 전면에 두지 않기
+3. Introduction
+
+도입은 아이디어를 설명하는 데는 성공했다.
+특히 “이건 그냥 smoothing이 아니다”라는 포인트는 좋다. target turnover로 비용을 계산하면 
+1
+/
+𝜂
+𝑡
+1/η
+t
+	
+
+ 만큼 왜곡된다는 Proposition 5와 잘 연결된다.
+
+그런데 도입에도 문제가 있다.
+
+3-1. contribution framing이 실험보다 크다
+
+도입에서는 사실상 다음을 주장한다.
+
+two-stage decomposition
+proximal execution control
+theory
+protocolized empirical study
+
+여기서 empirical study는 맞는데, 지금 형태는 execution effect isolation study다.
+즉 “execution-aware RL”이라고 쓰지만 실제로는 “execution-aware evaluation/control study on a frozen RL policy”에 더 가깝다. 이 차이를 도입에서 정직하게 밝혀야 한다. 안 그러면 뒤에서 실험 볼 때 약해 보인다.
+
+3-2. “왜 중요한가”가 finance-specific하게 더 강해져야 한다
+
+지금 도입은 일반 RL 문제처럼 들린다. 하지만 finance 리뷰어가 듣고 싶은 건 이런 말이다.
+
+체결은 즉시/완전하게 이루어지지 않는다
+rebalancing aggressiveness는 실제 holding path를 바꾼다
+cost는 executed trades에 붙어야지 target desire에 붙는 게 아니다
+그래서 target와 executed를 분리하지 않으면 accounting 자체가 틀어진다
+
+지금도 그 말은 있지만, 금융 맥락에서의 실질적 의미가 조금 더 살아나야 한다.
+예를 들면 “this is not merely a control smoother but a change in the realized self-financing path” 같은 톤이 더 좋다.
+
+3-3. related work로 넘어가는 bridge가 약하다
+
+도입 끝에서 related work의 공백을 더 강하게 보여줘야 한다.
+지금은 “many RL papers conflate action and execution” 정도인데, 이걸 좀 더 구조적으로 써야 한다.
+
+예:
+
+turnover penalty literature는 많다
+transaction-cost-aware RL도 있다
+하지만 대부분 action=holding assumption 위에 페널티를 주는 식이다
+본 논문은 holding formation 자체를 명시적 state transition으로 둔다
+
+이 차이를 더 명료하게 써야 novelty가 선다.
+
+4. Related Work
+
+여기는 솔직히 지금 상태로는 가장 약한 섹션 중 하나다.
+
+논문에는 related work에 사실상 메모가 남아 있고, 참고문헌도 Markowitz, Merton, Moody & Saffell 세 개뿐이다. 이건 제출 단계 기준으로는 너무 부족하다. 초고 메모인 “Keep concise; emphasize the gap”도 그대로 남아 있다.
+
+왜 심각하냐
+
+리뷰어 입장에서 related work가 얇으면 두 가지 생각을 한다.
+
+저자가 문헌을 충분히 안 봤다
+novelty positioning을 정확히 못 하고 있다
+
+지금 논문은 오히려 아이디어가 괜찮은데 관련연구가 얇아서 기존 논문을 모르고 쓴 것처럼 보일 위험이 크다.
+
+반드시 보강해야 할 관련연구 축
+
+최소한 네 갈래는 있어야 한다.
+
+Portfolio RL / direct weight control
+Transaction-cost-aware portfolio optimization
+Execution / partial rebalancing / no-trade region / trading frictions
+Regularization / action smoothing / control filtering in RL
+
+지금은 3번, 4번 축이 거의 없다.
+네 논문의 핵심은 바로 거기 있는데, 그 축이 비어 있으면 제안의 위치가 흐려진다.
+
+관련연구에서 해야 할 핵심 문장
+
+이 문장 구조를 추천한다.
+
+prior work penalizes turnover at the action level
+our point is that under partial execution, action-level turnover and realized turnover are different objects
+therefore, execution must be part of the dynamics, not only part of the penalty
+
+이게 related work의 중심이어야 한다.
+
+5. Problem Setup / Method
+
+여기는 수식적으로는 꽤 잘 돼 있다.
+특히 (1)~(6) 정의가 명확하고, core vs diagnostic 구분도 좋다. 이것 자체는 논문의 큰 장점이다.
+
+5-1. 가장 좋은 점
+𝑤
+𝑡
+𝑔
+𝑡
+w
+tgt
+, 
+𝑤
+𝑒
+𝑥
+𝑒
+𝑐
+w
+exec
+ 분리 명확
+cost는 
+𝑇
+𝑂
+𝑒
+𝑥
+𝑒
+𝑐
+TO
+exec
+에 부과
+𝑅
+𝑡
++
+1
+R
+t+1
+	
+
+ 정의가 깔끔
+core metric과 diagnostic 분리 좋음
+
+이건 계속 유지해도 된다.
+
+5-2. 가장 큰 구조적 문제
+
+4.1에서 “The agent learns parameters θ to optimize expected return under the executed dynamics (6)”라고 썼다. 그런데 실험 섹션에서는 “trained once and reused across all execution arms”라고 한다. 즉, 실제 실험은 executed dynamics 아래 다시 학습한 게 아니라, 하나의 trained policy를 execution arms별로 재평가한 것이다.
+
+이건 그냥 작은 표현 문제가 아니다.
+method가 제시하는 세계와 experiment가 검증하는 세계가 다르다.
+
+고쳐야 하는 방법
+
+둘 중 하나를 택해야 한다.
+
+논문의 scope를 줄인다
+“본 논문은 execution-aware formulation을 제시하고, 먼저 frozen-policy protocol에서 execution effect를 분리해 분석한다.”
+이게 현재 데이터와 가장 정합적이다.
+실험을 추가한다
+wrong-cost training vs correct-cost training
+immediate-exec training vs execution-aware training
+같은 policy class, 같은 data split, 같은 seeds로 비교
+
+두 번째가 들어가면 논문이 훨씬 세진다.
+하지만 지금 당장 원고 정합성만 맞추려면 첫 번째가 우선이다.
+
+5-3. 4.2의 rule-based timescale은 지금 빼는 게 맞다
+
+4.2에 clip(f(σ_t); ηmin, ηmax) ... (fill in rule details later)가 들어가 있다. 이건 초고 흔적이라 반드시 지워야 한다. 게다가 7.3에서 adaptive는 이번 버전에서 intentionally left out이라고 쓴다. 그러면 4.2에서 rule-based를 굳이 method 본문에 열어둘 이유가 거의 없다.
+
+내 의견은 이렇다.
+
+이번 버전 main paper에서는 fixed η만 남겨라
+adaptive는 appendix/future work로 빼라
+
+지금은 adaptive가 본문에 들어와 있을수록 “안 한 걸 해놓은 듯 적은” 인상을 준다.
+
+6. Theory
+
+여기는 깔끔하지만, 기여도를 너무 크게 잡으면 손해 본다.
+
+6-1. 좋은 점
+
+Proposition 1, 5는 메시지상 유용하다.
+
+Prop 1: proximal interpretation
+Prop 5: target turnover로 cost를 계산하면 misalignment 생김
+
+이 둘은 실제 논문의 중심과 잘 맞는다.
+
+6-2. 아쉬운 점
+
+Prop 2, 3, 4는 사실상 execution update를 쓰면 거의 바로 따라오는 성질이다.
+틀린 건 아니지만, 이것만으로 “theoretical contribution”을 강하게 내세우면 리뷰어는 “too straightforward”라고 느낄 수 있다.
+
+6-3. theory를 더 강하게 보이게 하려면
+
+가장 좋은 건 Proposition 5를 학습 signal distortion까지 연결하는 것이다.
+
+즉,
+
+잘못된 cost accounting은 reward를 틀리게 만들고
+그게 gradient / critic target / policy update를 왜곡하며
+그래서 evaluation bias가 아니라 training bias도 만든다
+
+이걸 formal하게 못 하더라도 remark나 proposition 수준으로 연결하면 theory 파트가 훨씬 살아난다.
+
+6-4. 지금 상태에서 표현을 바꾸는 게 좋다
+
+“theoretical properties”보다
+
+“useful properties”
+“accounting implications”
+“basic properties of the execution mapping”
+
+같이 톤을 조금 낮추는 게 더 낫다.
+
+7. Experimental Setup
+
+여기는 논문 설득력을 결정하는 핵심인데, 지금 가장 취약한 구간이다.
+
+7-1. 데이터와 split은 명확하나, 외적 타당성이 약하다
+
+Dow30, yfinance adjusted close, train 2010–2021 / val 2022–2023 / test 2024–2025라고 되어 있다. split을 명시한 건 좋다.
+
+하지만 리뷰어는 바로 이런 질문을 한다.
+
+Dow30 “universe”가 historical constituent인지 current constituent인지?
+survivorship bias는 없는지?
+adjusted close 기준이면 실제 rebalance timing과 어떻게 맞는지?
+딱 한 개 recent test window에서만 robust한지?
+
+지금은 여기에 대한 방어가 거의 없다.
+적어도 Appendix에라도:
+
+constituent treatment
+delisting/changes 처리
+execution timing convention
+close-to-close인지 next-open approximation인지
+cash 미포함의 이유
+이런 걸 써야 한다.
+7-2. baseline이 사실상 없다
+
+6.4 제목은 “Baselines (must be strong and explicit)”인데 실제 baseline은 immediate execution arm 하나다. 즉 외부 baseline이 없다.
+
+이건 정말 큰 약점이다.
+
+리뷰어 질문:
+
+equal weight보다 낫나?
+daily rebalanced EW보다 낫나?
+inverse-vol / risk parity보다 낫나?
+그냥 buy-and-hold보다 낫나?
+
+현재 원고는 이걸 답하지 못한다.
+
+최소한 넣어야 할 baseline
+Buy-and-hold equal weight
+Daily rebalanced equal weight
+Inverse-vol / risk parity
+가능하면 mean-variance style heuristic 1개
+
+네 논문의 메시지가 execution-aware accounting이라 해도, 외부 baseline이 없으면 empirical paper의 체급이 확 내려간다.
+
+7-3. “model selection uses only validation window”는 좋지만, 실제 selection rule이 없다
+
+문제는 이 문장이다.
+validation only라고 써놨지만, η=0.082를 어떤 기준으로 선택했는지 원고 어디에도 구체적 규칙이 없다.
+
+이건 반드시 써야 한다.
+
+예:
+
+choose largest Sharpe gain subject to tracking error < threshold
+choose elbow point on validation frontier
+choose smallest η within 95% of best validation Sharpe
+choose η maximizing validation objective 
+𝑆
+ℎ
+𝑎
+𝑟
+𝑝
+𝑒
+−
+𝜆
+⋅
+𝑇
+𝑟
+𝑎
+𝑐
+𝑘
+𝑖
+𝑛
+𝑔
+Sharpe−λ⋅Tracking
+
+이런 selection rule이 있어야 post-hoc selection 의심을 피한다.
+
+7-4. paired seeds protocol은 좋지만 보고가 부족하다
+
+6.6에서 “Median [IQR] across seeds”라고 적었는데, 실제 표는 IQR이 없다. 이건 문장과 표가 안 맞는다.
+
+즉 지금은
+
+methodology는 통계적으로 엄밀해 보이는데
+results는 median point estimate만 있다
+
+여기서 설득력이 빠진다.
+
+반드시 추가해야 할 것
+IQR 또는 std
+paired sign test / Wilcoxon
+bootstrap confidence interval
+seed-wise scatter figure
+8. Results 전체 평가
+
+여기가 가장 중요하다. 아주 냉정하게 말하면, **지금 결과는 “좋아 보이지만 아직 덜 설득적”**이다.
+
+8-1. Table 1은 예쁘지만 너무 예쁘다
+
+표 1은 η가 감소할수록 turnover가 줄고, κ>0일수록 Sharpe가 개선되는 예쁜 frontier를 보여준다. 수치 자체도 매끈하다. 예를 들어 κ=0.001에서 η=1.0의 Sharpe 1.1121이 η=0.082에서 1.1555, η=0.02에서 1.1571로 올라가고, turnover는 0.02173에서 0.00221, 0.00059로 줄어든다.
+
+문제는 이 패턴이 너무 구조적으로 당연해 보인다는 것이다.
+
+왜냐하면 논문이 스스로 Prop 2에서 
+𝑇
+𝑂
+𝑡
+𝑒
+𝑥
+𝑒
+𝑐
+=
+𝜂
+𝑡
+𝑇
+𝑂
+𝑡
+𝑡
+𝑔
+𝑡
+TO
+t
+exec
+	
+
+=η
+t
+	
+
+TO
+t
+tgt
+	
+
+를 보여주기 때문이다. 즉 η를 줄이면 turnover와 cost가 줄어드는 건 어느 정도 내장되어 있다. 그러면 리뷰어는 묻는다.
+
+“좋다. 그런데 이건 새로운 finance insight인가, 아니면 partial rebalancing의 기계적 결과인가?”
+
+이 질문에 답하려면 추가 실험이 필요하다.
+
+wrong-cost accounting 비교
+execution-aware retraining 비교
+external baseline 비교
+gross return vs net return decomposition
+variance decomposition
+
+지금 Table 1만으로는 “mechanically consistent”는 보여주지만 “scientifically deep”까지는 못 간다.
+
+8-2. Table 2는 가장 중요한 표인데, 아직 덜 다듬어졌다
+
+Table 2는 immediate-execution baseline 대비 paired ΔSharpe, ΔCAGR, ΔTOexec, win-rate를 보여준다. 이건 방향 자체는 아주 좋다. 특히 pairwise comparison은 네 논문이 강조하는 reproducibility와 잘 맞는다.
+
+그런데 문제는 세 가지다.
+
+(1) 분산 정보가 없다
+
+median만 있고 IQR이나 CI가 없다.
+그래서 0.0176이 robust하게 큰 건지, 0.0347이 얼마나 stable한지 바로 판단하기 어렵다.
+
+(2) win-rate 1.00은 강조할수록 검정이 필요하다
+
+κ=5e-4, 1e-3에서 전부 1.00인 건 인상적이지만, 10 seeds라는 작은 샘플에서는 더더욱 p-value나 sign test를 같이 줘야 한다. 안 그러면 “좋아 보이는 수치만 실었다”는 인상을 줄 수 있다.
+
+(3) η=0.082의 대표성 문제가 남는다
+
+예를 들어 κ=0.0005에서는 η=0.050이 ΔSharpe +0.0183으로 η=0.082의 +0.0176보다 약간 높다. κ=0.001에서도 η=0.020이 가장 높다. 그런데 결론에서는 계속 η=0.082를 대표값으로 쓴다. 이건 selection rule이 없으면 설득력이 떨어진다.
+
+8-3. κ=0 결과 해석은 현재 너무 강하다
+
+논문은 κ=0에서도 stabilization / regularization을 말한다.
+그런데 실제 수치는:
+
+η=0.082: ΔSharpe +0.0008, win-rate 0.60
+η=0.020: ΔSharpe -0.0002, win-rate 0.50
+
+이건 솔직히 “strong evidence”가 아니다.
+정확한 표현은 이 정도다.
+
+κ=0에서는 execution이 turnover를 크게 줄인다
+risk-adjusted performance는 거의 비슷하거나 약간 개선될 수 있다
+너무 작은 η는 anchoring으로 오히려 해칠 수 있다
+
+즉 “regularization exists”보다 “regularization-consistent pattern” 정도가 맞다.
+
+8-4. Table 3은 현재 사실상 실패한 diagnostic이다
+
+Table 3에서 Δmis가 전부 0.00000으로 나온다. 그런데 Figure 1에서는 executed equity와 target equity가 완전히 같지 않고, turnover는 훨씬 크게 벌어져 있다. 즉 지표가 정보량을 못 담고 있다.
+
+이건 왜 문제냐면, 논문이 “misalignment”를 상당히 중요한 메시지로 미는데 정작 정량지표가 거의 0이다. 그러면 리뷰어는 이렇게 생각한다.
+
+misalignment가 실제로 별거 아닌가?
+아니면 metric이 잘못 설계됐나?
+
+둘 중 어느 쪽이어도 현재 table은 손해다.
+
+Δmis 대체 추천
+
+반드시 아래 중 몇 개로 바꿔라.
+
+mean absolute return gap
+median absolute return gap
+cumulative equity gap at test end
+std of return gap
+worst-day gap / 95th percentile gap
+correlation between target and executed returns
+pathwise TE of weights and equity
+
+signed mean은 상쇄가 심해서 안 좋다.
+네 그림과 논리에는 absolute-type metric이 훨씬 맞다.
+
+9. Figure 평가
+9-1. Figure 1은 지금 제출용 그림이 아니다
+
+Figure 1은 현재 raw variable name이 그대로 보인다.
+
+equity_net_lin
+equity_net_lin_target
+turnover_exec
+turnover_target
+
+이건 코드 그림 느낌이 강하다. 논문 그림 같지 않다.
+
+문제점
+어떤 κ, 어떤 η, 어떤 seed인지 안 보인다
+왜 이 run이 representative인지 설명이 없다
+핵심 메시지가 캡션에 안 들어 있다
+상단 equity와 하단 turnover 모두 중요한데, annotation이 없다
+target와 executed gap이 보이긴 하지만, 정량 해석으로 연결되지 않는다
+어떻게 고치면 좋나
+
+이 그림은 차라리 이렇게 바꿔라.
+
+캡션에 (κ=0, η=0.082, representative seed) 명시
+legend 이름을 Executed equity, Hypothetical target equity, Executed turnover, Target turnover로 변경
+특정 spike 구간에 annotation 달기
+오른쪽 끝에 cumulative gap 숫자 표시
+가능하면 Figure 1a: equity, Figure 1b: turnover로 분리
+
+지금 그림은 “있어 보이지만 메시지가 약한 그림”이다.
+
+9-2. Figure 2도 아직 미완성이다
+
+Figure 2는 η frontier를 보여주지만, x축과 y축이 raw metric name이고 error bar가 없고, κ가 어떤 regime인지도 그림만 보면 잘 안 보인다.
+
+왜 약하냐
+
+이 그림은 표 1을 시각화한 것인데, 표보다 더 많은 정보를 주지 못한다.
+
+더 좋은 버전
+κ=0, 5e-4, 1e-3를 각각 다른 색/마커로 한 그림에 넣기
+또는 3-panel figure로 cost regime별 frontier 제시
+각 점에 CI/error bar 넣기
+avg_turnover_exec 대신 Average executed turnover
+sharpe_net_lin 대신 Net Sharpe
+
+그럼 그림이 “코드 출력”이 아니라 “논문용 summary figure”가 된다.
+
+10. Discussion / Conclusion
+10-1. Discussion은 상대적으로 괜찮지만, 여전히 톤이 살짝 세다
+
+“stabilization, not alpha creation” 해석은 괜찮다. 이건 현재 결과와도 잘 맞는다. κ>0에서 execution이 주로 cost 절감과 harmful variance reduction으로 Sharpe를 개선한다는 설명은 자연스럽다.
+
+다만 여기서도 η=0.082를 너무 예쁘게 “compromise point”라고 부르는 건 아직 selection rule이 없어서 약하다. 그 문장은 validation-based rule이 추가되기 전에는 조금 조심하는 게 좋다.
+
+10-2. Limitation은 솔직해서 좋다
+frozen control model
+external heuristics 미비교
+fixed η only
+long-only simplex limitation
+
+이건 좋다. 오히려 이 limitation은 논문 신뢰를 높여준다.
+하지만 limitation이 이렇게 선명하면, conclusion도 그에 맞춰 톤을 조금 낮춰야 한다.
+
+10-3. Conclusion은 지금 약간 과장돼 있다
+
+결론은 execution frontier와 η=0.082 결과를 다시 강조한다. 그런데 현재 결과만 보면 conclusion은 다음처럼 바꾸는 게 더 정직하다.
+
+본 논문은 full end-to-end superiority를 보였다는 것보다
+execution-aware decomposition의 necessity를 보였다
+특히 cost alignment와 turnover-control tradeoff를 정량화했다
+frozen-policy setting에서 execution frontier가 clean하게 나타났다
+broader baselines and end-to-end training remain future work
+
+이렇게 쓰면 reviewer가 덜 공격적으로 읽는다.
+
+11. 문장/작성/레이아웃 차원의 문제
+
+이건 별것 아닌 것 같아도 상당히 중요하다.
+
+11-1. 초고 메모가 너무 많이 남아 있다
+
+원고에는 이런 표현이 남아 있다.
+
+“Keep concise; emphasize the gap”
+“must be strong and explicit”
+“fill in rule details later”
+“Describe the monotone trade-offs expected from theory”
+“Present this as...”
+“Include:”
+“Limitations (state clearly).”
+“optional”
+
+이건 반드시 다 지워야 한다.
+이 흔적만으로도 “manuscript not finished” 인상을 준다.
+
+11-2. Appendix/Checklist가 main body와 섞여 보인다
+
+Figure 1 아래에 limitation, conclusion, reproducibility checklist, implementation notes, references가 너무 몰려 있다. 레이아웃이 답답하고, 논문이 아니라 작업 노트를 압축한 느낌이 난다.
+
+개선
+Reproducibility Checklist는 appendix 뒤로
+Implementation notes는 appendix 또는 repo로
+Figure 1은 discussion 앞이나 results 섹션 근처로 이동
+Conclusion은 figure 아래에 눌리지 않게 독립 공간 확보
+11-3. figure axis / legend / naming 정리 필요
+
+raw metric names는 다 사람 읽는 이름으로 바꿔라.
+이건 작은 수정인데 체감 퀄리티를 많이 올린다.
+
+12. 지금 논문이 가장 설득력 있어지려면 반드시 필요한 추가 실험
+
+우선순위대로 적을게.
+
+1순위
+
+외부 baseline 추가
+
+equal-weight
+daily-rebalanced equal-weight
+inverse-vol / risk parity
+buy-and-hold
+
+이거 없으면 empirical section의 체급이 안 올라간다.
+
+2순위
+
+η=0.082 selection rule 명시 + validation 표
+
+validation frontier 별도 표/그림
+선택 기준 명시
+test에서는 그대로 고정
+
+이거 없으면 0.082는 계속 취약점이다.
+
+3순위
+
+misalignment metric 재설계
+
+signed mean gap 폐기
+absolute / pathwise / cumulative gap 도입
+
+이건 지금 Table 3을 살리기 위한 필수 수정이다.
+
+4순위
+
+통계 보고 보강
+
+IQR
+bootstrap CI
+sign test / Wilcoxon
+seed-wise scatter
+
+특히 100% win-rate를 쓸 거면 꼭 필요하다.
+
+5순위
+
+training-time alignment 실험
+이게 들어가면 논문 체급이 확 올라간다.
+예:
+
+target-cost training vs exec-cost training
+immediate-exec training vs execution-aware training
+
+그러면 Proposition 5가 단순 accounting note가 아니라 학습 편향과 직접 연결된다.
+
+13. 내가 보기엔 문장 톤을 이렇게 바꾸는 게 좋다
+지금 너무 센 주장
+“acts as implicit regularization”
+“can improve risk-adjusted outcomes”
+“selected fixed setting η = 0.082”
+“must be strong and explicit”
+“clean execution frontier”
+바꾸면 좋은 표현
+“provides a stabilization effect consistent with regularization”
+“can improve net risk-adjusted performance primarily when costs are non-zero”
+“we focus on η = 0.082 as a validation-selected operating point”
+“in the present frozen-policy protocol”
+“we observe a monotone turnover-performance frontier”
+
+이렇게 바꾸면 논문이 더 정직하고, 오히려 더 강해 보인다.
+
+14. 냉정한 최종 판정
+
+정말 냉정하게 한 줄로 말하면:
+
+지금 초고는 “execution-aware portfolio RL의 중요한 문제를 정확히 짚은 좋은 초안”이지만, 아직은 “강한 논문”이 되기 위한 핵심 증거가 덜 들어가 있다.
+
+좋은 점은 분명하다.
+
+문제 설정이 좋다
+수식 정의가 깔끔하다
+core vs diagnostic 구분이 좋다
+κ>0에서 execution frontier는 꽤 설득력 있다
+
+하지만 아직 큰 약점도 분명하다.
+
+외부 baseline 부재
+frozen-policy study와 framework claim의 불일치
+η=0.082 선택 근거 부족
+misalignment metric 실패
+κ=0 regularization claim 약함
+related work 부족
+초고 메모 잔존
+
+
+1단계. 논문 스코프를 먼저 “정직하게” 고정하기
+목표
+
+이 논문이 무엇을 실제로 증명하는 논문인지를 먼저 확정하는 단계다.
+이걸 먼저 안 하면 뒤에서 초록, 실험, 결론을 아무리 고쳐도 다 다시 흔들린다.
+
+왜 1단계인가
+
+지금 원고는 방법 섹션에서는 마치 execution-aware learning framework 전체를 제안하는 것처럼 읽히지만, 실험은 실제로는 trained once and reused across all execution arms인 frozen-control protocol이다. 또 6.4 baseline도 외부 baseline이 아니라 사실상 η=1.0 immediate execution arm뿐이다. 이 불일치를 먼저 정리해야 한다.
+
+구체 작업
+
+다음 중 하나로 스코프를 확정해라.
+
+선택지 A. 이번 버전은 “frozen-policy execution study”로 명확히 고정
+
+가장 현실적이고 안전하다.
+
+논문의 main claim을
+“execution-aware formulation + fixed-η execution frontier + cost alignment necessity”
+로 제한한다.
+“execution-aware RL learns better” 같은 주장은 빼거나 future work로 내린다.
+method 4.1의 “The agent learns … under the executed dynamics”는 그대로 두되, 실험 설명에서
+“In the present paper, to isolate execution effects, we evaluate a frozen trained policy under multiple execution arms.”
+를 분명히 써야 한다.
+선택지 B. 진짜 framework paper로 밀기
+
+이 경우에는 반드시 추가 실험이 필요하다.
+
+wrong-cost training vs correct-cost training
+immediate-exec training vs execution-aware training
+training-time alignment effect
+
+지금 당장 투고용 안정성 기준으로는 A가 우선이다.
+
+이 단계에서 실제로 수정할 문장
+제목/초록/도입/결론에서 “framework superiority”처럼 읽히는 표현을 전부 점검
+“present paper isolates execution effects under one frozen control model”이라는 limitation 문장을 limitation에만 두지 말고, 도입 말미나 실험 setup 초반으로 끌어올리기
+산출물
+한 줄짜리 논문 정의
+한 문단짜리 scope statement
+main claim 3개 / non-claim 3개
+완료 기준
+
+다음 질문에 한 문장으로 답할 수 있으면 완료다.
+
+“이 논문은 execution-aware training을 입증하나?” → 아직 아니다.
+“이 논문은 무엇을 입증하나?” → target/exec 분리, correct cost accounting, fixed-η execution frontier.
+주의점
+
+이 단계에서 욕심내서 claim을 크게 잡으면, 뒤 단계 전부가 불안정해진다.
+
+2단계. 초고 메모 흔적과 구조적 잡음을 전부 제거하기
+목표
+
+원고를 “작업 메모”에서 “논문 초고” 상태로 올리는 단계다.
+
+왜 지금 해야 하나
+
+현재 원고에는 이런 표현들이 그대로 남아 있다.
+
+“Keep concise; emphasize the gap”
+“fill in rule details later”
+“must be strong and explicit”
+“Describe the monotone trade-offs expected from theory”
+“Include:”
+“optional”
+“Limitations (state clearly)”
+
+이건 리뷰어가 보면 내용보다 먼저 “아직 manuscript freeze가 안 됐다”는 인상을 받는다.
+
+구체 작업
+
+다음 항목을 싹 지워라.
+
+삭제 대상
+메타 주석
+TODO 문장
+자기 지시 문구
+옵션성 설명
+“must be strong and explicit”류의 내부 작성 지침
+즉시 수정 대상
+4.2 rule-based timescale의 “fill in rule details later” 삭제
+A Reproducibility Checklist, B Implementation Notes는 main body 뒤쪽 별도 appendix로 완전히 분리
+limitation bullet이 Figure 1 밑에 섞여 있는 배치를 정리
+산출물
+메모 문구 0개인 clean tex draft
+appendix 분리된 구조
+완료 기준
+
+PDF를 처음부터 끝까지 읽었을 때 “초고용 지시문”이 한 줄도 안 보여야 한다.
+
+주의점
+
+이 단계는 사소해 보이지만 실제 인상 개선 효과가 크다.
+논문 퀄리티가 갑자기 좋아 보이는 가장 쉬운 단계다.
+
+3단계. 초록과 도입의 주장 강도를 실험 수준에 맞게 재정렬하기
+목표
+
+초록과 Introduction의 톤을 현재 증거 강도에 맞춘다.
+
+왜 이 단계가 중요하냐
+
+현재 초록은
+
+“implicit regularization”
+“can improve risk-adjusted outcomes”
+η=0.082 대표 강조
+100% seed win-rate 강조
+를 꽤 강하게 내세운다. 그런데 실제 실험은 frozen-control이고, κ=0에서는 개선이 아주 약하며, η=0.082의 선택 규칙도 본문에 명확히 없다.
+구체 작업
+초록에서 고칠 것
+첫 문장 유지
+action과 execution의 conflation 문제 제기는 좋다.
+regularization claim 낮추기
+현재: “can improve risk-adjusted outcomes”
+수정: “can provide a stabilization effect consistent with regularization, especially in weak-signal regimes”
+이유: κ=0 결과가 강하지 않다. 표 2에서 η=0.082는 +0.0008, η=0.020은 -0.0002다.
+η=0.082를 대표값처럼 쓰지 말고 validation-selected operating point로 낮추기
+지금은 selected setting이라고만 쓰여 있고 selection rule이 없다.
+100% win-rate는 통계 보강 전까지 과도하게 밀지 않기
+초록에 남기더라도 “paired 10-seed study”로 수위를 낮추는 편이 안전하다.
+도입에서 고칠 것
+“왜 이게 smoothing이 아닌가”는 유지
+하지만 contribution 4번의 empirical claim은 조금 줄이기
+related work의 빈약함을 메우기 위한 bridge 추가
+도입 마지막에 현재 버전은 frozen-control study임을 1문장 명시
+산출물
+초록 revised v1
+introduction revised v1
+contribution bullets revised v1
+완료 기준
+
+초록만 읽어도 “이 논문이 실제로 한 것”과 “아직 안 한 것”이 분리되어 보여야 한다.
+
+주의점
+
+초록은 강하게 쓰고 싶어도, 지금은 정직한 초록이 더 강한 초록이다.
+
+4단계. 방법론 섹션을 “현재 실험과 완전히 정합적”으로 다시 쓰기
+목표
+
+Method 섹션과 Experimental Setup이 서로 정확히 맞물리게 만든다.
+
+왜 필요한가
+
+현재 4.1은 agent가 executed dynamics 아래 학습하는 것처럼 쓰였고, 4.2는 rule-based η까지 열어두었지만, 실제 실험은 같은 trained policy를 fixed η arms에 재사용하며 adaptive schedule은 intentionally left out이다. 즉 method와 experiment가 어긋난다.
+
+구체 작업
+4.1 Two-stage control
+
+다음 구조로 바꿔라.
+
+formulation 자체는 일반적 execution-aware RL로 제시
+그러나 본 논문의 empirical protocol은 execution effect isolation을 위해 frozen policy를 쓴다고 명시
+
+문장 예시 구조:
+
+“The formulation supports learning under executed dynamics.”
+“In the present paper, however, we deliberately isolate execution effects by evaluating a fixed trained policy under multiple execution controllers.”
+4.2 Execution modes
+
+둘 중 하나 선택.
+
+권장안
+
+이번 버전에서는 fixed η만 main text에 남긴다.
+
+rule-based η 문단 삭제
+adaptive는 appendix or future work
+차선안
+
+rule-based를 언급하되, “not evaluated in the present version”이라고 명확히 분리
+
+placeholder 문구는 반드시 제거
+4.3 Cost alignment
+
+이 섹션은 살려라.
+여기가 논문의 핵심이다.
+
+target turnover cost charging이 bias를 만든다는 점 유지
+Prop 5와 연결 강화
+산출물
+Method v2
+“formulation vs empirical protocol” 구분 문단
+완료 기준
+
+리뷰어가 4장 읽고 6장 갔을 때 “어? 실제로는 딴 얘기 했네?”라는 느낌이 없어야 한다.
+
+주의점
+
+여기서 모호하게 쓰면 나중에 “claim inflation”으로 보인다.
+
+5단계. 실험 설계를 보강해서 η=0.082와 baseline 취약점을 해소하기
+목표
+
+현재 실험의 가장 큰 약점 두 개,
+
+η=0.082 selection rule 부재
+외부 baseline 부재
+를 해결한다.
+왜 이 단계가 핵심인가
+
+지금 실험 섹션은 baseline 제목은 강하지만 실제 baseline은 η=1.0뿐이고, η=0.082는 대표값처럼 계속 나오는데 왜 선택됐는지 명확하지 않다. 이 두 개는 리뷰어가 가장 먼저 물을 부분이다.
+
+구체 작업
+5-1. η=0.082 selection rule 명문화
+
+반드시 선택 규칙을 써라.
+
+추천 가능한 규칙:
+
+validation Sharpe 최대값과 충분히 가까운 η 중에서 tracking이 과도하지 않은 가장 큰 η
+validation frontier에서 elbow point
+validation objective
+
+𝐽
+(
+𝜂
+)
+=
+𝑆
+ℎ
+𝑎
+𝑟
+𝑝
+𝑒
+𝑣
+𝑎
+𝑙
+−
+𝜆
+⋅
+𝑇
+𝑟
+𝑎
+𝑐
+𝑘
+𝑖
+𝑛
+𝑔
+𝑣
+𝑎
+𝑙
+J(η)=Sharpe
+val
+	
+
+−λ⋅Tracking
+val
+	
+
+
+가장 좋은 방식은:
+
+validation 표 하나 추가
+selection criterion 명시
+test에서는 고정
+5-2. 외부 baseline 추가
+
+최소한 아래 4개는 넣는 게 좋다.
+
+buy-and-hold equal weight
+daily rebalanced equal weight
+inverse-vol risk parity
+equal weight
+
+네 diagnostic outputs 쪽 흐름상 이미 이런 베이스라인을 계산할 수 있는 구조가 있는 것 같으니, 이걸 main paper table로 가져오는 게 가장 좋다.
+
+5-3. Baselines 섹션 제목과 본문 수정
+
+현재 6.4는 “Baselines (must be strong and explicit)”인데 본문 내용은 execution arms 설명이다. 이건 제목-내용 불일치다.
+
+수정 방향:
+
+6.4 Execution Arms
+6.5 External Baselines
+또는
+6.4 Empirical Comparators
+산출물
+validation selection table
+external baseline result table
+baseline 정의 문단
+완료 기준
+
+다음 질문에 즉시 답할 수 있어야 한다.
+
+왜 η=0.082인가?
+immediate execution 말고 뭐랑 비교했나?
+EW보다도 좋은가?
+주의점
+
+η=0.082가 꼭 최적값이 아니라면, 그걸 억지로 대표값으로 밀지 말고 operating point라고 표현하는 게 낫다.
+
+6단계. 통계 보고 방식을 논문 수준으로 올리기
+목표
+
+현재 median point estimate 중심 결과를 분산/검정 포함 결과로 바꾸는 단계다.
+
+왜 필요한가
+
+6.6에서는 “Median [IQR] across seeds”라고 되어 있는데 실제 표는 IQR이 없고, Table 2는 100% win-rate를 보여주지만 통계 검정이 없다. 이건 보고 체계가 불완전하다는 신호다.
+
+구체 작업
+6-1. 각 표에 dispersion 추가
+
+필수 중 하나:
+
+median [IQR]
+mean ± std
+bootstrap CI
+
+추천:
+
+main table: median [IQR]
+appendix: mean ± std
+6-2. paired test 추가
+
+Table 2용으로:
+
+sign test
+Wilcoxon signed-rank
+bootstrap CI of paired ΔSharpe
+6-3. seed-wise scatter plot 추가
+
+특히 κ=5e-4, 1e-3에서 η별 ΔSharpe scatter를 넣어라.
+이유:
+
+100% win-rate를 시각적으로 설득 가능
+“숫자만 예쁘다”는 인상을 줄임
+6-4. n=10의 한계도 명시
+
+10 seeds면 나쁜 건 아니지만 아주 큰 건 아니다.
+그래서
+
+paired protocol의 장점
+limited seed count
+둘 다 정직하게 쓰는 편이 좋다.
+산출물
+Table 1 revised with IQR
+Table 2 revised with IQR / p-value / CI
+seed-wise scatter figure
+완료 기준
+
+결과표를 봤을 때 “중앙값 하나만 예쁘게 뽑았다”는 느낌이 없어야 한다.
+
+주의점
+
+통계가 약하면 숫자를 숨기지 말고, 그에 맞게 해석 톤을 낮춰라.
+
+7단계. Table 3와 misalignment diagnostic을 전면 재설계하기
+목표
+
+현재 사실상 정보가 죽어 있는 misalignment 표를 살리는 단계다.
+
+왜 필요한가
+
+현재 Table 3에서
+
+η=1.0, 0.082, 0.020 모두 Δmis = 0.00000
+인데,
+동시에 figure에서는 executed equity와 target equity가 완전히 같지 않고 turnover는 크게 벌어진다. 즉 지표가 실제 차이를 못 잡고 있다.
+구체 작업
+7-1. 현재 Δmis 정의 폐기 또는 보조지표로 내리기
+
+현재 정의는 signed average return gap이라 상쇄 문제가 크다.
+main diagnostic으로 쓰기엔 부적절하다.
+
+7-2. 대체 지표 도입
+
+추천 우선순위:
+
+mean absolute return gap
+cumulative equity gap at test end
+std of daily return gap
+max absolute gap / 95th percentile gap
+correlation between target and executed return streams
+weight-path tracking error
+7-3. Table 3 구조 자체 변경
+
+현재:
+
+TOexec
+TOtgt
+Tracking
+Δmis
+
+수정 추천:
+
+TOexec
+TOtgt
+Avg weight tracking error
+Mean |return gap|
+Final equity gap
+Max daily gap
+7-4. Figure 1과 정합성 맞추기
+
+Figure 1이 pathwise divergence를 보여주면,
+Table 3은 그 divergence를 요약한 숫자를 보여줘야 한다.
+
+산출물
+new misalignment definition
+revised Table 3
+diagnostic paragraph rewrite
+완료 기준
+
+Table 3 숫자만 봐도 “η가 줄수록 target/exec 괴리가 실제로 커진다”가 살아 보여야 한다.
+
+주의점
+
+misalignment는 이 논문의 중심 메시지 중 하나라서, 여기 실패하면 논문 핵심 한 축이 무너진다.
+
+8단계. Figure 1, Figure 2를 “코드 출력”에서 “논문 그림”으로 바꾸기
+목표
+
+현재 raw plot 느낌의 그림을 논문형 figure로 재설계한다.
+
+왜 필요한가
+
+Figure 1은 legend가 equity_net_lin, equity_net_lin_target, turnover_exec, turnover_target처럼 raw 변수명 그대로이고, Figure 2도 avg_turnover_exec, sharpe_net_lin 같은 코드 축 이름을 그대로 쓴다. 또 Figure 2는 κ 하나만 보여주는 것처럼 보이고 error bar도 없다.
+
+구체 작업
+8-1. Figure 1 재설계
+
+현재 그림의 문제:
+
+representative run 기준 없음
+κ, η, seed 미표기
+annotation 없음
+legend가 코드 변수명
+message가 약함
+
+수정 방향:
+
+Figure 1a: Executed vs target equity
+Figure 1b: Executed vs target turnover
+캡션에 (κ=0, η=0.082, representative seed chosen by median Sharpe) 같은 식으로 명시
+legend를 사람 말로 변경
+Executed equity
+Hypothetical target equity
+Executed turnover
+Target turnover
+spike 구간 annotation 추가
+8-2. Figure 2 재설계
+
+추천안:
+
+3개 κ regime를 한 그림에 색으로 구분하거나
+3-panel figure로 나누기
+각 η 점에 error bar 추가
+x축: Average executed turnover
+y축: Net Sharpe
+8-3. 새로 넣으면 좋은 그림
+
+가능하면 아래 2개 중 하나 추가:
+
+seed-wise ΔSharpe scatter
+validation/test frontier 비교 그림
+산출물
+Figure 1 revised
+Figure 2 revised
+optional Figure 3 added
+완료 기준
+
+그림만 봐도 본문 핵심 메시지가 전달되어야 한다.
+“표를 그냥 옮긴 그림”이면 실패다.
+
+주의점
+
+그림은 예쁘기보다 논리 압축 장치여야 한다.
+
+9단계. Related Work와 dataset/protocol 설명을 대폭 보강하기
+목표
+
+“아이디어는 좋은데 문헌/실험 맥락이 빈약하다”는 약점을 없앤다.
+
+왜 필요한가
+
+현재 related work는 사실상 3개 레퍼런스뿐이고, 본문에도 메모 흔적이 남아 있다. 또 데이터 설명은 Dow30 + yfinance + split 정도만 있고, constituent handling, survivorship bias, execution timing convention 등은 충분히 안 써져 있다.
+
+구체 작업
+9-1. Related Work 축 4개 구성
+
+최소한 이 4문단 구조로 가라.
+
+classical portfolio optimization
+portfolio RL with transaction costs / turnover penalties
+execution / trading frictions / partial adjustment
+smoothing / regularization / control filtering 관점
+9-2. novelty positioning 문장
+
+반드시 넣어야 할 핵심:
+
+prior work often penalizes trading at the action level
+this paper distinguishes action-level target changes from realized executed changes
+therefore execution belongs to the state-transition and accounting layer, not only to the penalty term
+9-3. data/protocol 상세 보강
+
+appendix라도 좋으니 아래를 써라.
+
+Dow30 current constituents인지 historical constituents인지
+survivorship bias 처리
+adjusted close 사용 이유
+decision at t, return over (t, t+1] timing convention
+long-only fully invested simplex 이유
+no cash asset limitation
+9-4. anti-lookahead 문장 강화
+
+현재 anti-lookahead 문장은 괜찮지만 더 구체적으로 써라.
+
+state cutoff time
+portfolio application interval
+return realization timing
+산출물
+related work full rewrite
+data appendix
+protocol appendix
+완료 기준
+
+리뷰어가 “관련연구가 너무 얇다” “백테스트 프로토콜이 모호하다”라고 말하기 어려워야 한다.
+
+주의점
+
+related work는 길게 쓰는 게 목적이 아니라, 네 논문이 어디에 서 있는지 명확하게 보이게 하는 것이 목적이다.
+
+10단계. Discussion/Conclusion 최종 톤 조정 + 제출 직전 체크리스트 만들기
+목표
+
+모든 수정이 끝난 뒤, 논문 전체 톤과 서사 흐름을 최종 정리하는 마지막 단계다.
+
+왜 마지막이어야 하나
+
+이전 1~9단계가 끝나기 전에는 결론을 제대로 못 고친다.
+결론은 항상 “실제로 남은 증거”를 반영해야 한다.
+
+구체 작업
+10-1. Discussion 수정
+
+현재 Discussion의 좋은 점:
+
+“stabilization, not alpha creation” 프레임은 괜찮다.
+
+하지만 아래는 수정 필요:
+
+η=0.082를 compromise point라고 부를 때는 selection rule이 본문에 있어야 함
+κ=0 regularization 톤은 낮춰야 함
+cost regime에서 강하고 κ=0에서는 약하다는 evidence asymmetry를 정직하게 써야 함
+10-2. Conclusion 수정
+
+현재 conclusion은
+
+cost alignment
+implicit regularization
+clean execution frontier
+η=0.082 강조
+를 다 강하게 묶는다.
+
+최종 conclusion은 이렇게 정리하는 게 좋다.
+
+본 논문은 target/executed 분리의 필요성을 보여준다
+executed turnover 기준 cost accounting이 핵심이다
+frozen-policy setting에서도 fixed-η execution frontier가 분명히 나타난다
+κ>0에서 성능 개선 evidence는 강하다
+κ=0에서는 stabilization-consistent but modest evidence
+broader baselines, adaptive schedules, end-to-end execution-aware training are future work
+10-3. 제출 직전 체크리스트
+
+마지막으로 아래를 전부 확인해라.
+
+초록과 결론이 같은 톤인가
+도입 contribution과 실험이 정합적인가
+η=0.082 selection rule이 명시돼 있는가
+모든 표에 dispersion이 있는가
+모든 figure 캡션이 self-contained한가
+raw variable name이 남아 있지 않은가
+related work가 충분한가
+limitation이 정직한가
+appendix와 main text 경계가 깔끔한가
+references가 최소 논문 체급에 맞는가
+산출물
+final discussion/conclusion
+submission checklist 1장
+version freeze draft
+완료 기준
+
+논문을 처음부터 끝까지 읽었을 때
+“좋은 아이디어인데 아직 메모 같다”가 아니라
+“명확한 범위 안에서 잘 설계되고 정직하게 주장하는 논문”처럼 보여야 한다.
+
+주의점
+
+결론은 세게 쓰는 곳이 아니라, 증거를 가장 정확하게 압축하는 곳이다.
+
+실행 순서 한 번에 정리
+
+진짜 작업 순서만 다시 압축하면 이렇게 가면 된다.
+
+스코프 고정
+메모/초고 흔적 제거
+초록/도입 주장 톤 조정
+Method–Experiment 정합화
+η 선택 규칙 + 외부 baseline 추가
+통계 보고 보강
+misalignment metric 재설계
+figure 전면 개편
+related work + data/protocol 보강
+discussion/conclusion 최종 정리

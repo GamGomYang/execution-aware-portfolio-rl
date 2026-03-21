@@ -1,3 +1,122 @@
+2026-03-21 Control-Frozen Eta Frontier Paper Execution Spec (최신 우선)
+
+문서 우선순위 안내
+- 본 섹션은 2026-03-21 UTC 기준 최신 논문화 실행 명세다.
+- 아래에 남아 있는 alpha-first / second-wave 명세는 연구 기록으로 보존하되, 지금부터의 메인 목표는 `control을 고정하고 execution-aware eta frontier를 메인 결과로 완성`하는 것이다.
+- challenger 탐색은 보조 연구 트랙으로 유지하고, 논문 마감용 공식 결과는 frozen control로 생성한다.
+
+문서 목적
+- `configs/prl_100k_signals_u27_eta082_current.yaml` 기준 current control basket을 frozen snapshot으로 고정한다.
+- `2024-01-01 ~ 2025-12-31` final OOS에서 eta frontier를 완성한다.
+- `2026-01-01 ~ cache_max_date` forward sanity를 별도 보존한다.
+- 논문 표/그림에 바로 옮길 수 있는 paper pack을 한 번에 만든다.
+
+CF0) 목표와 범위
+- 공식 논문 결과 자산
+  - frozen control config
+  - final OOS eta frontier
+  - selected eta=`0.082` forward 2026 YTD sanity
+  - paper-ready summary/figure pack
+- 지금 메인 논문에 넣지 않을 것
+  - second-wave challenger 결과
+  - alpha adoption 스토리
+  - "최고 alpha 탐색" 메시지
+- 메인 주장
+  - 같은 control alpha basket에서도 execution-aware eta sweep가 turnover-sharpe frontier를 만든다.
+  - 비용 구간에서 작은 eta가 비용/turnover를 줄이며 risk-adjusted outcome을 개선하는 영역이 존재한다.
+
+CF1) 고정 execution recipe
+- base config
+  - `prl-dow30/configs/prl_100k_signals_u27_eta082_current.yaml`
+- frozen recipe
+  - signals: `reversal_5d`, `short_term_reversal`
+  - `mid_plasticity_multiplier = 0.70`
+  - `cvar_penalty_gamma = 0.3`
+  - `learning_rate = 1e-4`
+  - `L = 30`
+  - `Lv = 30`
+  - `c_tc = 0.0005`
+  - `logit_scale = 10.0`
+  - universe = fixed U27
+- seeds
+  - `0 1 2 3 4 5 6 7 8 9`
+
+CF2) 고정 evaluation windows
+- training window
+  - `2010-01-01 ~ 2021-12-31`
+- final OOS eta frontier
+  - `2024-01-01 ~ 2025-12-31`
+- forward sanity
+  - `2026-01-01 ~ cache_max_date`
+
+CF3) eta grid 확정
+- 메인 eta grid는 아래 7개로 고정
+  - `1.0`
+  - `0.5`
+  - `0.2`
+  - `0.1`
+  - `0.082`
+  - `0.05`
+  - `0.02`
+- 선정 이유
+  - `1.0`: immediate execution baseline
+  - `0.082`: 현재 tuned incumbent
+  - `0.1`, `0.05`, `0.02`: low-turnover region을 촘촘히 보기 위한 핵심 점
+  - `0.2`, `0.5`: frontier shape가 단조로운지 확인하는 중간 점
+
+CF4) 결과 pack 구조
+- run root
+  - `prl-dow30/outputs/paper_control_eta_<TS>/`
+- train root
+  - `prl-dow30/outputs/paper_control_eta_<TS>/train_control_100k`
+- final eta frontier root
+  - `prl-dow30/outputs/paper_control_eta_<TS>/step6_final_eta_frontier`
+- forward eta082 root
+  - `prl-dow30/outputs/paper_control_eta_<TS>/step6_forward_eta082`
+- release pack root
+  - `prl-dow30/outputs/releases/u27_control_eta_paper_<TS>/`
+- release pack 필수 산출물
+  - `eta_frontier_final_summary.csv/.md`
+  - `eta_frontier_paired_vs_eta1.csv/.md`
+  - `selected_eta_final_forward_summary.csv/.md`
+  - `table_eta_frontier_rows.tex`
+  - `table_paired_vs_eta1_rows.tex`
+  - `final_eta_frontier/fig_frontier.png`
+  - `final_eta_frontier/fig_misalignment.png`
+  - frozen config / frozen signal snapshot / eval configs / materialization meta
+
+CF5) 실행 명령
+- detached launcher phase
+  - `paperControl`
+- 실행 명령
+  - `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+  - `PYTHON_BIN=/workspace/execution-aware-portfolio-rl/.venv/bin/python bash scripts/launch_u27_eta082_detached.sh paperControl`
+- wrapper script
+  - `prl-dow30/scripts/run_u27_control_eta_paper.sh`
+- 내부 단계
+  1) frozen snapshot materialize
+  2) control 100k x 10 seeds train
+  3) final OOS step6 eta frontier build
+  4) forward eta082 step6 build
+  5) paper pack build
+
+CF6) 논문 표/그림 대응
+- `02.17.01.tex` Table `eta_sweep`
+  - source: `eta_frontier_final_summary.csv`
+- `02.17.01.tex` Table `paired_delta`
+  - source: `eta_frontier_paired_vs_eta1.csv`
+- frontier figure
+  - source: `final_eta_frontier/fig_frontier.png`
+- misalignment figure
+  - source: `final_eta_frontier/fig_misalignment.png`
+- forward sanity 표 또는 appendix
+  - source: `selected_eta_final_forward_summary.csv`
+
+CF7) 판단 규칙
+- 논문용 공식 결과는 challenger 성공 여부와 분리한다.
+- control eta frontier pack이 생성되면, 그것이 곧 논문 마감용 baseline result pack이다.
+- challenger 연구는 별도 세션/별도 문단/별도 future work로 유지한다.
+
 2026-03-20 Alpha-First Batch 후속 실행 명세 (최신 우선)
 
 문서 우선순위 안내

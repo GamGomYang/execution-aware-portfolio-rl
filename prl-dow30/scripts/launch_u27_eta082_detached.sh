@@ -14,6 +14,7 @@ case "$PHASE" in
   alphaC) SCRIPT="scripts/run_u27_alpha_first_batch_phaseC.sh" ;;
   alpha2A) SCRIPT="scripts/run_u27_alpha_second_wave_phaseA.sh" ;;
   alpha2B) SCRIPT="scripts/run_u27_alpha_second_wave_phaseB.sh" ;;
+  paperControl) SCRIPT="scripts/run_u27_control_eta_paper.sh" ;;
   alphaForward) SCRIPT="scripts/run_u27_alpha_first_batch_forward_oos.sh" ;;
   alphaPostadopt) SCRIPT="scripts/run_u27_alpha_first_batch_post_adoption.sh" ;;
   alphaAdopt) SCRIPT="scripts/run_u27_alpha_first_batch_adoption.sh" ;;
@@ -92,6 +93,13 @@ ENV_VARS=(
   PROMOTION_META
   BASELINE_TAG_20K
   WINNER_TAG_100K
+  SEEDS
+  ETAS
+  KAPPAS
+  SELECTED_ETA
+  BASELINE_ETA
+  FINAL_START
+  FINAL_END
   TAG_SUFFIX
   TIMESTEPS
   SKIP_RATIONALE

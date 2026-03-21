@@ -1,0 +1,21 @@
+{
+  "git.countBadge": "tracked",
+  "files.exclude": {
+    ".venv": true,
+    "**/__pycache__": true,
+    "prl-dow30/outputs": true
+  },
+  "search.exclude": {
+    ".venv": true,
+    "**/__pycache__": true,
+    "prl-dow30/outputs": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.venv/**": true,
+    "**/venv/**": true,
+    "**/__pycache__/**": true,
+    "**/prl-dow30/outputs/**": true
+  }
+}

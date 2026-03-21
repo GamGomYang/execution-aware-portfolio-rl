@@ -1,0 +1,9 @@
+{
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "source_current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "generated_at": "20260321T090000Z",
+  "tag": "u27_eta082_control_paper_20260321T090000Z"
+}

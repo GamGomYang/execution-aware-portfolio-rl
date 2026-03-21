@@ -1,0 +1,458 @@
+﻿
+% !TEX program = pdflatex
+% ============================================================
+% Execution-Aware Portfolio RL (Journal-style 12-page draft)
+% Single-file LaTeX (no external .bib required)
+% Author: Kim Geum-Young
+% ============================================================
+
+\documentclass[10pt,twocolumn]{article}
+
+% ---------- Page / Layout ----------
+\usepackage[a4paper,margin=18mm]{geometry}
+\usepackage{times}
+\usepackage{microtype}
+
+% ---------- Math / Theorems ----------
+\usepackage{amsmath,amssymb,amsthm}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{remark}{Remark}
+
+% ---------- Figures / Tables ----------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}        % for [H]
+\usepackage{dblfloatfix}  % improve placement of figure* / table* in twocolumn
+
+% ---------- Links ----------
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Lists / Colors ----------
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+% ---------- Misc ----------
+\usepackage{url}
+\usepackage{authblk}
+
+% ---------- Custom Macros ----------
+\newcommand{\wexec}{w^{\mathrm{exec}}}
+\newcommand{\wtgt}{w^{\mathrm{tgt}}}
+\newcommand{\TOexec}{\mathrm{TO}^{\mathrm{exec}}}
+\newcommand{\TOtgt}{\mathrm{TO}^{\mathrm{tgt}}}
+\newcommand{\kappaTC}{\kappa}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\normone}[1]{\left\lVert #1 \right\rVert_1}
+\newcommand{\normtwo}[1]{\left\lVert #1 \right\rVert_2}
+\newcommand{\DeltaN}{\Delta^N}
+
+% ---------- Title ----------
+\title{\vspace{-6mm}
+\textbf{Execution-Aware Portfolio Reinforcement Learning via Proximal Execution Control}\\
+\vspace{-1mm}
+\large Separating Target and Executed Portfolios for Correct Cost Alignment and Implicit Regularization
+\vspace{-3mm}
+}
+\author[1]{Kim Geum-Young}
+\affil[1]{Chungbuk National University, Department of Software Engineering}
+\date{}
+
+\begin{document}
+
+% ============================================================
+% Title + Abstract across both columns (more journal-like)
+% ============================================================
+\twocolumn[{%
+\maketitle
+\vspace{-4mm}
+\begin{abstract}
+\vspace{-1mm}
+Most portfolio reinforcement learning (RL) formulations implicitly assume the portfolio weights output by the policy are immediately executed. Under transaction costs, this conflation misaligns cost accounting and can bias learning and evaluation. We formalize a two-stage decomposition: the policy outputs target weights $\wtgt_t$, while a proximal execution controller outputs realized weights $\wexec_t$ via a closed-form update with timescale $\eta_t\in(0,1]$. The key design choices are: (i) \emph{cost alignment}---transaction costs are charged on executed turnover, and (ii) \emph{execution-as-regularization}---even at $\kappaTC=0$, execution attenuates over-reactive target updates and can improve risk-adjusted outcomes in weak-signal regimes.
+We provide theoretical properties (proximal interpretation, turnover scaling, tracking error monotonicity, anchor/low-pass behavior) and a reproducible Dow30 pipeline with paired-seed evaluation and environment signatures. Empirically, using a frozen Dow30 control model trained on 2010--2021, validated on 2022--2023, and tested on 2024--2025 with 10 paired seeds, reducing $\eta$ from $1.0$ to $0.082$ cuts median executed turnover from $0.0217$ to $0.0022$ (about $89.8\%$) and improves median paired $\Delta$Sharpe by $+0.0176$ at $\kappa=5\times10^{-4}$ and $+0.0347$ at $\kappa=10^{-3}$, both with $100\%$ seed win-rates.
+\end{abstract}
+
+\vspace{-2mm}
+\noindent\textbf{Keywords:} portfolio RL, transaction costs, execution, turnover, proximal control, reproducible backtesting
+\vspace{1mm}
+\hrule
+\vspace{2mm}
+}]
+
+% ============================================================
+\section{Introduction}
+Portfolio RL has gained attention for optimizing dynamic allocations under complex objectives. However, many formulations implicitly assume that the action produced by the agent (portfolio weights) is executed immediately and exactly. In realistic trading---and even in cost-free simulations where policies can over-react and over-trade---the \emph{target} portfolio and the \emph{executed} portfolio are distinct objects:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \textbf{Target portfolio} $\wtgt_t$: the policy output at decision time $t$.
+\item \textbf{Executed portfolio} $\wexec_t$: the portfolio actually held over the next return interval and used for cost accounting.
+\end{itemize}
+
+\paragraph{Why this is not ``just smoothing''.}
+Execution-aware modeling changes the environment dynamics and the accounting identity under transaction costs. If execution is slower than target updates, charging costs on target turnover implicitly rescales the effective cost by $1/\eta_t$ (Proposition~\ref{prop:cost_misalignment}), creating a biased learning signal and misleading evaluation. Moreover, the execution mapping is a proximal step (Proposition~\ref{prop:prox}), equivalent to a low-pass filter on the target trajectory, which regularizes the \emph{trading path} rather than penalizing weights directly.
+
+\paragraph{Contributions.}
+\begin{enumerate}[leftmargin=*,itemsep=2pt]
+\item \textbf{Two-stage decomposition.} We define portfolio RL with explicit separation of target $\wtgt$ and executed $\wexec$ portfolios, and we compute all \emph{core} rewards and performance metrics using $\wexec$ only.
+\item \textbf{Proximal execution control.} We specify a closed-form execution update parameterized by timescale $\eta_t$ that controls rebalancing aggressiveness.
+\item \textbf{Theoretical properties (with proof sketches).} We show: (i) proximal interpretation, (ii) executed turnover scaling, (iii) monotone tracking-error growth as $\eta$ decreases, (iv) anchor/low-pass behavior as $\eta\to0$, and (v) cost-misalignment rescaling when costs are charged on targets.
+\item \textbf{Protocolized empirical study.} Using paired-seed evaluation on a reproducible Dow30 pipeline, we report $\eta$-frontiers across cost regimes and quantify paired improvements and win-rates.
+\end{enumerate}
+
+% ============================================================
+\section{Background and Related Work}
+(Keep concise; emphasize the gap: many RL papers conflate action and execution.)
+Classical portfolio theory optimizes risk/return under constraints \cite{markowitz1952}. Dynamic allocation under frictions has been studied through stochastic control \cite{merton1973}. RL for portfolio management often models weights directly as actions and includes transaction cost penalties or turnover regularization \cite{moody1998}. Our focus is on explicitly modeling execution as a first-class component so that (i) cost accounting is aligned with realized turnover and (ii) execution dynamics provide implicit regularization even when $\kappaTC=0$.
+
+% ============================================================
+\section{Problem Setup and Timing (Anti-Lookahead)}
+\label{sec:setup}
+We consider $N$ risky assets. Let $p_t\in\R^N$ be adjusted close prices and define single-period arithmetic returns over interval $(t,t{+}1]$ by
+\[
+r_{t+1} \triangleq \frac{p_{t+1}-p_t}{p_t}\in\R^N.
+\]
+At decision time $t$, the agent observes state $s_t$ constructed \emph{only} from information available up to time $t$ (e.g., rolling past returns, volatility estimates, and previous executed weights). The policy outputs a target portfolio $\wtgt_t\in\DeltaN$ (long-only, fully invested simplex). An execution controller maps $\wtgt_t$ to executed weights $\wexec_t$, which are held over the next return interval and used for both return realization and transaction cost accounting.
+
+\paragraph{Core (hard-locked) definitions.}
+Let the previous held portfolio be the last executed weights: $\wexec_{t-1}$. We define:
+\begin{align}
+\wtgt_t &= \pi_\theta(s_t)\in\DeltaN, \label{eq:tgt_policy}\\
+\wexec_t &= (1-\eta_t)\wexec_{t-1} + \eta_t \wtgt_t,\quad \eta_t\in(0,1], \label{eq:exec_update}\\
+\TOtgt_t &= \normone{\wtgt_t - \wexec_{t-1}}\quad\text{(diagnostic)}, \label{eq:turnover_tgt}\\
+\TOexec_t &= \normone{\wexec_t - \wexec_{t-1}}\quad\text{(core)}, \label{eq:turnover_exec}\\
+\mathrm{cost}_{t} &= \kappaTC \, \TOexec_t \quad\text{(core)}, \label{eq:cost_exec}\\
+R_{t+1} &= \wexec_t^\top r_{t+1} - \mathrm{cost}_t \quad\text{(core)}.\label{eq:reward}
+\end{align}
+\textbf{Core metrics} (Sharpe/CAGR/MDD) are computed from realized returns $\{R_{t+1}\}$ using $\wexec$ only. \textbf{Diagnostics} may also compute hypothetical quantities involving $\wtgt$ (e.g., misalignment), but these are explicitly labeled and not used as the primary evaluation metric.
+
+\paragraph{Optional extension (cash).}
+The present study does not include an explicit cash asset; all experiments use a long-only fully invested simplex over the Dow30 subset.
+
+% ============================================================
+\section{Method: Two-Stage Control with Proximal Execution}
+\subsection{Two-stage control}
+We interpret portfolio RL under frictions as a two-stage control problem:
+\begin{enumerate}[leftmargin=*,itemsep=1pt]
+\item \textbf{Target decision (agent):} $\wtgt_t=\pi_\theta(s_t)$.
+\item \textbf{Execution decision (controller):} $\wexec_t$ via \eqref{eq:exec_update}.
+\end{enumerate}
+The agent learns parameters $\theta$ to optimize expected return under the executed dynamics \eqref{eq:reward}.
+
+\subsection{Execution modes (same update, different $\eta_t$)}
+The update \eqref{eq:exec_update} is fixed. Only $\eta_t$ varies:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \textbf{Fixed timescale:} $\eta_t\equiv\eta$.
+\item \textbf{Rule-based timescale (volatility):} $\eta_t = \mathrm{clip}(f(\sigma_t); \eta_{\min},\eta_{\max})$ where $\sigma_t$ is a volatility estimate (fill in rule details later).
+\end{itemize}
+
+\subsection{Cost alignment (core principle)}
+Transaction costs must be charged on executed turnover \eqref{eq:cost_exec}. Charging costs on target turnover $\TOtgt_t$ induces systematic mis-estimation when $\eta_t<1$ (Proposition~\ref{prop:cost_misalignment}) and can bias training and evaluation.
+
+% ============================================================
+\section{Theory: Proximal Regularization, Turnover Scaling, and Limits}
+\label{sec:theory}
+
+\begin{proposition}[Proximal interpretation]\label{prop:prox}
+For constant $\eta\in(0,1)$, the execution update \eqref{eq:exec_update} is the unique minimizer of:
+\[
+\wexec_t=\arg\min_{w \in \DeltaN}\;
+\frac{1}{2}\normtwo{w-\wexec_{t-1}}^2 + \frac{\eta}{2(1-\eta)}\normtwo{w-\wtgt_t}^2.
+\]
+\end{proposition}
+\noindent\textbf{Proof sketch.} The objective is strongly convex in $w$. Setting the gradient to zero yields a convex combination of $\wexec_{t-1}$ and $\wtgt_t$; the simplex constraint is preserved by convexity of $\DeltaN$. \hfill$\square$
+\begin{remark}
+Execution is a proximal step that penalizes \emph{changes from the previous executed portfolio}, regularizing the trading path while still tracking the target.
+\end{remark}
+
+\begin{proposition}[Executed turnover scaling]\label{prop:turnover_scaling}
+Under \eqref{eq:exec_update}--\eqref{eq:turnover_exec}, for any $\eta_t\in(0,1]$:
+\[
+\TOexec_t = \eta_t \TOtgt_t.
+\]
+\end{proposition}
+\noindent\textbf{Proof sketch.} From \eqref{eq:exec_update},
+$\wexec_t-\wexec_{t-1}=\eta_t(\wtgt_t-\wexec_{t-1})$.
+Taking $\ell_1$ norms gives the claim. \hfill$\square$
+
+\begin{corollary}[Cumulative turnover bound]\label{cor:cum_turnover}
+If $\eta_t\le \eta_{\max}$ for all $t$, then
+\[
+\sum_{t=1}^T \TOexec_t \le \eta_{\max}\sum_{t=1}^T \TOtgt_t.
+\]
+\end{corollary}
+
+\begin{proposition}[Tracking error monotonicity]\label{prop:tracking}
+Define instantaneous tracking discrepancy by $\normtwo{\wexec_t-\wtgt_t}$. Then
+\[
+\wexec_t-\wtgt_t = (1-\eta_t)(\wexec_{t-1}-\wtgt_t),
+\]
+so for fixed $(\wexec_{t-1},\wtgt_t)$, smaller $\eta_t$ increases discrepancy whenever $\wexec_{t-1}\neq \wtgt_t$.
+\end{proposition}
+\noindent\textbf{Proof sketch.} Rearranging \eqref{eq:exec_update} yields the identity. \hfill$\square$
+
+\begin{proposition}[Anchor / low-pass behavior for constant $\eta$]\label{prop:anchor}
+For constant $\eta\in(0,1]$, the executed sequence has the closed form:
+\[
+\wexec_t = (1-\eta)^t \wexec_0 + \eta\sum_{i=1}^{t} (1-\eta)^{t-i}\wtgt_i.
+\]
+For fixed horizon $t$, $\eta\to0$ implies $\wexec_t\to \wexec_0$ (anchor convergence).
+\end{proposition}
+\noindent\textbf{Proof sketch.} Unroll the recursion \eqref{eq:exec_update}. \hfill$\square$
+\begin{remark}
+Thus, execution applies an exponential smoothing (a first-order low-pass filter) to the target trajectory, attenuating high-frequency target changes that can inflate realized variance in weak-signal regimes.
+\end{remark}
+
+\begin{proposition}[Cost misalignment rescaling]\label{prop:cost_misalignment}
+If one incorrectly charges costs using target turnover $\TOtgt_t$ while execution obeys \eqref{eq:exec_update}, then the charged cost overestimates realized cost by factor $1/\eta_t$:
+\[
+\kappaTC \TOtgt_t \;=\; \frac{\kappaTC}{\eta_t}\TOexec_t.
+\]
+\end{proposition}
+\noindent\textbf{Proof sketch.} Substitute Proposition~\ref{prop:turnover_scaling} into $\kappaTC\TOtgt_t$. \hfill$\square$
+
+% ============================================================
+\section{Experimental Setup}
+\label{sec:exp}
+
+\subsection{Data, universe, and splits}
+Dow30 universe using yfinance adjusted close prices. The frozen-control study uses:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Train window: 2010-01-01 to 2021-12-31.
+\item Validation window: 2022-01-01 to 2023-12-31.
+\item Test window: 2024-01-01 to 2025-12-31.
+\item Decision frequency: daily rebalancing.
+\end{itemize}
+Model selection uses only the validation window. Internal 2026 forward checks were used for engineering sanity only and are not part of the main paper tables.
+
+\subsection{Observations and environment}
+State $s_t$ includes: (i) rolling past returns, (ii) per-asset volatility estimates, and (iii) previous executed weights $\wexec_{t-1}$. Anti-lookahead is enforced by using only information up to time $t$ to form $s_t$ and applying $\wexec_t$ to interval return $r_{t+1}$.
+
+\subsection{Agents}
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \textbf{PRL-SAC control model:} a SAC-based long-only portfolio policy with volatility-conditioned plasticity parameters, trained once and reused across all execution arms.
+\item \textbf{Execution-control arms:} the same trained policy is evaluated under fixed $\eta\in\{1.0, 0.5, 0.2, 0.1, 0.082, 0.05, 0.02\}$, with $\eta=1.0$ as the immediate-execution baseline arm.
+\end{itemize}
+
+\subsection{Baselines (must be strong and explicit)}
+The core empirical comparison in this paper isolates the effect of execution control while holding the learned policy fixed:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item \textbf{Immediate execution baseline:} fixed $\eta=1.0$.
+\item \textbf{Execution-aware variants:} fixed $\eta\in\{0.5, 0.2, 0.1, 0.082, 0.05, 0.02\}$.
+\end{itemize}
+This design keeps the predictive model constant and attributes performance differences to execution alone.
+
+\subsection{Transaction cost regimes}
+Sweep $\kappaTC\in\{0,\;5\times10^{-4},\;10^{-3}\}$. Sweep $\eta$ over $\{1.0,\;0.5,\;0.2,\;0.1,\;0.082,\;0.05,\;0.02\}$, and evaluate with paired seeds.
+
+\subsection{Evaluation protocol (paired seeds)}
+Let $\mathcal{S}=\{0,1,\dots,9\}$. For each seed $s\in\mathcal{S}$, evaluate all arms (different $\eta$ values) with identical data splits and the same frozen trained policy per seed.
+Report:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Median [IQR] across seeds for each metric.
+\item Paired differences (e.g., $\Delta$Sharpe) and win-rate (\% seeds improved).
+\end{itemize}
+
+\subsection{Metrics}
+\paragraph{Core metrics (exec only).}
+Sharpe, CAGR, max drawdown, average executed turnover $\overline{\TOexec}$, and realized cost are computed from $\wexec$ and realized returns \eqref{eq:reward}. Specify annualization and risk-free assumption:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Sharpe annualization: $\sqrt{252}$.
+\item Risk-free rate: 0.
+\end{itemize}
+
+\paragraph{Diagnostics (target used for analysis only).}
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Target turnover $\overline{\TOtgt}$.
+\item Tracking error / misalignment measures (defined below).
+\end{itemize}
+
+\paragraph{Misalignment diagnostic.}
+Define a hypothetical immediate-execution net return for diagnostics:
+\[
+R^{\mathrm{tgt}}_{t+1} \triangleq \wtgt_t^\top r_{t+1} - \kappaTC \normone{\wtgt_t-\wexec_{t-1}}.
+\]
+Then define the misalignment gap (diagnostic):
+\[
+\Delta_{\mathrm{mis}} \triangleq \frac{1}{T}\sum_{t=0}^{T-1}\left(R_{t+1} - R^{\mathrm{tgt}}_{t+1}\right).
+\]
+For the present paper we also report path-wise equity and turnover differences through the stored diagnostic figures.
+
+% ============================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Main claim: $\eta$-frontier under transaction costs}
+Describe the monotone trade-offs expected from theory:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item $\eta \downarrow \Rightarrow \overline{\TOexec}\downarrow$ (Proposition~\ref{prop:turnover_scaling}).
+\item $\eta \downarrow \Rightarrow$ tracking discrepancy increases (Proposition~\ref{prop:tracking}).
+\item Under $\kappaTC>0$, smaller $\eta$ can reduce realized costs and improve net risk-adjusted performance over a region.
+\end{itemize}
+Table~\ref{tab:eta_sweep} confirms the expected frontier. Executed turnover declines almost monotonically as $\eta$ decreases, while Sharpe improves once transaction costs are non-zero. At $\kappa=10^{-3}$, median executed turnover falls from $0.0217$ at $\eta=1.0$ to $0.0022$ at $\eta=0.082$ and $0.00059$ at $\eta=0.02$, while median Sharpe rises from $1.1121$ to $1.1555$ and $1.1571$, respectively. The selected setting $\eta=0.082$ captures most of the cost-regime gain while avoiding the most aggressive anchor behavior of extremely small $\eta$.
+
+% ---------- Table: Aggregated frontier summary ----------
+\begin{table*}[t]
+\centering
+\scriptsize
+\caption{$\eta$ sweep summary on the 2024--2025 test set (median across 10 paired seeds).}
+\label{tab:eta_sweep}
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+$\kappaTC$ & $\eta$ & Sharpe$_{\mathrm{exec}}$ & CAGR & $\overline{\TOexec}$ & Cost (avg)\\
+\midrule
+0.0000 & 1.000 & 1.1572 & 0.1654 & 0.02173 & 0.00e+00 \\
+0.0000 & 0.500 & 1.1543 & 0.1649 & 0.01080 & 0.00e+00 \\
+0.0000 & 0.200 & 1.1579 & 0.1651 & 0.00493 & 0.00e+00 \\
+0.0000 & 0.100 & 1.1594 & 0.1653 & 0.00266 & 0.00e+00 \\
+0.0000 & 0.082 & 1.1594 & 0.1653 & 0.00221 & 0.00e+00 \\
+0.0000 & 0.050 & 1.1589 & 0.1653 & 0.00140 & 0.00e+00 \\
+0.0000 & 0.020 & 1.1582 & 0.1651 & 0.00059 & 0.00e+00 \\
+0.0005 & 1.000 & 1.1339 & 0.1616 & 0.02173 & 1.09e-05 \\
+0.0005 & 0.500 & 1.1438 & 0.1632 & 0.01080 & 5.40e-06 \\
+0.0005 & 0.200 & 1.1535 & 0.1643 & 0.00493 & 2.47e-06 \\
+0.0005 & 0.100 & 1.1571 & 0.1649 & 0.00266 & 1.33e-06 \\
+0.0005 & 0.082 & 1.1574 & 0.1650 & 0.00221 & 1.11e-06 \\
+0.0005 & 0.050 & 1.1577 & 0.1651 & 0.00140 & 6.98e-07 \\
+0.0005 & 0.020 & 1.1576 & 0.1650 & 0.00059 & 2.95e-07 \\
+0.0010 & 1.000 & 1.1121 & 0.1581 & 0.02173 & 2.17e-05 \\
+0.0010 & 0.500 & 1.1338 & 0.1615 & 0.01080 & 1.08e-05 \\
+0.0010 & 0.200 & 1.1492 & 0.1636 & 0.00493 & 4.93e-06 \\
+0.0010 & 0.100 & 1.1548 & 0.1646 & 0.00266 & 2.66e-06 \\
+0.0010 & 0.082 & 1.1555 & 0.1647 & 0.00221 & 2.21e-06 \\
+0.0010 & 0.050 & 1.1565 & 0.1649 & 0.00140 & 1.40e-06 \\
+0.0010 & 0.020 & 1.1571 & 0.1649 & 0.00059 & 5.90e-07 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+% ---------- Table: Paired delta vs baseline ----------
+\begin{table*}[t]
+\centering
+\scriptsize
+\caption{Paired-seed comparison vs the immediate-execution baseline arm $\eta=1.0$ on the 2024--2025 test set.}
+\label{tab:paired_delta}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Arm & $\kappaTC$ & $\Delta$Sharpe (median) & $\Delta$CAGR & $\Delta\overline{\TOexec}$ & Win-rate\\
+\midrule
+fixed $\eta=0.500$ & 0.0000 & 0.0017 & 0.0002 & -0.01091 & 0.80 \\
+fixed $\eta=0.200$ & 0.0000 & 0.0007 & 0.0001 & -0.01690 & 0.60 \\
+fixed $\eta=0.100$ & 0.0000 & 0.0011 & 0.0001 & -0.01915 & 0.60 \\
+fixed $\eta=0.082$ & 0.0000 & 0.0008 & 0.0001 & -0.01959 & 0.60 \\
+fixed $\eta=0.050$ & 0.0000 & 0.0005 & 0.0000 & -0.02038 & 0.60 \\
+fixed $\eta=0.020$ & 0.0000 & -0.0002 & -0.0001 & -0.02116 & 0.50 \\
+fixed $\eta=0.500$ & 0.0005 & 0.0111 & 0.0017 & -0.01091 & 1.00 \\
+fixed $\eta=0.200$ & 0.0005 & 0.0160 & 0.0026 & -0.01690 & 1.00 \\
+fixed $\eta=0.100$ & 0.0005 & 0.0174 & 0.0027 & -0.01915 & 1.00 \\
+fixed $\eta=0.082$ & 0.0005 & 0.0176 & 0.0027 & -0.01959 & 1.00 \\
+fixed $\eta=0.050$ & 0.0005 & 0.0183 & 0.0029 & -0.02038 & 1.00 \\
+fixed $\eta=0.020$ & 0.0005 & 0.0179 & 0.0028 & -0.02116 & 1.00 \\
+fixed $\eta=0.500$ & 0.0010 & 0.0205 & 0.0033 & -0.01091 & 1.00 \\
+fixed $\eta=0.200$ & 0.0010 & 0.0317 & 0.0050 & -0.01690 & 1.00 \\
+fixed $\eta=0.100$ & 0.0010 & 0.0341 & 0.0054 & -0.01915 & 1.00 \\
+fixed $\eta=0.082$ & 0.0010 & 0.0347 & 0.0055 & -0.01959 & 1.00 \\
+fixed $\eta=0.050$ & 0.0010 & 0.0358 & 0.0057 & -0.02038 & 1.00 \\
+fixed $\eta=0.020$ & 0.0010 & 0.0368 & 0.0060 & -0.02116 & 1.00 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Execution-as-regularization at $\kappaTC=0$ (diagnostic framing)}
+When $\kappaTC=0$, execution cannot improve returns via cost reduction. Any Sharpe change arises through variance/overtrading control (Remark after Proposition~\ref{prop:anchor}). Present this as a \emph{stabilization/regularization} phenomenon rather than alpha creation. Include:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Executed turnover drop vs target turnover (diagnostic).
+\item Evidence of ``anchor drift'' toward initial portfolio (e.g., equal-weight) when $\eta\to0$.
+\end{itemize}
+This is exactly what we observe. At $\kappa=0$, moving from $\eta=1.0$ to $\eta=0.082$ reduces median executed turnover from $0.0217$ to $0.0022$, while the paired median Sharpe gain is only $+0.0008$ with a $60\%$ win-rate. Pushing further to $\eta=0.02$ cuts turnover to $0.00059$, but the paired median Sharpe turns slightly negative ($-0.0002$), consistent with excessive anchoring.
+
+% ---------- Optional Diagnostic Table (clearly labeled) ----------
+\begin{table}[H]
+\centering
+\caption{Diagnostics at $\kappaTC=0$ (NOT core evaluation), median across 10 paired seeds.}
+\label{tab:k0_diag}
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+$\eta$ & $\overline{\TOexec}$ & $\overline{\TOtgt}$ & Tracking (avg) & $\Delta_{\mathrm{mis}}$\\
+\midrule
+1.000 & 0.02173 & 0.02173 & 0.00000 & 0.00000 \\
+0.082 & 0.00221 & 0.02701 & 0.00583 & 0.00000 \\
+0.020 & 0.00059 & 0.02952 & 0.00682 & 0.00000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Adaptive $\eta_t$ (rule-based) vs fixed $\eta$}
+Adaptive schedules are intentionally left out of the present version. The goal of this paper is to isolate the execution effect under a single frozen control model; adding rule-based $\eta_t$ schedules would mix execution design with schedule-selection effects. We therefore treat adaptive execution as future work and use the fixed-$\eta$ frontier as the main empirical object.
+
+% ---------- Figures (prefer figure* in twocolumn) ----------
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_misalignment.png}
+\caption{Misalignment demo (diagnostic): equity and turnover for executed vs target portfolios.}
+\label{fig:misalign}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_frontier.png}
+\caption{$\eta$ frontier: executed turnover vs net Sharpe, annotated by $\eta$.}
+\label{fig:frontier}
+\end{figure*}
+
+% ============================================================
+\section{Discussion}
+\paragraph{Interpretation: stabilization, not alpha creation.}
+In the present 2024--2025 test window, absolute Sharpe remains positive across all fixed-$\eta$ arms. The evidence therefore supports a stabilization interpretation: execution-aware control improves risk-adjusted performance primarily by reducing harmful rebalancing variance and, when $\kappaTC>0$, by reducing realized costs rather than by injecting predictive alpha.
+
+\paragraph{When and why does execution help most?}
+The present results point to three clear mechanisms:
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Benefits are strongest when transaction costs are non-zero. At $\kappa=10^{-3}$ every $\eta<1$ arm beats $\eta=1.0$ in paired Sharpe with a $100\%$ win-rate.
+\item Turnover reduction is mechanically monotone, but tracking drift grows as $\eta$ decreases: median tracking error rises from essentially zero at $\eta=1.0$ to $0.00583$ at $\eta=0.082$ and $0.00682$ at $\eta=0.02$.
+\item The selected $\eta=0.082$ is a compromise point: it captures most of the cost-regime Sharpe gain while remaining less extreme than the smallest-$\eta$ anchor regime.
+\end{itemize}
+
+\paragraph{Limitations (state clearly).}
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item The current paper isolates execution effects under one frozen control model; it does not yet compare against a broad set of external portfolio heuristics.
+\item Fixed $\eta$ may not be globally optimal; adaptive schedules are left for future work.
+\item Long-only simplex constraint may limit opportunities (optionally include cash / leverage in future work).
+\end{itemize}
+
+% ============================================================
+\section{Conclusion}
+We formulated execution-aware portfolio RL by separating target and executed portfolios and enforcing execution-based reward and cost accounting. A proximal execution controller provides cost alignment under transaction costs and acts as implicit regularization by filtering over-reactive target updates. Using paired-seed evaluation on a reproducible Dow30 pipeline, we observe a clean execution frontier: reducing $\eta$ monotonically lowers executed turnover, and under $\kappa\in\{5\times10^{-4},10^{-3}\}$ it improves net Sharpe relative to immediate execution. In particular, the selected fixed setting $\eta=0.082$ reduces median executed turnover by about $89.8\%$ relative to $\eta=1.0$ and improves paired median Sharpe by $+0.0176$ at $\kappa=5\times10^{-4}$ and $+0.0347$ at $\kappa=10^{-3}$. Future work will strengthen alpha signals and revisit adaptive execution schedules on top of this frozen-control baseline.
+
+% ============================================================
+\appendix
+\section{Reproducibility Checklist (for reviewers)}
+(Keep details here, not in main narrative.)
+\begin{itemize}[leftmargin=*,itemsep=1pt]
+\item Paired-seed evaluation across all arms.
+\item Per-run config archiving and command logging.
+\item Environment signature files to detect drift.
+\item Automated aggregation outputs (tables/figures) generated from stored traces.
+\item Hard-locked core definitions: \eqref{eq:exec_update}--\eqref{eq:reward}.
+\end{itemize}
+
+\section{Implementation Notes (optional)}
+Briefly describe caching policy, yfinance data handling, and anti-lookahead checks. Keep code-specific details minimal; point to repository in final version.
+
+% ============================================================
+\begin{thebibliography}{9}
+\bibitem{markowitz1952}
+H. Markowitz, ``Portfolio Selection,'' \emph{The Journal of Finance}, 1952.
+
+\bibitem{merton1973}
+R. C. Merton, ``An Intertemporal Capital Asset Pricing Model,'' \emph{Econometrica}, 1973.
+
+\bibitem{moody1998}
+J. Moody and M. Saffell, ``Learning to Trade via Direct Reinforcement,'' \emph{IEEE Transactions on Neural Networks}, 1998.
+\end{thebibliography}
+
+\end{document}
+
