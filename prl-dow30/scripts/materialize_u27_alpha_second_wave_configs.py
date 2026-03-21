@@ -15,30 +15,37 @@ CANDIDATES: list[dict[str, Any]] = [
     {
         "key": "ctrl",
         "label": "control_mean_reversion",
-        "manifest": "alpha_ctrl.json",
+        "manifest": "alpha2_ctrl.json",
         "signals": ["reversal_5d", "short_term_reversal"],
-        "notes": "Current incumbent control basket used as alpha-screen baseline.",
+        "notes": "Current incumbent control basket used as the second-wave baseline.",
     },
     {
-        "key": "cs61",
-        "label": "control_plus_cs_mom_6_1",
-        "manifest": "alpha_cs61.json",
-        "signals": ["reversal_5d", "short_term_reversal", "cs_mom_6_1"],
-        "notes": "Add medium-horizon momentum with near-zero correlation to control reversals.",
+        "key": "cs312",
+        "label": "control_plus_cs_mom_3_12",
+        "manifest": "alpha2_cs312.json",
+        "signals": ["reversal_5d", "short_term_reversal", "cs_mom_3_12"],
+        "notes": "Add the one remaining momentum family not directly screened in first-wave.",
     },
     {
-        "key": "vsmom",
-        "label": "control_plus_vol_scaled_mom",
-        "manifest": "alpha_vsmom.json",
-        "signals": ["reversal_5d", "short_term_reversal", "vol_scaled_mom"],
-        "notes": "Add volatility-scaled momentum; intentionally more anti-correlated to reversal control.",
+        "key": "cs61vsmom",
+        "label": "control_plus_cs_mom_6_1_plus_vol_scaled_mom",
+        "manifest": "alpha2_cs61_vsmom.json",
+        "signals": ["reversal_5d", "short_term_reversal", "cs_mom_6_1", "vol_scaled_mom"],
+        "notes": "Pair medium-horizon momentum with volatility-scaled momentum to test two-addon complementarity.",
     },
     {
-        "key": "resid",
-        "label": "control_plus_residual_mom",
-        "manifest": "alpha_residmom.json",
-        "signals": ["reversal_5d", "short_term_reversal", "residual_mom_beta_neutral"],
-        "notes": "Add beta-neutral residual momentum to test orthogonal cross-sectional alpha.",
+        "key": "cs61resid",
+        "label": "control_plus_cs_mom_6_1_plus_residual_mom",
+        "manifest": "alpha2_cs61_resid.json",
+        "signals": ["reversal_5d", "short_term_reversal", "cs_mom_6_1", "residual_mom_beta_neutral"],
+        "notes": "Pair medium-horizon momentum with residual momentum to test orthogonal addon stacking.",
+    },
+    {
+        "key": "cs312resid",
+        "label": "control_plus_cs_mom_3_12_plus_residual_mom",
+        "manifest": "alpha2_cs312_resid.json",
+        "signals": ["reversal_5d", "short_term_reversal", "cs_mom_3_12", "residual_mom_beta_neutral"],
+        "notes": "Pair the untouched 3_12 momentum family with residual momentum for a second-wave recovery shot.",
     },
 ]
 
@@ -47,7 +54,7 @@ CANDIDATE_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in CAN
 
 
 def candidate_tag(key: str, tag_suffix: str) -> str:
-    return f"u27_eta082_alpha_{key}_{tag_suffix}"
+    return f"u27_eta082_alpha2_{key}_{tag_suffix}"
 
 
 def candidate_key_from_tag(tag_or_key: str) -> str:
@@ -56,7 +63,7 @@ def candidate_key_from_tag(tag_or_key: str) -> str:
         raise ValueError("Empty candidate identifier is not allowed.")
     if raw in CANDIDATE_BY_KEY:
         return raw
-    prefix = "u27_eta082_alpha_"
+    prefix = "u27_eta082_alpha2_"
     if raw.startswith(prefix):
         remainder = raw[len(prefix) :]
         key = remainder.split("_", 1)[0]
@@ -85,7 +92,7 @@ def normalize_candidate_keys(values: list[str] | None) -> list[str]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Materialize alpha first-batch signal manifests and screen configs.")
+    parser = argparse.ArgumentParser(description="Materialize alpha second-wave signal manifests and screen configs.")
     parser.add_argument(
         "--base-config",
         type=str,
@@ -95,38 +102,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--manifest-dir",
         type=str,
-        default="configs/signal_sets/alpha_first_batch",
+        default="configs/signal_sets/alpha_second_wave",
         help="Directory to write signal selection manifests into.",
     )
     parser.add_argument(
         "--config-dir",
         type=str,
         default="configs/exp",
-        help="Directory to write alpha first-batch configs into.",
+        help="Directory to write alpha second-wave configs into.",
     )
     parser.add_argument(
         "--meta-out",
         type=str,
-        default="outputs/reports/u27_alpha_first_batch_materialization.json",
+        default="outputs/reports/u27_alpha_second_wave_materialization.json",
         help="Metadata JSON output path.",
     )
     parser.add_argument(
         "--rationale-csv-out",
         type=str,
-        default="outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.csv",
+        default="outputs/reports/u27_alpha_second_wave_signal_rationale_20260321.csv",
         help="CSV rationale output path.",
     )
     parser.add_argument(
         "--rationale-md-out",
         type=str,
-        default="outputs/reports/u27_alpha_first_batch_signal_rationale_20260319.md",
+        default="outputs/reports/u27_alpha_second_wave_signal_rationale_20260321.md",
         help="Markdown rationale output path.",
     )
     parser.add_argument(
         "--candidates",
         nargs="*",
         default=None,
-        help="Optional candidate subset. Accepts candidate keys (ctrl/cs61/vsmom/resid) or full tags.",
+        help="Optional candidate subset. Accepts candidate keys or full alpha2 tags.",
     )
     parser.add_argument(
         "--tag-suffix",
@@ -240,11 +247,11 @@ def main() -> None:
     for candidate_key in selected_keys:
         candidate = CANDIDATE_BY_KEY[candidate_key]
         tag = candidate_tag(candidate_key, args.tag_suffix)
-        manifest_rel = f"configs/signal_sets/alpha_first_batch/{candidate['manifest']}"
+        manifest_rel = f"configs/signal_sets/alpha_second_wave/{candidate['manifest']}"
         manifest_payload = {
             "tag": tag,
             "candidate_key": candidate_key,
-            "tag_prefix": f"u27_eta082_alpha_{candidate_key}",
+            "tag_prefix": f"u27_eta082_alpha2_{candidate_key}",
             "label": candidate["label"],
             "selected_signals": candidate["signals"],
             "notes": candidate["notes"],
@@ -252,14 +259,12 @@ def main() -> None:
         manifest_path = _resolve(manifest_rel)
         if args.skip_manifests:
             if not manifest_path.exists():
-                raise FileNotFoundError(
-                    f"Manifest write skipped but file does not exist: {manifest_path}"
-                )
+                raise FileNotFoundError(f"Manifest write skipped but file does not exist: {manifest_path}")
         else:
             _write_json(manifest_rel, manifest_payload)
 
         cfg = json.loads(json.dumps(base_cfg))
-        cfg["mode"] = "screen_u27_eta082_alpha"
+        cfg["mode"] = "screen_u27_eta082_alpha_second_wave"
         cfg.setdefault("dates", {})
         cfg["dates"]["train_start"] = args.train_start
         cfg["dates"]["train_end"] = args.train_end
@@ -278,7 +283,7 @@ def main() -> None:
         signals_cfg["selection_policy"] = "alpha_research"
         signals_cfg["allow_nonfixed_selection"] = True
         signals_cfg["signal_names"] = list(candidate["signals"])
-        signals_cfg["selected_signals_path"] = f"../signal_sets/alpha_first_batch/{candidate['manifest']}"
+        signals_cfg["selected_signals_path"] = f"../signal_sets/alpha_second_wave/{candidate['manifest']}"
 
         cfg.setdefault("output", {})
         cfg["output"]["root"] = f"outputs/{tag}"
@@ -313,7 +318,7 @@ def main() -> None:
         stats_merge.to_csv(_resolve(args.rationale_csv_out), index=False)
 
         md_lines: list[str] = []
-        md_lines.append("# U27 Alpha First Batch Signal Rationale")
+        md_lines.append("# U27 Alpha Second Wave Signal Rationale")
         md_lines.append("")
         md_lines.append(f"- base_config: {args.base_config}")
         md_lines.append(f"- selection_window: {args.test_start}~{args.test_end}")
@@ -339,9 +344,9 @@ def main() -> None:
         md_lines.append("")
         md_lines.append("## Selection Rationale")
         md_lines.append("")
-        md_lines.append("- `cs_mom_6_1` was chosen because it has near-zero correlation to both reversal control signals and strong coverage.")
-        md_lines.append("- `vol_scaled_mom` was chosen because it is meaningfully anti-correlated to control reversal signals, giving a stronger diversification test.")
-        md_lines.append("- `residual_mom_beta_neutral` was chosen because it is also anti-correlated to control reversal signals while targeting a different momentum construction.")
+        md_lines.append("- `cs_mom_3_12` is the only momentum family not directly tested in first-wave, so it is the first recovery candidate.")
+        md_lines.append("- Two-addon combos are explicitly allowed in second-wave because first-wave single-addon tests were directionally useful but not promotion-ready.")
+        md_lines.append("- `vol_scaled_mom` and `residual_mom_beta_neutral` remain in scope only as complements to momentum, not as solo promotion bets.")
         _resolve(args.rationale_md_out).write_text("\n".join(md_lines) + "\n")
 
     meta = {

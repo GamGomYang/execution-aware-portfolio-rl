@@ -1,0 +1,12 @@
+{
+  "tag": "u27_eta082_alpha2_cs312_20k_r1",
+  "candidate_key": "cs312",
+  "tag_prefix": "u27_eta082_alpha2_cs312",
+  "label": "control_plus_cs_mom_3_12",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "cs_mom_3_12"
+  ],
+  "notes": "Add the one remaining momentum family not directly screened in first-wave."
+}

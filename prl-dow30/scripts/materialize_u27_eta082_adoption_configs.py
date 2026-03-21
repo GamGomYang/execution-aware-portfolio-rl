@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -85,8 +87,25 @@ def _write_yaml(path_str: str, payload: dict[str, Any]) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=False))
 
 
+def _resolve_config_relative_path(config_path: Path, raw_path: str | None) -> Path | None:
+    if not raw_path:
+        return None
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path
+    return (config_path.parent / path).resolve()
+
+
+def _relative_path(target: Path, start: Path) -> str:
+    return os.path.relpath(target.resolve(), start.resolve())
+
+
 def main() -> None:
     args = parse_args()
+
+    current_config_path = _resolve(args.current_config)
+    forward_config_path = _resolve(args.forward_config_out)
+    operational_config_path = _resolve(args.operational_config_out)
 
     current_cfg = _read_yaml(args.current_config)
     step6_template = _read_yaml(args.step6_template)
@@ -103,15 +122,38 @@ def main() -> None:
             "Refresh cache before forward OOS."
         )
 
-    forward_cfg = step6_template
+    current_signals = copy.deepcopy(current_cfg.get("signals", {}) or {})
+    current_signal_path = _resolve_config_relative_path(current_config_path, current_signals.get("selected_signals_path"))
+    if current_signal_path is not None:
+        current_signals["selected_signals_path"] = _relative_path(current_signal_path, forward_config_path.parent.resolve())
+
+    forward_cfg = copy.deepcopy(step6_template)
     forward_cfg["experiment_name"] = "step6_fixedeta_forward_2026ytd_eta082_seed10"
+    if current_cfg.get("data"):
+        forward_cfg["data"] = copy.deepcopy(current_cfg["data"])
+    if current_cfg.get("universe"):
+        forward_cfg["universe"] = copy.deepcopy(current_cfg["universe"])
+    if current_signals:
+        forward_cfg["signals"] = current_signals
+    if current_cfg.get("env"):
+        forward_cfg["env"] = copy.deepcopy(current_cfg["env"])
+    if current_cfg.get("prl"):
+        forward_cfg["prl"] = copy.deepcopy(current_cfg["prl"])
     forward_cfg.setdefault("dates", {})
     forward_cfg["dates"]["test_start"] = args.forward_start
     forward_cfg["dates"]["test_end"] = cache_max_date
     forward_cfg.setdefault("output", {})
     forward_cfg["output"]["root"] = args.forward_output_root
 
-    operational_cfg = current_cfg
+    operational_cfg = copy.deepcopy(current_cfg)
+    operational_signals = copy.deepcopy(operational_cfg.get("signals", {}) or {})
+    operational_signal_path = _resolve_config_relative_path(current_config_path, operational_signals.get("selected_signals_path"))
+    if operational_signal_path is not None:
+        operational_signals["selected_signals_path"] = _relative_path(
+            operational_signal_path,
+            operational_config_path.parent.resolve(),
+        )
+        operational_cfg["signals"] = operational_signals
     operational_cfg.setdefault("dates", {})
     operational_cfg["dates"]["train_end"] = args.operational_train_end
     operational_cfg["dates"]["test_start"] = args.forward_start
@@ -134,6 +176,8 @@ def main() -> None:
         "operational_train_end": args.operational_train_end,
         "forward_output_root": args.forward_output_root,
         "operational_output_root": args.operational_output_root,
+        "forward_selected_signals_path": (forward_cfg.get("signals", {}) or {}).get("selected_signals_path"),
+        "operational_selected_signals_path": (operational_cfg.get("signals", {}) or {}).get("selected_signals_path"),
     }
     meta_path = _resolve(args.meta_out)
     meta_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,11 @@
+{
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "residual_mom_beta_neutral"
+  ],
+  "winner_tag_20k": "u27_eta082_alpha_resid_20k_r1",
+  "winner_tag_100k": "u27_eta082_alpha_resid_100k_r1",
+  "winner_config": "configs/exp/u27_eta082_alpha_resid_100k_r1.yaml",
+  "generated_at": "20260321T032147Z"
+}

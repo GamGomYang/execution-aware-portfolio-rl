@@ -9,9 +9,9 @@ PILOT_SEEDS_RAW="${PILOT_SEEDS:-0 2 5 6}"
 CHECK2_HARD="${CHECK2_HARD:-3}"
 CHECK2_SOFT="${CHECK2_SOFT:-2}"
 MAX_STEPS="${MAX_STEPS:-0}"
-CANDIDATES_RAW="${CANDIDATES:-u27_eta082_alpha_ctrl_20k_r1 u27_eta082_alpha_cs61_20k_r1 u27_eta082_alpha_vsmom_20k_r1 u27_eta082_alpha_resid_20k_r1}"
+CANDIDATES_RAW="${CANDIDATES:-u27_eta082_alpha2_ctrl_20k_r1 u27_eta082_alpha2_cs312_20k_r1 u27_eta082_alpha2_cs61vsmom_20k_r1 u27_eta082_alpha2_cs61resid_20k_r1 u27_eta082_alpha2_cs312resid_20k_r1}"
 MATERIALIZE="${MATERIALIZE:-1}"
-MATERIALIZE_META="${MATERIALIZE_META:-outputs/reports/u27_alpha_first_batch_materialization.json}"
+MATERIALIZE_META="${MATERIALIZE_META:-outputs/reports/u27_alpha_second_wave_materialization.json}"
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
   echo "[ERROR] Python executable not found: $PYTHON_BIN"
@@ -25,10 +25,10 @@ read -r -a PILOT_SEEDS <<< "$PILOT_SEEDS_RAW"
 read -r -a CANDIDATES <<< "$CANDIDATES_RAW"
 
 JOB_TS="$(date -u +%Y%m%dT%H%M%SZ)"
-LOG_DIR="outputs/logs/u27_alpha_first_batch_phaseA_${JOB_TS}"
+LOG_DIR="outputs/logs/u27_alpha_second_wave_phaseA_${JOB_TS}"
 MASTER_LOG="${LOG_DIR}/master.log"
-SUMMARY_CSV="outputs/reports/u27_alpha_first_batch_phaseA_summary_${JOB_TS}.csv"
-SUMMARY_MD="outputs/reports/u27_alpha_first_batch_phaseA_summary_${JOB_TS}.md"
+SUMMARY_CSV="outputs/reports/u27_alpha_second_wave_phaseA_summary_${JOB_TS}.csv"
+SUMMARY_MD="outputs/reports/u27_alpha_second_wave_phaseA_summary_${JOB_TS}.md"
 mkdir -p "$LOG_DIR" "outputs/reports"
 
 log() {
@@ -48,8 +48,8 @@ run_step() {
 }
 
 materialize_batch() {
-  run_step "materialize_alpha_first_batch" \
-    "$PYTHON_BIN" scripts/materialize_u27_alpha_first_batch_configs.py \
+  run_step "materialize_alpha_second_wave" \
+    "$PYTHON_BIN" scripts/materialize_u27_alpha_second_wave_configs.py \
       --candidates "${CANDIDATES[@]}" \
       --meta-out "$MATERIALIZE_META"
 }
@@ -172,7 +172,7 @@ out_csv.parent.mkdir(parents=True, exist_ok=True)
 df.to_csv(out_csv, index=False)
 
 lines: list[str] = []
-lines.append("# U27 Alpha First Batch Phase A Summary")
+lines.append("# U27 Alpha Second Wave Phase A Summary")
 lines.append("")
 lines.append(f"- validation_step6_config: {step6_config}")
 lines.append(f"- hard_threshold: {hard_thr}")
@@ -205,7 +205,7 @@ if [[ "$MATERIALIZE" == "1" ]]; then
   materialize_batch
 fi
 
-log "[INFO] phase=alpha_first_batch_A"
+log "[INFO] phase=alpha_second_wave_A"
 log "[INFO] candidates=${CANDIDATES[*]}"
 log "[INFO] pilot_seeds=${PILOT_SEEDS[*]}"
 log "[INFO] step6_config=${STEP6_CONFIG}"
@@ -258,5 +258,5 @@ done
 
 summary_raw="$(build_summary)"
 printf '%s\n' "$summary_raw" | tee -a "$MASTER_LOG"
-log "[DONE] phase=alpha_first_batch_A complete"
+log "[DONE] phase=alpha_second_wave_A complete"
 log "[DONE] master_log=${MASTER_LOG}"

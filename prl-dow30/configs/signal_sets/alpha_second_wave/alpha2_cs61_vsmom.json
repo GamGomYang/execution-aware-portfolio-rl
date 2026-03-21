@@ -1,0 +1,13 @@
+{
+  "tag": "u27_eta082_alpha2_cs61vsmom_20k_r1",
+  "candidate_key": "cs61vsmom",
+  "tag_prefix": "u27_eta082_alpha2_cs61vsmom",
+  "label": "control_plus_cs_mom_6_1_plus_vol_scaled_mom",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "cs_mom_6_1",
+    "vol_scaled_mom"
+  ],
+  "notes": "Pair medium-horizon momentum with volatility-scaled momentum to test two-addon complementarity."
+}

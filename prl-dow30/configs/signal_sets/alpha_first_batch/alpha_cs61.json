@@ -1,5 +1,7 @@
 {
   "tag": "u27_eta082_alpha_cs61_20k_r1",
+  "candidate_key": "cs61",
+  "tag_prefix": "u27_eta082_alpha_cs61",
   "label": "control_plus_cs_mom_6_1",
   "selected_signals": [
     "reversal_5d",

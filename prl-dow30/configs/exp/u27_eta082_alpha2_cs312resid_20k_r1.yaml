@@ -1,26 +1,9 @@
-mode: paper
-experiment_name: step6_fixedeta_forward_2026ytd_eta082_seed10
-model_type: prl
-kappas:
-- 0.0
-- 0.0005
-- 0.001
-seeds:
-- 0
-- 1
-- 2
-- 3
-- 4
-- 5
-- 6
-- 7
-- 8
-- 9
+mode: screen_u27_eta082_alpha_second_wave
 dates:
   train_start: '2010-01-01'
   train_end: '2021-12-31'
-  test_start: '2026-01-01'
-  test_end: '2026-03-20'
+  test_start: '2022-01-01'
+  test_end: '2023-12-31'
 data:
   raw_dir: data/raw
   processed_dir: data/processed_u27
@@ -76,7 +59,11 @@ signals:
   signal_names:
   - reversal_5d
   - short_term_reversal
-  selected_signals_path: ../outputs/diagnostics/signal_scan_u27/selected_signals.json
+  - cs_mom_3_12
+  - residual_mom_beta_neutral
+  selected_signals_path: ../signal_sets/alpha_second_wave/alpha2_cs312_resid.json
+  selection_policy: alpha_research
+  allow_nonfixed_selection: true
 env:
   L: 30
   Lv: 30
@@ -84,16 +71,8 @@ env:
   logit_scale: 10.0
   eta_mode: fixed
   rebalance_eta: 0.082
-baseline_env:
-  eta_mode: fixed
-  rebalance_eta: 1.0
-execution:
-  enforce_paired_seeds: true
 output:
-  root: outputs/step6_u27_eta082_forward_2026ytd
-  save_trace: true
-  save_env_signature: true
-  save_cmd: true
+  root: outputs/u27_eta082_alpha2_cs312resid_20k_r1
 prl:
   alpha0: 0.2
   beta: 1.0
@@ -105,13 +84,29 @@ prl:
   mid_plasticity_multiplier: 0.7
   cvar_penalty_gamma: 0.3
 sac:
-  learning_rate: 0.0003
+  learning_rate: 0.0001
   batch_size: 256
   gamma: 0.99
   tau: 0.005
   buffer_size: 100000
-  total_timesteps: 100000
+  total_timesteps: 20000
   eval_freq: 5000
   ent_coef: 0.2
   log_interval_steps: 1000
   checkpoint_interval: 50000
+seeds:
+- 0
+- 1
+- 2
+- 3
+- 4
+- 5
+- 6
+- 7
+- 8
+- 9
+eval:
+  write_trace: false
+  trace_stride: 10
+  run_baselines: false
+  write_step4: false

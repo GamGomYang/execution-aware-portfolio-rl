@@ -1,0 +1,13 @@
+{
+  "tag": "u27_eta082_alpha2_cs61resid_20k_r1",
+  "candidate_key": "cs61resid",
+  "tag_prefix": "u27_eta082_alpha2_cs61resid",
+  "label": "control_plus_cs_mom_6_1_plus_residual_mom",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "cs_mom_6_1",
+    "residual_mom_beta_neutral"
+  ],
+  "notes": "Pair medium-horizon momentum with residual momentum to test orthogonal addon stacking."
+}

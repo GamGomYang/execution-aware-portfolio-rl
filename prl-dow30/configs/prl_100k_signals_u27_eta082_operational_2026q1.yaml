@@ -3,7 +3,7 @@ dates:
   train_start: '2010-01-01'
   train_end: '2025-12-31'
   test_start: '2026-01-01'
-  test_end: '2026-03-18'
+  test_end: '2026-03-20'
 data:
   raw_dir: data/raw
   processed_dir: data/processed_u27

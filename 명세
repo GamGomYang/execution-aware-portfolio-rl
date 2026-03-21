@@ -1,3 +1,545 @@
+2026-03-20 Alpha-First Batch 후속 실행 명세 (최신 우선)
+
+문서 우선순위 안내
+- 본 섹션은 2026-03-20 UTC 기준 최신 실행 명세다.
+- 아래에 남아 있는 2026-03-07 ~ 2026-03-09 Step6/eta 복구 명세는 보존용 기록이며, 현재 즉시 실행 우선순위는 본 섹션이 더 높다.
+- 현재 프로젝트의 핵심 병목은 execution recipe가 아니라 alpha source다.
+
+문서 목적
+- 2026-03-19 UTC까지 `nexttodo`에 기록된 작업을 기준으로, 2026-03-20 이후 무엇을 어떤 순서로 해야 하는지 실행 가능한 수준으로 고정한다.
+- 이미 구현된 alpha-first batch 파이프라인을 실제 screening -> shadow confirm -> 100k 승격 -> final OOS -> forward/operational 검증까지 연결하는 상세 명세를 남긴다.
+- "무엇을 새로 구현해야 하는지"와 "무엇은 이미 있으니 재사용해야 하는지"를 구분한다.
+
+0) 현재 상태 스냅샷 (실사 기준: 2026-03-20 UTC)
+- 작업 루트
+  - workspace root: `/workspace/execution-aware-portfolio-rl`
+  - repo root: `/workspace/execution-aware-portfolio-rl/prl-dow30`
+- 현재 워크트리 상태
+  - `git status --short` 결과는 비어 있음
+  - 즉, `nexttodo`에 적힌 "dirty worktree" 메모는 2026-03-19 시점 기록이고, 2026-03-20 현재 상태와는 다름
+- 현재 출력물 상태
+  - `prl-dow30/outputs` 디렉터리는 현재 없음
+  - 따라서 `nexttodo`에 적힌 alpha smoke / phaseA 결과 경로는 "기록상 존재했던 산출물"이지, 현재 워크스페이스에서 즉시 재사용 가능한 산출물은 아님
+- 이미 코드로 존재하는 핵심 자동화
+  - alpha materializer: `prl-dow30/scripts/materialize_u27_alpha_first_batch_configs.py`
+  - alpha phaseA runner: `prl-dow30/scripts/run_u27_alpha_first_batch_phaseA.sh`
+  - detached launcher alphaA 엔트리: `prl-dow30/scripts/launch_u27_eta082_detached.sh`
+  - generic phaseB runner: `prl-dow30/scripts/run_u27_eta082_phaseB.sh`
+  - generic phaseC runner: `prl-dow30/scripts/run_u27_eta082_phaseC.sh`
+  - forward OOS runner: `prl-dow30/scripts/run_u27_eta082_forward_oos.sh`
+  - post-adoption runner: `prl-dow30/scripts/run_u27_eta082_post_adoption.sh`
+- 즉시 결론
+  - 지금 가장 먼저 해야 할 일은 alpha phaseA를 다시 돌려 4개 후보를 screen하는 것
+  - 그 다음 할 일은 "phaseB runner를 새로 만드는 것"이 아니라, 기존 phaseB 러너를 alpha 실험에 맞게 감싸거나 오버라이드해서 쓰는 것
+  - phaseC로 넘어가기 전에 alpha용 `*_100k_r1` config 생성 경로를 반드시 마련해야 함
+
+1) 현재 고정 자산과 변경 금지 대상
+
+1-1. execution recipe 관련 고정 자산
+- official incumbent config
+  - `prl-dow30/configs/prl_100k_signals_u27_eta082_current.yaml`
+- immutable winner snapshot
+  - `prl-dow30/configs/prl_100k_signals_u27_eta082_20260319_m070_cg03_lr1e4.yaml`
+- 현재 고정해야 할 execution-side 설정
+  - `eta = 0.082`
+  - `mid_plasticity_multiplier = 0.70`
+  - `cvar_penalty_gamma = 0.3`
+  - `learning_rate = 1e-4`
+  - `L = 30`
+  - `Lv = 30`
+  - `c_tc = 0.0005`
+  - `logit_scale = 10.0`
+  - universe = U27 fixed list
+
+1-2. 평가 구간 관련 고정 자산
+- alpha phaseA / phaseB validation window
+  - train: `2010-01-01 ~ 2021-12-31`
+  - validation: `2022-01-01 ~ 2023-12-31`
+  - config: `prl-dow30/configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml`
+- final OOS window
+  - final test: `2024-01-01 ~ 2025-12-31`
+  - config: `prl-dow30/configs/step6_fixedeta_final_test_eta082_seed10.yaml`
+- forward OOS window
+  - forward start: `2026-01-01`
+  - config: `prl-dow30/configs/step6_fixedeta_forward_2026ytd_eta082_seed10.yaml`
+
+1-3. alpha first batch 후보 자산
+- control
+  - tag: `u27_eta082_alpha_ctrl_20k_r1`
+  - signals: `reversal_5d`, `short_term_reversal`
+- challenger 1
+  - tag: `u27_eta082_alpha_cs61_20k_r1`
+  - signals: `reversal_5d`, `short_term_reversal`, `cs_mom_6_1`
+- challenger 2
+  - tag: `u27_eta082_alpha_vsmom_20k_r1`
+  - signals: `reversal_5d`, `short_term_reversal`, `vol_scaled_mom`
+- challenger 3
+  - tag: `u27_eta082_alpha_resid_20k_r1`
+  - signals: `reversal_5d`, `short_term_reversal`, `residual_mom_beta_neutral`
+
+1-4. 현재 signal universe
+- `prl-dow30/prl/signals.py` 기준 사용 가능한 신호는 아래 6개뿐임
+  - `cs_mom_3_12`
+  - `cs_mom_6_1`
+  - `vol_scaled_mom`
+  - `residual_mom_beta_neutral`
+  - `short_term_reversal`
+  - `reversal_5d`
+- 즉, first batch 이후 second-wave를 설계할 경우 가장 먼저 검토할 미사용 신호는 `cs_mom_3_12`임
+
+2) 지금 당장 하지 말아야 할 일
+- `eta`, `mid_plasticity_multiplier`, `cvar_penalty_gamma`, `learning_rate`를 다시 탐색하지 않는다.
+- `run_u27_eta082_overnight.sh`를 alpha 실험에 그대로 쓰지 않는다.
+  - 이 스크립트는 현재 기본값이 구형 eta 후보를 전제로 하며, alpha 태그를 기본으로 보지 않는다.
+- `nexttodo`에 적힌 옛 output 경로를 현재 파일 시스템에 있다고 가정하지 않는다.
+- alpha 후보가 확정되기 전에는 `configs/prl_100k_signals_u27_eta082_current.yaml`를 덮어쓰지 않는다.
+
+3) Spec-AF0. alpha batch 재시작 준비
+- 목적
+  - 2026-03-20 시점 clean state에서 alpha phaseA를 즉시 재가동 가능한지 사전 점검
+- 선행조건
+  - 없음
+- 입력
+  - Python venv: `/workspace/execution-aware-portfolio-rl/.venv/bin/python`
+  - repo root: `/workspace/execution-aware-portfolio-rl/prl-dow30`
+  - cache dir: `prl-dow30/data/processed_u27`
+- 절차
+  1) Python 실행파일 존재 확인
+     - `test -x /workspace/execution-aware-portfolio-rl/.venv/bin/python`
+  2) `tmux` 존재 확인
+     - `tmux -V`
+  3) processed cache 존재 확인
+     - `test -d /workspace/execution-aware-portfolio-rl/prl-dow30/data/processed_u27`
+  4) alpha configs 존재 확인
+     - `ls /workspace/execution-aware-portfolio-rl/prl-dow30/configs/exp/u27_eta082_alpha_*_20k_r1.yaml`
+  5) step6 tune config 존재 확인
+     - `test -f /workspace/execution-aware-portfolio-rl/prl-dow30/configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml`
+- 산출물
+  - 없음
+- 통과 기준
+  - 위 5개 확인이 모두 통과
+- 실패 시 조치
+  - venv가 없으면 requirements 설치
+  - processed cache가 없으면 별도 cache 복구 후 phaseA 시작
+- 예상 소요
+  - 5~10분
+
+4) Spec-AF1. alpha phaseA 전체 재실행
+- 목적
+  - 4개 alpha 후보를 20k, 4-seed, 2022~2023 validation 기준으로 다시 screen
+- 선행조건
+  - Spec-AF0 완료
+- 실제 사용할 러너
+  - detached launcher: `prl-dow30/scripts/launch_u27_eta082_detached.sh`
+  - 본 실행 스크립트: `prl-dow30/scripts/run_u27_alpha_first_batch_phaseA.sh`
+- phaseA 실행 스펙
+  - candidates: `u27_eta082_alpha_ctrl_20k_r1`, `u27_eta082_alpha_cs61_20k_r1`, `u27_eta082_alpha_vsmom_20k_r1`, `u27_eta082_alpha_resid_20k_r1`
+  - seeds: `0 2 5 6`
+  - timesteps: `20000`
+  - step6 config: `configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml`
+  - kappas: `0.0`, `0.0005`, `0.001`
+  - eta: `0.082`
+  - max_steps: `0` 유지
+- 실행 명령
+  - `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+  - `bash scripts/launch_u27_eta082_detached.sh alphaA`
+- foreground 대체 명령
+  - `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+  - `bash scripts/run_u27_alpha_first_batch_phaseA.sh`
+- 모니터링 명령
+  - `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+  - `tmux ls`
+  - `tail -f outputs/logs/u27_alpha_first_batch_phaseA_<TS>/master.log`
+- 기대 산출물
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_materialization.json`
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_<TS>.csv`
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_summary_<TS>.md`
+  - 후보별 train root
+    - `prl-dow30/outputs/u27_eta082_alpha_ctrl_20k_r1`
+    - `prl-dow30/outputs/u27_eta082_alpha_cs61_20k_r1`
+    - `prl-dow30/outputs/u27_eta082_alpha_vsmom_20k_r1`
+    - `prl-dow30/outputs/u27_eta082_alpha_resid_20k_r1`
+  - 후보별 step6 root
+    - `prl-dow30/outputs/step6_u27_eta082_alpha_ctrl_20k_r1`
+    - `prl-dow30/outputs/step6_u27_eta082_alpha_cs61_20k_r1`
+    - `prl-dow30/outputs/step6_u27_eta082_alpha_vsmom_20k_r1`
+    - `prl-dow30/outputs/step6_u27_eta082_alpha_resid_20k_r1`
+- 통과 기준
+  - 4개 후보 모두에 대해 train 완료
+  - 4개 후보 모두에 대해 `aggregate.csv`, `paired_delta.csv`, `acceptance_report_hard3.*`, `acceptance_report_soft2.*` 생성
+  - summary csv/md 생성
+- 실패 시 조치
+  - 특정 후보만 실패하면 해당 후보만 foreground 재실행
+  - materialize 단계 실패 시 signal manifest/config부터 복구
+- 예상 소요
+  - 환경 성능에 따라 반나절 내외
+
+5) Spec-AF2. phaseA 판정과 top2 확정
+- 목적
+  - phaseA 결과를 바탕으로 phaseB로 올릴 top 2 후보를 확정
+- 선행조건
+  - Spec-AF1 완료
+- 먼저 확인할 컬럼
+  - `hard_pass`
+  - `soft_pass`
+  - `k001_positive`
+  - `k001_mean_delta_sharpe`
+  - `k001_negative_seeds`
+  - `k001_collapse_rate`
+- hard ranking 규칙
+  1) `hard_pass = True`
+  2) `k001_positive` 값이 큰 후보
+  3) `k001_mean_delta_sharpe` 값이 큰 후보
+  4) `k0005_positive` 값이 큰 후보
+  5) `k0005_mean_delta_sharpe` 값이 큰 후보
+- 탈락 규칙
+  - `collapse_rate > 0` 이면 즉시 탈락
+  - `k001_positive <= 1` 이면 우선 탈락
+  - `k001_mean_delta_sharpe <= 0` 이고 `soft_pass = False`이면 원칙적으로 탈락
+- phaseB 진입 규칙
+  - 원칙: top 2 challenger를 phaseB로 올림
+  - 예외: control이 top 2 밖으로 밀려도, baseline 비교 기준이 필요하면 control은 baseline 태그로 유지
+- 필수 기록물
+  - `prl-dow30/outputs/reports/u27_alpha_first_batch_phaseA_decision_<TS>.md`
+  - 문서에는 아래를 반드시 적는다.
+    - top 2 후보명
+    - 탈락 후보명과 탈락 사유
+    - `k001_positive`, `k001_mean_delta_sharpe`, `collapse_rate`
+- 통과 기준
+  - phaseB로 올릴 top 2 후보가 명시적으로 하나의 문서에 확정됨
+- 예상 소요
+  - 20~40분
+
+6) Spec-AF3. alpha 전용 phaseB 러너 정리
+- 목적
+  - 기존 generic phaseB를 사람 실수 없이 alpha batch에 재사용할 수 있게 정리
+- 현재 확인된 사실
+  - `prl-dow30/scripts/run_u27_eta082_phaseB.sh`는 이미 존재함
+  - 그러나 기본값이 alpha 전용이 아님
+    - 기본 baseline tag가 구형 eta 실험용
+    - 기본 step6 config가 final test(2024~2025)용
+    - 기본 `MAX_STEPS=252`
+- 따라서 해야 할 일
+  - 새로 완전히 다른 phaseB를 복붙 생성하는 것이 아니라, alpha 전용 wrapper 또는 alpha 전용 entrypoint를 추가하는 것이 맞음
+- 권장 구현
+  - 새 파일: `prl-dow30/scripts/run_u27_alpha_first_batch_phaseB.sh`
+  - 내부 동작
+    - `BASELINE_TAG='u27_eta082_alpha_ctrl_20k_r1'`
+    - `STEP6_CONFIG='configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml'`
+    - `FULL_SEEDS='0 1 2 3 4 5 6 7 8 9'`
+    - `CHECK2_HARD='6'`
+    - `CHECK2_SOFT='5'`
+    - `MAX_STEPS='0'`
+    - `PHASEB_CANDIDATES='<phaseA top1> <phaseA top2>'`
+    - 마지막에 `bash scripts/run_u27_eta082_phaseB.sh` 호출
+  - detached launcher 확장
+    - `prl-dow30/scripts/launch_u27_eta082_detached.sh`에 `alphaB` phase 추가
+- 통과 기준
+  - 사람이 alpha phaseB를 실행할 때 env override를 길게 기억하지 않아도 됨
+  - `bash scripts/launch_u27_eta082_detached.sh alphaB` 한 줄로 10-seed confirm 시작 가능
+- 예상 소요
+  - 구현 30~60분
+
+7) Spec-AF4. alpha phaseB 10-seed shadow confirm
+- 목적
+  - phaseA top2가 10-seed 기준에서도 유지되는지 2022~2023 tune window에서 재검증
+- 선행조건
+  - Spec-AF2 완료
+  - Spec-AF3 구현 또는 env override 수동 준비
+- 실행 스펙
+  - baseline tag: `u27_eta082_alpha_ctrl_20k_r1`
+  - candidates: phaseA top 2
+  - full seeds: `0 1 2 3 4 5 6 7 8 9`
+  - step6 config: `configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml`
+  - kappas: `0.0`, `0.0005`, `0.001`
+  - max_steps: `0`
+- 수동 실행 명령
+  - `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+  - `BASELINE_TAG='u27_eta082_alpha_ctrl_20k_r1' PHASEB_CANDIDATES='<TOP1> <TOP2>' STEP6_CONFIG='configs/step6_fixedeta_tune_2022_2023_eta082_seed10.yaml' FULL_SEEDS='0 1 2 3 4 5 6 7 8 9' CHECK2_HARD='6' CHECK2_SOFT='5' MAX_STEPS='0' bash scripts/run_u27_eta082_phaseB.sh`
+- 기대 산출물
+  - `prl-dow30/outputs/reports/u27_eta082_phaseB_summary_<TS>.csv`
+  - `prl-dow30/outputs/reports/u27_eta082_phaseB_summary_<TS>.md`
+  - `prl-dow30/outputs/<tag>_full10`
+  - `prl-dow30/outputs/step6_<tag>_full10`
+- phaseB 판정 규칙
+  - 1순위: `hard6 pass`
+  - 2순위: `soft5 pass`
+  - 3순위: `k001_mean_delta_sharpe`
+  - 4순위: `k001_negative_seeds`가 적은 후보
+  - 5순위: `collapse_rate = 0`
+- 승격 규칙
+  - winner 1개를 phaseC 후보로 승격
+  - challenger 둘 다 부진하면 control 유지 + second-wave alpha 설계로 분기
+- 통과 기준
+  - phaseC에 올릴 단일 winner 또는 "승격 불가" 결론이 명확히 정리됨
+- 예상 소요
+  - 반나절 ~ 하루
+
+8) Spec-AF5. alpha winner용 100k config 승격 구현
+- 목적
+  - phaseC가 요구하는 `*_100k_r1` alpha config를 생성
+- 현재 확인된 블로커
+  - 현재 `configs/exp`에는 `u27_eta082_alpha_*_20k_r1.yaml`만 있고 `*_100k_r1.yaml`은 없음
+  - `prl-dow30/scripts/run_u27_eta082_phaseC.sh`와 `prl-dow30/scripts/run_u27_eta082_overnight.sh`는 사실상 `*_100k_r1` config가 존재해야 자연스럽게 이어짐
+- 권장 구현 원칙
+  - 새 스크립트를 복붙으로 하나 더 만들기보다 기존 `materialize_u27_alpha_first_batch_configs.py`를 확장한다
+  - config 생성의 단일 원천을 유지한다
+- 권장 변경 사항
+  - `prl-dow30/scripts/materialize_u27_alpha_first_batch_configs.py`에 아래 CLI 인자 추가
+    - `--timesteps`
+    - `--tag-suffix`
+    - `--candidate-filter` 또는 `--candidates`
+    - 필요 시 `--output-root-prefix`
+  - 20k/100k 모두 같은 생성 로직을 타게 한다
+  - winner 확정 후 아래 config를 생성할 수 있어야 함
+    - `prl-dow30/configs/exp/u27_eta082_alpha_ctrl_100k_r1.yaml`
+    - `prl-dow30/configs/exp/u27_eta082_alpha_<WINNER>_100k_r1.yaml`
+  - 생성되는 100k config 요구사항
+    - execution-side 하이퍼파라미터는 incumbent와 동일
+    - signal set만 winner 기준으로 반영
+    - `sac.total_timesteps = 100000`
+    - `output.root = outputs/<tag>`
+    - `signals.selection_policy = alpha_research`
+    - `signals.allow_nonfixed_selection = true`
+- 추가로 함께 할 일
+  - 필요 시 `launch_u27_eta082_detached.sh`에 `alphaC` 또는 `alphaPromote` phase 추가
+- 통과 기준
+  - `PHASEC_TAG='u27_eta082_alpha_<WINNER>_100k_r1'`로 phaseC 러너를 바로 실행할 수 있음
+- 예상 소요
+  - 구현 1~2시간
+
+9) Spec-AF6. alpha winner 최종 OOS 검증 (phaseC)
+- 목적
+  - phaseB winner가 2024~2025 final OOS에서도 실제로 유지되는지 검증
+- 선행조건
+  - Spec-AF5 완료
+- 실행 스펙
+  - phaseC tag: `u27_eta082_alpha_<WINNER>_100k_r1`
+  - phaseC config: `configs/exp/u27_eta082_alpha_<WINNER>_100k_r1.yaml`
+  - eval window: `2024-01-01 ~ 2025-12-31`
+  - step6 config: `configs/step6_fixedeta_final_test_eta082_seed10.yaml`
+  - seeds: `0 1 2 3 4 5 6 7 8 9`
+  - kappas: `0.0`, `0.0005`, `0.001`
+- 실행 명령
+  - `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
+  - `PHASEC_TAG='u27_eta082_alpha_<WINNER>_100k_r1' MAX_STEPS='0' RUN_FULL_AUDIT='1' FULL_AUDIT_MAX_STEPS='0' bash scripts/run_u27_eta082_phaseC.sh`
+- 기대 산출물
+  - `prl-dow30/outputs/modelswap_u27_eta082_alpha_<WINNER>_100k_r1`
+  - `prl-dow30/outputs/step6_u27_eta082_alpha_<WINNER>_100k_r1`
+  - `prl-dow30/outputs/reports/u27_eta082_phaseC_summary_<TS>.md`
+- 최종 통과 기준
+  - `hard6 pass` 또는 최소 `soft5 pass`
+  - `k001_mean_delta_sharpe > 0`
+  - `k001_positive >= 6` 권장
+  - `collapse_rate = 0`
+- 실패 시 조치
+  - winner 반려
+  - control 유지
+  - second-wave alpha 설계로 이동
+- 예상 소요
+  - 하루 내외
+
+10) Spec-AF7. adoption / forward / operational 검증
+- 목적
+  - alpha winner가 research 승자로 끝나지 않고 운영 승자로도 성립하는지 확인
+- 선행조건
+  - Spec-AF6 통과
+- adoption 전 필수 작업
+  - 기존 current config 백업본 유지
+  - winner signal set을 반영한 immutable snapshot 생성
+  - 그 다음에만 `prl-dow30/configs/prl_100k_signals_u27_eta082_current.yaml` 갱신
+- forward OOS 실행
+  - 스크립트: `prl-dow30/scripts/run_u27_eta082_forward_oos.sh`
+  - alpha wrapper: `prl-dow30/scripts/run_u27_alpha_first_batch_forward_oos.sh`
+  - 평가창: `2026-01-01 ~ cache_max_date`
+  - 기대 산출물
+    - `prl-dow30/outputs/reports/u27_eta082_forward_summary_<TS>.md`
+    - `prl-dow30/outputs/releases/u27_eta082_forward_2026ytd/`
+- post-adoption 실행
+  - 스크립트: `prl-dow30/scripts/run_u27_eta082_post_adoption.sh`
+  - alpha wrapper: `prl-dow30/scripts/run_u27_alpha_first_batch_post_adoption.sh`
+  - 기대 산출물
+    - `prl-dow30/outputs/reports/u27_eta082_post_adoption_summary_<TS>.md`
+    - `prl-dow30/outputs/releases/u27_eta082_operational_2026q1/`
+- adoption current materialization
+  - 스크립트: `prl-dow30/scripts/materialize_u27_alpha_first_batch_current_adoption.py`
+  - 역할
+    - 기존 `current` config 백업
+    - winner signal snapshot 생성
+    - immutable snapshot config 생성
+    - `prl-dow30/configs/prl_100k_signals_u27_eta082_current.yaml` 갱신
+    - forward / operational config 동시 materialize
+- end-to-end wrapper
+  - 스크립트: `prl-dow30/scripts/run_u27_alpha_first_batch_adoption.sh`
+  - detached launcher phase: `alphaAdopt`
+- adoption 완료 기준
+  - final OOS 통과
+  - forward OOS에서 실행 건강성 유지
+  - operational release pack 생성
+- 2026-03-21 실행 결과
+  - winner: `u27_eta082_alpha_resid_100k_r1`
+  - forward 창: `2026-01-01 ~ 2026-03-20`
+  - forward 결과: `hard6 fail`, `soft5 fail`
+  - 핵심 수치
+    - `k001_main_median_sharpe = -6.7984`
+    - `k001_baseline_median_sharpe = -6.8210`
+    - `k001_mean_delta_sharpe = +0.0160`
+    - `k001_positive = 8/10`
+    - `k0005_positive = 5/10`
+    - `kappa0_median_delta_sharpe = -0.0221`
+  - 해석
+    - winner가 baseline보다 "조금 덜 나쁜" seed는 있었지만 절대 성과가 음수라 운영 승격 기준 미달
+    - 따라서 `research winner`와 `production winner`를 분리해야 함
+  - 즉시 결정
+    - `current` alias는 control 기준으로 복구
+    - failed adoption snapshot은 audit 용도로만 보존
+    - operational long-run은 go/no-go 판단만 필요할 경우 중단 권고
+  - 예외
+    - 운영 long-run을 끝까지 돌리는 것은 `stale model` 가설 검증 목적일 때만 의미가 있음
+- 예상 소요
+  - 반나절 ~ 하루
+
+11) Spec-AF8. second-wave alpha fallback 설계
+- 목적
+  - first batch에서 승격 불가 시 다음 alpha 배치를 빠르게 설계
+- 진입 조건
+  - Spec-AF4 또는 Spec-AF6 또는 Spec-AF7 실패
+- 설계 원칙
+  - execution recipe는 고정
+  - 1차 실패 직후 execution-side 재튜닝 금지
+  - 새 실험은 signal 조합만 바꾼다
+- 2026-03-21 후속 권고
+  - `resid`는 research 승자로 기록하되 promotion은 보류
+  - 다음 실험의 1순위는 second-wave alpha 또는 stale-model 원인분리 실험
+  - stale-model 원인분리 실험을 할 경우
+    - frozen winner 모델 forward와
+    - 2025-12-31까지 재학습한 operational 모델 2026 YTD를 분리 비교
+- 2차 배치 우선 후보
+  - 후보 1: `control + cs_mom_3_12`
+  - 후보 2: `control + cs_mom_6_1 + vol_scaled_mom`
+  - 후보 3: `control + cs_mom_6_1 + residual_mom_beta_neutral`
+  - 후보 4: `control + cs_mom_3_12 + residual_mom_beta_neutral`
+- 이유
+  - 현재 signal universe 6개 중 first batch에서 직접 시험하지 않은 축은 `cs_mom_3_12`
+  - first batch가 "단일 addon" 위주였다면 second wave는 "상호보완 addon 2개" 조합까지 허용해볼 가치가 있음
+- 선행 구현
+  - materializer가 3-signal뿐 아니라 4-signal config도 안전하게 생성할 수 있어야 함
+- 통과 기준
+  - second-wave candidate 4개가 config/manifest 수준에서 생성되고 phaseA 재사용 가능
+
+11A) Spec-AF8b. failed adoption 이후 즉시 실행 명세
+- 현재 상태 한 줄 요약
+  - `resid`는 research winner지만 production winner는 아님
+- 현재 상태 상세
+  - 실행 중 실험 세션 없음
+  - `current` alias는 control basket으로 복구 완료
+  - forward / operational 파생 config도 current 기준으로 재정렬 완료
+  - failed adoption 산출물은 audit 용도로만 보존
+- 쉽게 설명
+  - 예선/준결승/결승까지는 `resid`가 제일 유망했음
+  - 그런데 실제 최신 구간 리허설(`2026-01-01 ~ 2026-03-20`)에서는 절대 성과가 너무 안 좋았음
+  - 그래서 "연구실 챔피언"까진 맞지만 "실전 선발"은 못 넘었다고 보면 됨
+- 즉시 의사결정
+  - 운영 전략은 기존 control 유지
+  - `resid`의 current alias 승격은 중단
+  - adoption 관련 장시간 operational run은 종료 상태 유지
+- 바로 다음 우선순위
+  - 1순위: second-wave alpha batch 시작
+  - 2순위: stale-model 원인분리 실험은 필요할 때만 별도 트랙으로 수행
+- stale-model 원인분리 실험 명세
+  - 목적
+    - `resid`가 정말 signal 문제인지, 아니면 2021까지 학습된 frozen winner가 2026 구간에서 stale 해진 것인지 분리
+  - 최소 비교군
+    - frozen winner forward 결과
+    - 2025-12-31까지 재학습한 operational 모델의 2026 YTD 결과
+  - 해석 규칙
+    - operational 재학습 모델도 약하면 signal/regime 문제로 해석
+    - operational 재학습 모델이 회복되면 stale-model 가능성으로 해석
+  - 이 트랙은 채택 판단과 분리하여 진단 목적으로만 운영
+- second-wave alpha batch 실행 명세
+  - 목적
+    - execution recipe는 그대로 유지하면서 signal 조합만 새로 시험
+  - 구현 경로
+    - materializer: `prl-dow30/scripts/materialize_u27_alpha_second_wave_configs.py`
+    - phaseA runner: `prl-dow30/scripts/run_u27_alpha_second_wave_phaseA.sh`
+    - detached launcher phase: `alpha2A`
+  - 실험 후보
+    - `control + cs_mom_3_12`
+    - `control + cs_mom_6_1 + vol_scaled_mom`
+    - `control + cs_mom_6_1 + residual_mom_beta_neutral`
+    - `control + cs_mom_3_12 + residual_mom_beta_neutral`
+  - 실제 phaseA 태그 집합
+    - `u27_eta082_alpha2_ctrl_20k_r1`
+    - `u27_eta082_alpha2_cs312_20k_r1`
+    - `u27_eta082_alpha2_cs61vsmom_20k_r1`
+    - `u27_eta082_alpha2_cs61resid_20k_r1`
+    - `u27_eta082_alpha2_cs312resid_20k_r1`
+  - phaseA 규칙
+    - 기존 alpha-first phaseA 러너 재사용
+    - `20k`, `4 seeds`, `2022-01-01 ~ 2023-12-31`
+    - hard/soft/pass 규칙은 기존과 동일
+  - phaseB 진입 규칙
+    - challenger 상위 2개만 `10 seeds` shadow confirm
+    - control은 baseline으로 유지
+  - phaseC 진입 규칙
+    - phaseB winner만 `100k` 승격
+    - final gate는 hard6 또는 최소 soft5
+  - 중단 규칙
+    - forward OOS fail 시 adoption 보류
+    - current alias는 다시 덮어쓰지 않음
+- 기대 산출물
+  - second-wave 후보 manifest/config
+  - phaseA summary / decision
+  - 필요 시 phaseB / phaseC summary
+  - adoption 여부 최종 판단 메모
+- 완료 기준
+  - current alias가 control 상태로 유지됨
+  - second-wave batch spec으로 바로 재실행 가능한 준비가 끝남
+  - 다음 실험이 stale-model 진단인지 second-wave alpha인지 문서상 명확히 구분됨
+
+12) 기록 의무
+- 각 단계 완료 후 아래 문서를 반드시 갱신
+  - `/workspace/execution-aware-portfolio-rl/nexttodo`
+  - `/workspace/execution-aware-portfolio-rl/결과 분석`
+- 최소 기록 항목
+  - 실행 시각 UTC
+  - 사용 config/tag
+  - seed 집합
+  - step6 window
+  - `hard_pass`, `soft_pass`
+  - `k001_positive`
+  - `k001_mean_delta_sharpe`
+  - `collapse_rate`
+  - 다음 분기 결정
+
+13) 최종 완료 기준 (Definition of Done)
+- DoD-A
+  - alpha phaseA summary와 top2 결정 문서가 존재
+- DoD-B
+  - alpha 전용 phaseB 실행 경로가 사람이 실수 없이 재사용 가능
+- DoD-C
+  - winner용 `*_100k_r1` config가 생성됨
+- DoD-D
+  - phaseC final OOS에서 winner가 hard 또는 soft acceptance 기준을 충족
+- DoD-E
+  - winner 채택 시 forward/post-adoption release pack 생성
+- DoD-F
+  - 실패 시 second-wave alpha spec까지 문서화되어 다음 루프가 즉시 시작 가능
+
+14) 실제 실행 순서 요약
+- 1순위: Spec-AF0
+- 2순위: Spec-AF1
+- 3순위: Spec-AF2
+- 4순위: Spec-AF3
+- 5순위: Spec-AF4
+- 6순위: Spec-AF5
+- 7순위: Spec-AF6
+- 8순위: Spec-AF7
+- 9순위: Spec-AF8
+
+15) 한 줄 결론
+- 2026-03-20 이후의 정답 경로는 "alpha phaseA 재가동 -> top2 선발 -> alpha 전용 phaseB 10-seed confirm -> winner 100k 승격 -> 2024~2025 final OOS -> 2026 forward/operational 검증"이며, 그 전까지 execution recipe 재튜닝은 중단한다.
+
 저번주 작업 복원 명세 (업데이트: 2026-03-07 UTC)
 
 문서 목적

@@ -1,0 +1,13 @@
+{
+  "tag": "u27_eta082_alpha2_cs312resid_20k_r1",
+  "candidate_key": "cs312resid",
+  "tag_prefix": "u27_eta082_alpha2_cs312resid",
+  "label": "control_plus_cs_mom_3_12_plus_residual_mom",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "cs_mom_3_12",
+    "residual_mom_beta_neutral"
+  ],
+  "notes": "Pair the untouched 3_12 momentum family with residual momentum for a second-wave recovery shot."
+}
