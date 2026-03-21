@@ -1,0 +1,11 @@
+{
+  "tag": "u27_eta082_alpha2_ctrl_20k_r1",
+  "candidate_key": "ctrl",
+  "tag_prefix": "u27_eta082_alpha2_ctrl",
+  "label": "control_mean_reversion",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "notes": "Current incumbent control basket used as the second-wave baseline."
+}

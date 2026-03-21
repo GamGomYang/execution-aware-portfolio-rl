@@ -23,6 +23,7 @@ from prl.eval import (
 from prl.features import load_vol_stats
 from prl.train import (
     build_env_for_range,
+    build_signal_features,
     create_scheduler,
     prepare_market_and_features,
     run_training,
@@ -44,8 +45,8 @@ def parse_args():
     parser.add_argument(
         "--output-root",
         type=str,
-        default="outputs",
-        help="Base directory for reports/models/logs (default: outputs).",
+        default=None,
+        help="Base directory for reports/models/logs (default: config.output.root or outputs).",
     )
     parser.add_argument(
         "--total-timesteps",
@@ -53,6 +54,16 @@ def parse_args():
         help="Override sac.total_timesteps for quick smoke runs.",
     )
     return parser.parse_args()
+
+
+def _resolve_output_root(cli_output_root: str | None, cfg: dict) -> Path:
+    if cli_output_root:
+        return Path(cli_output_root)
+    output_cfg = cfg.get("output", {}) or {}
+    cfg_root = output_cfg.get("root")
+    if cfg_root:
+        return Path(cfg_root)
+    return Path("outputs")
 
 
 def _mean_std_safe(values: list[float]) -> tuple[float, float]:
@@ -428,6 +439,7 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     cfg["config_path"] = args.config
+    output_root = _resolve_output_root(args.output_root, cfg)
     if args.total_timesteps:
         cfg.setdefault("sac", {})
         cfg["sac"]["total_timesteps"] = args.total_timesteps
@@ -463,6 +475,7 @@ def main():
         session_opts=session_opts,
         cache_only=cache_only,
     )
+    signal_features, _ = build_signal_features(market, config=cfg)
 
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for training/evaluation.")
@@ -482,7 +495,6 @@ def main():
     regime_rows: list[dict] = []
     run_ids_this_session: list[str] = []
     step4_targets: set[str] = set()
-    output_root = Path(args.output_root)
     reports_dir = output_root / "reports"
     traces_dir = output_root / "traces"
     models_dir = output_root / "models"
@@ -537,6 +549,7 @@ def main():
                     risk_lambda=env_cfg.get("risk_lambda", 0.0),
                     risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
                     rebalance_eta=env_cfg.get("rebalance_eta"),
+                    signal_features=signal_features,
                 )
 
                 assert_env_compatible(env, meta, Lv=env_cfg.get("Lv"))

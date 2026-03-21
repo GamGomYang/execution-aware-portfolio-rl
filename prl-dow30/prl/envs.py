@@ -39,6 +39,7 @@ class EnvConfig:
     rule_vol_a: float = 1.0
     eta_clip_min: float = 0.02
     eta_clip_max: float = 0.5
+    signal_features: Optional[pd.DataFrame] = None
 
 
 class Dow30PortfolioEnv(Env):
@@ -55,8 +56,42 @@ class Dow30PortfolioEnv(Env):
 
         self.num_assets = self.returns.shape[1]
         self.window_size = cfg.window_size
+        self.signal_state = False
+        self.signal_names: list[str] = []
+        self.num_signals = 0
+        self.signal_dim = 0
+        self.signal_features: pd.DataFrame | None = None
 
-        obs_dim = self.window_size * self.num_assets + 2 * self.num_assets
+        if cfg.signal_features is not None:
+            signal_features = cfg.signal_features.astype(np.float32)
+            if not self.returns.index.equals(signal_features.index):
+                raise ValueError("Signal features and returns indices must match exactly.")
+            if not isinstance(signal_features.columns, pd.MultiIndex) or signal_features.columns.nlevels != 2:
+                raise ValueError("signal_features columns must be a 2-level MultiIndex: (signal_name, asset).")
+
+            expected_assets = list(self.returns.columns)
+            signal_names = list(pd.Index(signal_features.columns.get_level_values(0)).unique())
+            if not signal_names:
+                raise ValueError("signal_features must contain at least one signal when provided.")
+
+            ordered_columns: list[tuple[str, str]] = []
+            for signal_name in signal_names:
+                signal_slice = signal_features.xs(signal_name, axis=1, level=0)
+                signal_assets = list(signal_slice.columns)
+                if signal_assets != expected_assets:
+                    raise ValueError(
+                        f"signal_features asset order mismatch for signal={signal_name}: "
+                        f"expected={expected_assets}, got={signal_assets}"
+                    )
+                ordered_columns.extend([(signal_name, asset) for asset in expected_assets])
+            signal_features = signal_features.loc[:, pd.MultiIndex.from_tuples(ordered_columns)]
+            self.signal_features = signal_features
+            self.signal_state = True
+            self.signal_names = signal_names
+            self.num_signals = len(signal_names)
+            self.signal_dim = self.num_assets * self.num_signals
+
+        obs_dim = self.window_size * self.num_assets + 2 * self.num_assets + self.signal_dim
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -112,10 +147,19 @@ class Dow30PortfolioEnv(Env):
         idx = self.current_step - 1
         return self.volatility.iloc[idx].to_numpy(copy=True)
 
+    def _get_signal_vector(self) -> np.ndarray:
+        if not self.signal_state or self.signal_features is None:
+            return np.empty(0, dtype=np.float32)
+        idx = self.current_step - 1
+        return self.signal_features.iloc[idx].to_numpy(copy=True)
+
     def _get_observation(self) -> np.ndarray:
         returns_flat = self._get_returns_window()
         vol_vector = self._get_vol_vector()
-        obs = np.concatenate([returns_flat, vol_vector, self.prev_weights], dtype=np.float32)
+        parts = [returns_flat, vol_vector, self.prev_weights]
+        if self.signal_state:
+            parts.append(self._get_signal_vector())
+        obs = np.concatenate(parts, dtype=np.float32)
         return obs.astype(np.float32)
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None):

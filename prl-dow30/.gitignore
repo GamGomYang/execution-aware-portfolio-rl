@@ -6,6 +6,10 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
+env/
+**/.venv/
+**/venv/
+**/env/
 .env/
 .pub/
 

@@ -1,0 +1,26 @@
+# Local virtual environments
+.venv/
+venv/
+env/
+**/.venv/
+**/venv/
+**/env/
+
+# Python cache / tooling cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated experiment outputs
+outputs/
+prl-dow30/outputs/
+
+# Local working notes/results (non-source artifacts)
+결과
+
+# OS/editor noise
+.DS_Store

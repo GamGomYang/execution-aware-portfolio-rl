@@ -16,6 +16,7 @@ from prl.diagnostics import (
     _align_returns_vol,
     build_manifest,
     compute_beta_report,
+    compute_multi_signal_ic_ls,
     compute_momentum_ic,
     derive_diagnosis_message,
     format_beta_line,
@@ -24,6 +25,7 @@ from prl.diagnostics import (
     load_config,
     prepare_market_and_features,
     run_baselines_test,
+    select_signals_by_screening,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback", type=int, default=20, help="Momentum lookback window.")
     parser.add_argument("--momentum_quantile", type=float, default=0.30, help="Top/bottom quantile for LS.")
     parser.add_argument("--include_ls", type=int, default=0, help="Include momentum long-short curve.")
+    parser.add_argument("--ic_start", type=str, default=None, help="Signal IC window start date (YYYY-MM-DD).")
+    parser.add_argument("--ic_end", type=str, default=None, help="Signal IC window end date (YYYY-MM-DD).")
+    parser.add_argument(
+        "--signals",
+        type=str,
+        default="all",
+        help="Comma-separated signal list or 'all'.",
+    )
     return parser.parse_args()
 
 
@@ -68,6 +78,16 @@ def main() -> int:
     data_cfg = cfg.get("data", {})
     test_start = dates["test_start"]
     test_end = dates["test_end"]
+    ic_start = args.ic_start or dates["train_start"]
+    ic_end = args.ic_end or dates["train_end"]
+
+    if pd.to_datetime(ic_start) > pd.to_datetime(ic_end):
+        raise ValueError(f"Invalid IC window: ic_start ({ic_start}) > ic_end ({ic_end})")
+    if pd.to_datetime(ic_end) >= pd.to_datetime(test_start):
+        raise ValueError(
+            "IC screening window must end before test_start to avoid leakage. "
+            f"ic_end={ic_end}, test_start={test_start}"
+        )
 
     cache_only = bool(
         data_cfg.get("offline", False) or data_cfg.get("require_cache", False) or data_cfg.get("paper_mode", False)
@@ -118,6 +138,44 @@ def main() -> int:
         if not ls_curve.empty:
             ls_curve["date"] = pd.to_datetime(ls_curve["date"]).dt.strftime("%Y-%m-%d")
         _write_csv(run_dir / "momentum_longshort_equity_curve.csv", ls_curve)
+
+    multi_signal = compute_multi_signal_ic_ls(
+        market.prices,
+        market.returns,
+        ic_start=ic_start,
+        ic_end=ic_end,
+        signals=args.signals,
+        quantile=float(args.momentum_quantile),
+        include_longshort=bool(args.include_ls),
+    )
+
+    signal_ic_summary = multi_signal.ic_summary.copy()
+    signal_ic_timeseries = multi_signal.ic_timeseries.copy()
+    if not signal_ic_timeseries.empty:
+        signal_ic_timeseries["date"] = pd.to_datetime(signal_ic_timeseries["date"]).dt.strftime("%Y-%m-%d")
+    signal_ls_summary = multi_signal.longshort_summary.copy()
+    _write_csv(run_dir / "signal_ic_summary.csv", signal_ic_summary)
+    _write_csv(run_dir / "signal_ic_timeseries.csv", signal_ic_timeseries)
+    _write_csv(run_dir / "signal_longshort_summary.csv", signal_ls_summary)
+
+    selected_signals = select_signals_by_screening(
+        signal_ic_summary,
+        signal_ls_summary,
+        tstat_abs_threshold=2.0,
+        ls_sharpe_threshold=0.0,
+    )
+    selected_payload = {
+        "ic_start": ic_start,
+        "ic_end": ic_end,
+        "signals_arg": args.signals,
+        "screening": {
+            "abs_tstat_gt": 2.0,
+            "ls_sharpe_gt": 0.0,
+        },
+        "selected_signals": selected_signals,
+        "n_selected": int(len(selected_signals)),
+    }
+    (run_dir / "selected_signals.json").write_text(json.dumps(selected_payload, indent=2))
 
     n_assets = int(market.returns.shape[1])
     n_days_test = int(len(returns_aligned))

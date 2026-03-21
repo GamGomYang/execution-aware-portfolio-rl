@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 from prl.eval import assert_env_compatible, load_model, run_backtest_episode
-from prl.train import build_env_for_range, create_scheduler, prepare_market_and_features
+from prl.train import build_env_for_range, build_signal_features, create_scheduler, prepare_market_and_features
 
 
 def parse_args():
@@ -22,10 +22,20 @@ def parse_args():
     parser.add_argument(
         "--output-root",
         type=str,
-        default="outputs",
-        help="Base directory for reports/models/logs (default: outputs).",
+        default=None,
+        help="Base directory for reports/models/logs (default: config.output.root or outputs).",
     )
     return parser.parse_args()
+
+
+def _resolve_output_root(cli_output_root: str | None, cfg: dict) -> Path:
+    if cli_output_root:
+        return Path(cli_output_root)
+    output_cfg = cfg.get("output", {}) or {}
+    cfg_root = output_cfg.get("root")
+    if cfg_root:
+        return Path(cfg_root)
+    return Path("outputs")
 
 
 def write_metrics(path: Path, row: dict):
@@ -154,6 +164,7 @@ def main():
     args = parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     cfg["config_path"] = args.config
+    output_root = _resolve_output_root(args.output_root, cfg)
     dates = cfg["dates"]
     env_cfg = cfg["env"]
     prl_cfg = cfg.get("prl", {})
@@ -178,6 +189,7 @@ def main():
         cache_only=cache_only,
         session_opts=session_opts,
     )
+    signal_features, _ = build_signal_features(market, config=cfg)
 
     if "logit_scale" not in env_cfg or env_cfg["logit_scale"] is None:
         raise ValueError("env.logit_scale is required for evaluation.")
@@ -193,9 +205,9 @@ def main():
         risk_lambda=env_cfg.get("risk_lambda", 0.0),
         risk_penalty_type=env_cfg.get("risk_penalty_type", "r2"),
         rebalance_eta=env_cfg.get("rebalance_eta"),
+        signal_features=signal_features,
     )
 
-    output_root = Path(args.output_root)
     reports_dir = output_root / "reports"
     models_dir = output_root / "models"
 

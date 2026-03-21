@@ -1,0 +1,12 @@
+{
+  "tag": "u27_eta082_alpha_vsmom_20k_r1",
+  "candidate_key": "vsmom",
+  "tag_prefix": "u27_eta082_alpha_vsmom",
+  "label": "control_plus_vol_scaled_mom",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal",
+    "vol_scaled_mom"
+  ],
+  "notes": "Add volatility-scaled momentum; intentionally more anti-correlated to reversal control."
+}

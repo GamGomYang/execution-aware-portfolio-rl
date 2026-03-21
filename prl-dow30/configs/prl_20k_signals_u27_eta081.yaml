@@ -1,0 +1,110 @@
+mode: paper
+
+dates:
+  train_start: "2010-01-01"
+  train_end: "2021-12-31"
+  test_start: "2022-01-01"
+  test_end: "2025-12-31"
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed_u27
+  source: yfinance_only
+  universe_policy: fixed_list
+  min_assets: 27
+  force_refresh: false
+  offline: true
+  require_cache: true
+  paper_mode: true
+  min_history_days: 500
+  history_tolerance_days: 30
+  ticker_substitutions: {}
+  quality_params:
+    min_vol_std: 0.005
+    min_max_abs_return: 0.02
+    max_flat_fraction: 0.20
+    max_missing_fraction: 0.01
+
+universe:
+  min_assets: 27
+  policy: fixed_list
+  fixed_asset_list:
+    - AAPL
+    - AMGN
+    - AXP
+    - BA
+    - CAT
+    - CRM
+    - CSCO
+    - CVX
+    - DIS
+    - GS
+    - HD
+    - HON
+    - IBM
+    - INTC
+    - JNJ
+    - JPM
+    - KO
+    - MCD
+    - MMM
+    - MRK
+    - MSFT
+    - NKE
+    - PG
+    - UNH
+    - V
+    - VZ
+    - WMT
+
+signals:
+  enabled: true
+  signal_state: true
+  signal_names:
+    - reversal_5d
+    - short_term_reversal
+  selected_signals_path: ../outputs/diagnostics/signal_scan_u27/selected_signals.json
+
+env:
+  L: 30
+  Lv: 30
+  c_tc: 0.0005
+  logit_scale: 10.0
+  eta_mode: fixed
+  rebalance_eta: 0.081
+
+output:
+  root: outputs/step3_u27_eta081_20k
+
+prl:
+  alpha0: 0.2
+  beta: 1.0
+  lambdav: 2.0
+  bias: -2.0
+  center_prob: true
+  alpha_min: 0.01
+  alpha_max: 1.0
+
+sac:
+  learning_rate: 0.0003
+  batch_size: 256
+  gamma: 0.99
+  tau: 0.005
+  buffer_size: 100000
+  total_timesteps: 20000
+  eval_freq: 5000
+  ent_coef: 0.2
+  log_interval_steps: 1000
+  checkpoint_interval: 50000
+
+seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9

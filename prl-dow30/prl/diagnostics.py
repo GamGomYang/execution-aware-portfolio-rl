@@ -6,7 +6,7 @@ import math
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ from .baselines import run_baseline_strategy_detailed
 from .data import MarketData, load_market_data, slice_frame
 from .features import VolatilityFeatures, compute_volatility_features
 from .metrics import compute_metrics
+from .signals import compute_signal_frames, parse_signal_list
 from .utils.signature import canonical_json, sha256_bytes
 
 LOGGER = logging.getLogger(__name__)
@@ -49,6 +50,13 @@ class MomentumDiagnostics:
     longshort_curve: pd.DataFrame | None
     dropped_due_to_lookback: int
     dropped_due_to_nan_alignment: int
+
+
+@dataclass
+class MultiSignalDiagnostics:
+    ic_summary: pd.DataFrame
+    ic_timeseries: pd.DataFrame
+    longshort_summary: pd.DataFrame
 
 
 def load_config(config_path: str | Path) -> Dict[str, Any]:
@@ -362,6 +370,170 @@ def compute_momentum_ic(
         dropped_due_to_lookback=dropped_lookback,
         dropped_due_to_nan_alignment=dropped_nan,
     )
+
+
+def _mean_std_tstat(values: Sequence[float]) -> tuple[float, float, float]:
+    arr = np.asarray(values, dtype=np.float64)
+    if arr.size == 0:
+        return 0.0, 0.0, 0.0
+    mean = float(np.mean(arr))
+    std = float(np.std(arr, ddof=0))
+    if std <= 1e-12:
+        return mean, std, 0.0
+    tstat = float(mean / (std / math.sqrt(arr.size)))
+    return mean, std, tstat
+
+
+def compute_multi_signal_ic_ls(
+    prices: pd.DataFrame,
+    returns_log: pd.DataFrame,
+    *,
+    ic_start: str,
+    ic_end: str,
+    signals: str | Sequence[str] | None = None,
+    quantile: float = 0.30,
+    include_longshort: bool = True,
+) -> MultiSignalDiagnostics:
+    if quantile <= 0.0 or quantile >= 0.5:
+        raise ValueError("quantile must be in (0, 0.5)")
+
+    signal_names = parse_signal_list(signals)
+    signal_frames = compute_signal_frames(prices, returns_log, signals=signal_names)
+    # Fixed protocol: signal_t must be evaluated against return_{t+1}.
+    returns_tplus1 = np.expm1(returns_log).shift(-1)
+
+    ic_rows: list[dict[str, Any]] = []
+    ic_summary_rows: list[dict[str, Any]] = []
+    ls_summary_rows: list[dict[str, Any]] = []
+
+    for signal_name in signal_names:
+        signal_slice = slice_frame(signal_frames[signal_name], ic_start, ic_end)
+        return_slice = slice_frame(returns_tplus1, ic_start, ic_end)
+        idx = signal_slice.index.intersection(return_slice.index)
+
+        ic_values: list[float] = []
+        ls_values: list[float] = []
+        for date in idx:
+            sig_vec = signal_slice.loc[date]
+            ret_vec = return_slice.loc[date]
+            valid = sig_vec.notna() & ret_vec.notna()
+            n_valid = int(valid.sum())
+            if n_valid < 2:
+                continue
+
+            sig_valid = sig_vec[valid].to_numpy(dtype=np.float64)
+            ret_valid = ret_vec[valid].to_numpy(dtype=np.float64)
+            ic = _spearman_corr(sig_valid, ret_valid)
+            if not np.isfinite(ic):
+                continue
+
+            ic_values.append(float(ic))
+            ic_rows.append(
+                {
+                    "date": pd.to_datetime(date),
+                    "signal": signal_name,
+                    "ic_spearman": float(ic),
+                    "n_assets": n_valid,
+                }
+            )
+
+            if include_longshort:
+                n_top = max(1, int(math.floor(quantile * n_valid)))
+                if n_top * 2 > n_valid:
+                    n_top = max(1, n_valid // 2)
+                ranked = pd.Series(sig_vec[valid]).sort_values()
+                bottom_idx = ranked.index[:n_top]
+                top_idx = ranked.index[-n_top:]
+                ls_ret = float(ret_vec.loc[top_idx].mean() - ret_vec.loc[bottom_idx].mean())
+                if np.isfinite(ls_ret):
+                    ls_values.append(ls_ret)
+
+        ic_mean, ic_std, ic_tstat = _mean_std_tstat(ic_values)
+        ic_summary_rows.append(
+            {
+                "signal": signal_name,
+                "ic_mean": ic_mean,
+                "ic_std": ic_std,
+                "icir": float(ic_mean / ic_std) if ic_std > 1e-12 else 0.0,
+                "tstat": ic_tstat,
+                "n_days_ic": int(len(ic_values)),
+            }
+        )
+
+        if include_longshort:
+            ls_mean, ls_std, ls_tstat = _mean_std_tstat(ls_values)
+            ls_sharpe = 0.0
+            if ls_values:
+                ls_arr = np.asarray(ls_values, dtype=np.float64)
+                log_rewards = [math.log(max(1.0 + float(v), 1e-8)) for v in ls_arr]
+                ls_sharpe = float(
+                    compute_metrics(
+                        rewards=log_rewards,
+                        portfolio_returns=ls_arr,
+                        turnovers=np.zeros_like(ls_arr),
+                    ).sharpe
+                )
+            ls_summary_rows.append(
+                {
+                    "signal": signal_name,
+                    "ls_mean": ls_mean,
+                    "ls_std": ls_std,
+                    "ls_tstat": ls_tstat,
+                    "ls_sharpe": ls_sharpe,
+                    "n_days": int(len(ls_values)),
+                }
+            )
+
+    ic_summary = pd.DataFrame(ic_summary_rows)
+    if not ic_summary.empty:
+        ic_summary = ic_summary.sort_values("signal").reset_index(drop=True)
+    else:
+        ic_summary = pd.DataFrame(columns=["signal", "ic_mean", "ic_std", "icir", "tstat", "n_days_ic"])
+
+    ic_timeseries = pd.DataFrame(ic_rows)
+    if not ic_timeseries.empty:
+        ic_timeseries = ic_timeseries.sort_values(["date", "signal"]).reset_index(drop=True)
+    else:
+        ic_timeseries = pd.DataFrame(columns=["date", "signal", "ic_spearman", "n_assets"])
+
+    if include_longshort:
+        longshort_summary = pd.DataFrame(ls_summary_rows)
+        if not longshort_summary.empty:
+            longshort_summary = longshort_summary.sort_values("signal").reset_index(drop=True)
+        else:
+            longshort_summary = pd.DataFrame(
+                columns=["signal", "ls_mean", "ls_std", "ls_tstat", "ls_sharpe", "n_days"]
+            )
+    else:
+        longshort_summary = pd.DataFrame(columns=["signal", "ls_mean", "ls_std", "ls_tstat", "ls_sharpe", "n_days"])
+
+    return MultiSignalDiagnostics(
+        ic_summary=ic_summary,
+        ic_timeseries=ic_timeseries,
+        longshort_summary=longshort_summary,
+    )
+
+
+def select_signals_by_screening(
+    ic_summary: pd.DataFrame,
+    longshort_summary: pd.DataFrame,
+    *,
+    tstat_abs_threshold: float = 2.0,
+    ls_sharpe_threshold: float = 0.0,
+) -> list[str]:
+    if ic_summary.empty or longshort_summary.empty:
+        return []
+
+    left = ic_summary[["signal", "tstat"]].copy()
+    right = longshort_summary[["signal", "ls_sharpe"]].copy()
+    merged = left.merge(right, on="signal", how="inner")
+    passed = merged[
+        (pd.to_numeric(merged["tstat"], errors="coerce").abs() > float(tstat_abs_threshold))
+        & (pd.to_numeric(merged["ls_sharpe"], errors="coerce") > float(ls_sharpe_threshold))
+    ]
+    if passed.empty:
+        return []
+    return sorted(passed["signal"].astype(str).drop_duplicates().tolist())
 
 
 def build_manifest(
