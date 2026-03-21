@@ -5,9 +5,7 @@ Workspace root: `/workspace/execution-aware-portfolio-rl`
 Primary repo root: `/workspace/execution-aware-portfolio-rl/prl-dow30`
 
 ## 1. 지금 큰 그림
-
 현재 프로젝트 상태는 아래처럼 구분해서 이해하면 된다.
-
 1. execution-aware recipe 선정 단계
 - 사실상 완료됨.
 - 공식 incumbent는 이미 채택되어 있음.
@@ -28,7 +26,6 @@ Primary repo root: `/workspace/execution-aware-portfolio-rl/prl-dow30`
 - 내일 여기서 다시 시작하면 됨.
 
 ## 2. 왜 이제 alpha를 보는가
-
 핵심 결론:
 - execution 레시피는 이미 충분히 정리됨.
 - `eta`, `mid_plasticity_multiplier`, `cvar_penalty_gamma`, `learning_rate`를 또 만지는 게 우선순위가 아님.
@@ -62,7 +59,6 @@ Primary repo root: `/workspace/execution-aware-portfolio-rl/prl-dow30`
 ### 3-2. alpha first batch materializer 추가
 새 파일:
 - `prl-dow30/scripts/materialize_u27_alpha_first_batch_configs.py`
-
 역할:
 - signal manifest 4개 생성
 - alpha candidate config 4개 생성
@@ -94,7 +90,6 @@ bash scripts/launch_u27_eta082_detached.sh alphaA
 ```
 
 ## 4. 오늘 만든 alpha first batch 후보
-
 고정한 execution recipe:
 - `eta = 0.082`
 - `mid_plasticity_multiplier = 0.70`
@@ -278,7 +273,6 @@ tmux 상태:
 추가 정리 작업은 필요 없음.
 
 ## 9. 내일 가장 먼저 해야 할 일
-
 추천 순서:
 
 ### Step 1. 작업 폴더 들어가기
@@ -407,7 +401,6 @@ phaseA 목표:
 
 결론적으로:
 - phaseA 끝나면 top 2만 phaseB로 올리는 것이 목표
-
 ## 12. phaseA가 끝나면 바로 해야 할 일
 
 ### 12-1. summary 파일 확인
@@ -477,7 +470,6 @@ bash scripts/run_u27_alpha_first_batch_phaseA.sh
 ```
 
 ## 14. 관련 주요 파일 목록
-
 ### alpha batch 구현 관련
 - `prl-dow30/prl/train.py`
 - `prl-dow30/scripts/step6_sanity.py`
@@ -513,7 +505,6 @@ bash scripts/run_u27_alpha_first_batch_phaseA.sh
 - `prl-dow30/outputs/logs/u27_alpha_first_batch_phaseA_20260319T163331Z/master.log`
 
 ## 15. 현재 git 상태 메모
-
 오늘 기준 `git status --short`에서 눈에 띄는 항목:
 
 수정됨:
@@ -538,16 +529,13 @@ bash scripts/run_u27_alpha_first_batch_phaseA.sh
 - 내일 phaseA 끝나고 나면 alpha batch 관련 변경만 별도 정리해서 commit 범위를 신중히 잡는 게 좋다.
 
 ## 16. 내일 딱 한 줄로 뭘 하면 되나
-
 가장 짧은 재시작 답:
-
 1. `cd /workspace/execution-aware-portfolio-rl/prl-dow30`
 2. `bash scripts/launch_u27_eta082_detached.sh alphaA`
 3. phaseA summary 나온 뒤 top 2 뽑기
 4. 그다음 `phaseB runner` 구현하고 10-seed shadow confirm으로 넘어가기
 
 ## 17. 마지막 메모
-
 - 서버 끄기 전 alpha detached session은 이미 종료했음.
 - 따라서 지금은 “안전하게 멈춘 상태”임.
 - 내일은 그냥 위 순서대로 재시작하면 된다.

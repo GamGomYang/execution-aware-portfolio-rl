@@ -6327,7 +6327,6 @@
 - rule_aggregate_csv: outputs/model_swap_matrix_20260309T070613Z/reports/model_swap_rule_aggregate.csv
 - vs_sac_csv: outputs/model_swap_matrix_20260309T070613Z/reports/model_swap_vs_sac.csv
 - summary_md: outputs/model_swap_matrix_20260309T070613Z/reports/model_swap_summary.md
-
 ---
 
 ## [2026-03-09T11:48:08Z] Model-Swap Pilot Progress (finished)
@@ -6426,11 +6425,8 @@ Spec-N5 다음 실행 명세
 - rule_aggregate_csv: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_rule_aggregate.csv
 - vs_sac_csv: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_vs_sac.csv
 - summary_md: outputs/model_swap_matrix_20260318T070607Z/reports/model_swap_summary.md
-
 ---
-
 ---
-
 ## Snapshot UTC 2026-03-19T10:01:02+00:00
 
 ### 0) 이번 라운드 최종 결론
