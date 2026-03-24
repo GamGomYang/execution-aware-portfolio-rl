@@ -1,0 +1,4 @@
+eta,n_positive_kappas,n_pairs_vs_eta1,score_mean_median_sharpe_pos_kappa,score_mean_median_delta_sharpe_vs_eta1_pos_kappa,median_turnover_exec_pos_kappa_mean,qualifies,selected
+1.0,2,4,0.7,0.0,0.3,False,False
+0.082,2,4,0.96,0.26,0.12,True,True
+0.05,2,4,0.98,0.28,0.1,True,False

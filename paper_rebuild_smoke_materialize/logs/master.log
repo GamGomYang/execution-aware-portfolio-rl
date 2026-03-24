@@ -1,0 +1,63 @@
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0 1 2 3 4 5 6 7 8 9
+[INFO] etas=1.0 0.5 0.2 0.1 0.082 0.05 0.02
+[INFO] kappas=0.0 0.0005 0.001
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=outputs/paper_rebuild_smoke_materialize
+[INFO] python_cmd=uv run --with pandas --with pyarrow --with pyyaml python
+[STEP-START] materialize_validation_and_final_configs :: 2026-03-24T06:22:26Z
+Downloading pyarrow (45.4MiB)
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded pyarrow
+Installed 6 packages in 230ms
+{
+  "generated_at": "20260324T062226Z",
+  "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "snapshot_config_out": "outputs/paper_rebuild_smoke_materialize/configs/snapshot_control.yaml",
+  "signal_snapshot_out": "outputs/paper_rebuild_smoke_materialize/configs/selected_signals_snapshot.json",
+  "validation_config_out": "outputs/paper_rebuild_smoke_materialize/configs/validation_eta.yaml",
+  "final_config_out": "outputs/paper_rebuild_smoke_materialize/configs/final_eta.yaml",
+  "forward_config_out": "",
+  "processed_dir": "data/processed_u27",
+  "returns_path": "data/processed_u27/returns.parquet",
+  "cache_max_date": "2026-03-20",
+  "validation_start": "2022-01-01",
+  "validation_end": "2023-12-31",
+  "final_start": "2024-01-01",
+  "final_end": "2025-12-31",
+  "forward_start": "2026-01-01",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "sac_total_timesteps": null,
+  "train_output_root": "outputs/paper_rebuild_smoke_materialize/train_control",
+  "validation_output_root": "outputs/paper_rebuild_smoke_materialize/validation_eta",
+  "final_output_root": "outputs/paper_rebuild_smoke_materialize/final_eta",
+  "forward_output_root": null
+}
+[STEP-END] materialize_validation_and_final_configs rc=0 :: 2026-03-24T06:22:30Z
+[INFO] skip training phase (RUN_TRAIN=0)
+[INFO] skip validation eta frontier phase (RUN_VALIDATION=0)
+[INFO] skip selection phase (RUN_SELECT=0)
+[INFO] skip final/test phase (RUN_FINAL=0)
+[INFO] skip pack phase (RUN_PACK=0)
+[STEP-START] check_validation_first_outputs :: 2026-03-24T06:22:30Z
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+Downloading pyarrow (45.4MiB)
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded pyarrow
+Installed 6 packages in 246ms
+WROTE_MD=outputs/paper_rebuild_smoke_materialize/checklists/control_eta_validation_first.md
+WROTE_JSON=outputs/paper_rebuild_smoke_materialize/checklists/control_eta_validation_first.json
+[STEP-END] check_validation_first_outputs rc=0 :: 2026-03-24T06:22:32Z
+[DONE] phase=control_eta_validation_first complete
+[DONE] master_log=outputs/paper_rebuild_smoke_materialize/logs/master.log
+[DONE] run_root=outputs/paper_rebuild_smoke_materialize

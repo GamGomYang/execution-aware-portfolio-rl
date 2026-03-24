@@ -1,0 +1,182 @@
+{
+  "run_root": "prl-dow30/outputs/paper_rebuild_smoke_materialize",
+  "implementation_checks": [
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize",
+      "description": "Run root created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/train_control",
+      "description": "train_control directory created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/validation_eta",
+      "description": "validation_eta directory created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/final_eta",
+      "description": "final_eta directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/external_baselines",
+      "description": "external_baselines directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack",
+      "description": "paper_pack directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/configs/snapshot_control.yaml",
+      "description": "Frozen training config emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/configs/validation_eta.yaml",
+      "description": "Validation eval config emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/configs/final_eta.yaml",
+      "description": "Final eval config emitted",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/configs/materialization_meta.json",
+      "description": "Materialization metadata emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    }
+  ],
+  "execution_checks": [
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/validation_eta/aggregate.csv",
+      "description": "Validation aggregate report written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/validation_eta/paired_delta.csv",
+      "description": "Validation paired report written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/validation_eta/fig_frontier.png",
+      "description": "Validation frontier figure written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/validation_eta/selection/validation_eta_selection.json",
+      "description": "Validation eta selection JSON written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/validation_eta/selection/validation_eta_selection.md",
+      "description": "Validation eta selection markdown written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/final_eta/aggregate.csv",
+      "description": "Final/test aggregate report written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/final_eta/paired_delta.csv",
+      "description": "Final/test paired report written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/external_baselines/aggregate.csv",
+      "description": "External baseline aggregate report written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/external_baselines/protocol.json",
+      "description": "External baseline protocol JSON written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack/README.md",
+      "description": "Paper pack README written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack/protocol_lock.md",
+      "description": "Pack protocol lock markdown written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack/tables/validation_selection.csv",
+      "description": "Validation selection table written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack/tables/test_selected_vs_eta1.csv",
+      "description": "Test selected-vs-eta1 table written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack/tables/test_selected_vs_external_baselines.csv",
+      "description": "Test selected-vs-external-baselines table written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_materialize/paper_pack/tables/diagnostic_selected_eta.csv",
+      "description": "Diagnostic selected-eta table written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    }
+  ]
+}

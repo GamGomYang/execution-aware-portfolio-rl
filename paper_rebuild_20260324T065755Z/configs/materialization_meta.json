@@ -1,0 +1,26 @@
+{
+  "generated_at": "20260324T140938Z",
+  "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "snapshot_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
+  "signal_snapshot_out": "outputs/paper_rebuild_20260324T065755Z/configs/selected_signals_snapshot.json",
+  "validation_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml",
+  "final_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+  "forward_config_out": "",
+  "processed_dir": "data/processed_u27",
+  "returns_path": "data/processed_u27/returns.parquet",
+  "cache_max_date": "2026-03-20",
+  "validation_start": "2022-01-01",
+  "validation_end": "2023-12-31",
+  "final_start": "2024-01-01",
+  "final_end": "2025-12-31",
+  "forward_start": "2026-01-01",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "sac_total_timesteps": null,
+  "train_output_root": "outputs/paper_rebuild_20260324T065755Z/train_control",
+  "validation_output_root": "outputs/paper_rebuild_20260324T065755Z/validation_eta",
+  "final_output_root": "outputs/paper_rebuild_20260324T065755Z/final_eta",
+  "forward_output_root": null
+}

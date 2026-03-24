@@ -175,6 +175,8 @@ def test_regime_metrics_has_three_regimes(tmp_path, monkeypatch):
         "buy_and_hold_equal_weight",
         "daily_rebalanced_equal_weight",
         "inverse_vol_risk_parity",
+        "minimum_variance",
+        "mean_variance_long_only",
     ]:
         regimes = set(df[df["model_type"] == model_type]["regime"])
         assert expected_regimes.issubset(regimes)

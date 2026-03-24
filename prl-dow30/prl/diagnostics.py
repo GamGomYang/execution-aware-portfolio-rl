@@ -26,6 +26,8 @@ BASELINE_MAP = {
     "equal_weight": "buy_and_hold_equal_weight",
     "daily_rebalanced_equal_weight": "daily_rebalanced_equal_weight",
     "inverse_vol_risk_parity": "inverse_vol_risk_parity",
+    "minimum_variance": "minimum_variance",
+    "mean_variance_long_only": "mean_variance_long_only",
 }
 
 

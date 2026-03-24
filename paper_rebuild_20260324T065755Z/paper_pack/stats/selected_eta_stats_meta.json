@@ -1,0 +1,9 @@
+{
+  "selected_eta": 0.2,
+  "baseline_eta": 1.0,
+  "bootstrap": 5000,
+  "bootstrap_alpha": 0.05,
+  "bootstrap_seed": 0,
+  "summary_csv": "outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_vs_eta1_stats.csv",
+  "seedwise_csv": "outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_seedwise_deltas.csv"
+}

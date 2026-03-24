@@ -1,0 +1,8 @@
+{
+  "selected_eta": 0.2,
+  "representative_seed": 5,
+  "representative_kappa": 0.001,
+  "fig_selected_trace": "outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_selected_trace.png",
+  "fig_validation_frontier": "outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_validation_frontier.png",
+  "fig_seed_scatter": "outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_seed_scatter.png"
+}

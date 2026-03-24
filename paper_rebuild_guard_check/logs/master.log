@@ -1,0 +1,10 @@
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0
+[INFO] etas=1.0 0.082
+[INFO] kappas=0.0 0.0005
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=outputs/paper_rebuild_guard_check
+[INFO] python_cmd=python3
+[ERROR] paper_mode training requires SAC_TOTAL_TIMESTEPS >= 100000, or 0 to keep the frozen config default.

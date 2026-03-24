@@ -1,0 +1,133 @@
+{
+  "run_root": "prl-dow30/outputs/paper_rebuild_smoke_full",
+  "implementation_checks": [
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full",
+      "description": "Run root created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/train_control",
+      "description": "train_control directory created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/validation_eta",
+      "description": "validation_eta directory created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/final_eta",
+      "description": "final_eta directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/external_baselines",
+      "description": "external_baselines directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/paper_pack",
+      "description": "paper_pack directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/configs/snapshot_control.yaml",
+      "description": "Frozen training config emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/configs/validation_eta.yaml",
+      "description": "Validation eval config emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/configs/final_eta.yaml",
+      "description": "Final eval config emitted",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/configs/materialization_meta.json",
+      "description": "Materialization metadata emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    }
+  ],
+  "execution_checks": [
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/validation_eta/aggregate.csv",
+      "description": "Validation aggregate report written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/validation_eta/paired_delta.csv",
+      "description": "Validation paired report written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/validation_eta/fig_frontier.png",
+      "description": "Validation frontier figure written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/validation_eta/selection/validation_eta_selection.json",
+      "description": "Validation eta selection JSON written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/validation_eta/selection/validation_eta_selection.md",
+      "description": "Validation eta selection markdown written",
+      "required": true,
+      "exists": false,
+      "status": "FAIL"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/final_eta/aggregate.csv",
+      "description": "Final/test aggregate report written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/final_eta/paired_delta.csv",
+      "description": "Final/test paired report written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    },
+    {
+      "path": "prl-dow30/outputs/paper_rebuild_smoke_full/paper_pack/README.md",
+      "description": "Paper pack README written",
+      "required": false,
+      "exists": false,
+      "status": "SKIP"
+    }
+  ]
+}

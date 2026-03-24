@@ -1,0 +1,231 @@
+{
+  "run_root": "outputs/paper_rebuild_20260324T065755Z",
+  "implementation_checks": [
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z",
+      "description": "Run root created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/train_control",
+      "description": "train_control directory created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/validation_eta",
+      "description": "validation_eta directory created",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/final_eta",
+      "description": "final_eta directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/external_baselines",
+      "description": "external_baselines directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack",
+      "description": "paper_pack directory created",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
+      "description": "Frozen training config emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml",
+      "description": "Validation eval config emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+      "description": "Final eval config emitted",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/configs/materialization_meta.json",
+      "description": "Materialization metadata emitted",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    }
+  ],
+  "execution_checks": [
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/validation_eta/aggregate.csv",
+      "description": "Validation aggregate report written",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/validation_eta/paired_delta.csv",
+      "description": "Validation paired report written",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/validation_eta/fig_frontier.png",
+      "description": "Validation frontier figure written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/validation_eta/selection/validation_eta_selection.json",
+      "description": "Validation eta selection JSON written",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/validation_eta/selection/validation_eta_selection.md",
+      "description": "Validation eta selection markdown written",
+      "required": true,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/final_eta/aggregate.csv",
+      "description": "Final/test aggregate report written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/final_eta/paired_delta.csv",
+      "description": "Final/test paired report written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/external_baselines/aggregate.csv",
+      "description": "External baseline aggregate report written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/external_baselines/protocol.json",
+      "description": "External baseline protocol JSON written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/README.md",
+      "description": "Paper pack README written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/protocol_lock.md",
+      "description": "Pack protocol lock markdown written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/tables/validation_selection.csv",
+      "description": "Validation selection table written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/tables/test_selected_vs_eta1.csv",
+      "description": "Test selected-vs-eta1 table written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_vs_eta1_stats.csv",
+      "description": "Selected-vs-eta1 stats CSV written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_seedwise_deltas.csv",
+      "description": "Selected-vs-eta1 seedwise deltas CSV written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/tables/test_selected_vs_external_baselines.csv",
+      "description": "Test selected-vs-external-baselines table written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/tables/diagnostic_selected_eta.csv",
+      "description": "Diagnostic selected-eta table written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2.csv",
+      "description": "Diagnostic selected-eta v2 table written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/representative_seed_metrics.json",
+      "description": "Representative selected-eta seed metadata written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_selected_trace.png",
+      "description": "Selected-trace figure written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_validation_frontier.png",
+      "description": "Validation frontier figure written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    },
+    {
+      "path": "outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_seed_scatter.png",
+      "description": "Seed scatter figure written",
+      "required": false,
+      "exists": true,
+      "status": "PASS"
+    }
+  ]
+}

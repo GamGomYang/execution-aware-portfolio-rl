@@ -230,10 +230,11 @@ class Dow30PortfolioEnv(Env):
         assert abs(float(np.sum(w_exec)) - 1.0) < 1e-6
 
         portfolio_return = float(np.dot(w_exec, arithmetic_returns))
+        portfolio_return_target = float(np.dot(w_target, arithmetic_returns))
         cost_exec = self.cfg.transaction_cost * turnover_exec
         cost_target = self.cfg.transaction_cost * turnover_target
         net_return_lin_exec = portfolio_return - cost_exec
-        net_return_lin_target = portfolio_return - cost_target
+        net_return_lin_target = portfolio_return_target - cost_target
         tracking_error_l2 = float(np.linalg.norm(w_exec - w_target, ord=2))
 
         collapse_flag = False
@@ -256,9 +257,24 @@ class Dow30PortfolioEnv(Env):
                 collapse_reason = "log_argument_invalid_after_clip"
             log_argument = float(self.cfg.log_clip)
 
+        raw_log_argument_target = 1.0 + portfolio_return_target
+        if not np.isfinite(raw_log_argument_target):
+            collapse_flag = True
+            if collapse_reason is None:
+                collapse_reason = "target_log_argument_non_finite"
+            log_argument_target = float(self.cfg.log_clip)
+        else:
+            log_argument_target = max(raw_log_argument_target, self.cfg.log_clip)
+        if not np.isfinite(log_argument_target) or log_argument_target <= 0.0:
+            collapse_flag = True
+            if collapse_reason is None:
+                collapse_reason = "target_log_argument_invalid_after_clip"
+            log_argument_target = float(self.cfg.log_clip)
+
         log_return_gross = math.log(log_argument)
+        log_return_gross_target = math.log(log_argument_target)
         log_return_net = log_return_gross - cost_exec
-        log_return_net_target = log_return_gross - cost_target
+        log_return_net_target = log_return_gross_target - cost_target
 
         cost = cost_exec
         risk_lambda = float(self.cfg.risk_lambda)
@@ -273,6 +289,7 @@ class Dow30PortfolioEnv(Env):
         obs = self._get_observation() if not terminated else np.zeros(self.observation_space.shape, dtype=np.float32)
         info = {
             "portfolio_return": portfolio_return,
+            "portfolio_return_target": portfolio_return_target,
             "turnover": turnover_exec,
             "turnover_rebalance": turnover_exec,
             "turnover_target_change": turnover_target,
@@ -292,7 +309,9 @@ class Dow30PortfolioEnv(Env):
             "net_return_lin_target": net_return_lin_target,
             "tracking_error_l2": tracking_error_l2,
             "log_argument": log_argument,
+            "log_argument_target": log_argument_target,
             "log_return_gross": log_return_gross,
+            "log_return_gross_target": log_return_gross_target,
             "log_return_net": log_return_net,
             "log_return_net_target": log_return_net_target,
             "risk_penalty": risk_penalty,

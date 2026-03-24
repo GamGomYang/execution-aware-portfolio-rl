@@ -180,6 +180,8 @@ def test_paper_gate_artifacts(tmp_path, monkeypatch):
         "buy_and_hold_equal_weight",
         "daily_rebalanced_equal_weight",
         "inverse_vol_risk_parity",
+        "minimum_variance",
+        "mean_variance_long_only",
     }
 
     summary_df = pd.read_csv(summary_path)

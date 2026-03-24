@@ -1,0 +1,10 @@
+{
+  "selected_eta": 0.2,
+  "baseline_eta": 1.0,
+  "rules": {
+    "eta_grid_fixed_a_priori": true,
+    "validation_only_selection": true,
+    "test_not_used_for_selection": true,
+    "matched_external_baselines": true
+  }
+}

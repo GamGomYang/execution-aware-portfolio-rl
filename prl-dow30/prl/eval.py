@@ -165,6 +165,7 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
     done = False
     rewards: List[float] = []
     portfolio_returns: List[float] = []
+    portfolio_returns_target: List[float] = []
     turnovers_exec: List[float] = []
     turnovers_target: List[float] = []
     dates: List = []
@@ -174,6 +175,7 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
     net_returns_lin: List[float] = []
     net_returns_lin_target: List[float] = []
     log_returns_gross: List[float] = []
+    log_returns_gross_target: List[float] = []
     log_returns_net: List[float] = []
     log_returns_net_target: List[float] = []
     eta_ts: List[float] = []
@@ -189,6 +191,7 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         rewards.append(reward)
         info = info_list[0]
         port_ret = info.get("portfolio_return", 0.0)
+        port_ret_target = info.get("portfolio_return_target", np.nan)
         turnover_exec = info.get("turnover_exec", info.get("turnover", 0.0))
         turnover_target = info.get("turnover_target", info.get("turnover_target_change", turnover_exec))
         cost = float(info.get("cost", 0.0))
@@ -200,9 +203,11 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         collapse_flag = info.get("collapse_flag", False)
         collapse_reason = info.get("collapse_reason", None)
         log_return_gross = info.get("log_return_gross")
+        log_return_gross_target = info.get("log_return_gross_target")
         log_return_net = info.get("log_return_net")
         log_return_net_target = info.get("log_return_net_target")
         portfolio_returns.append(port_ret)
+        portfolio_returns_target.append(float(port_ret_target))
         turnovers_exec.append(turnover_exec)
         turnovers_target.append(turnover_target)
         dates.append(info.get("date"))
@@ -215,6 +220,7 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         net_returns_lin.append(port_ret - cost)
         net_returns_lin_target.append(net_lin_target)
         log_returns_gross.append(float(log_return_gross) if log_return_gross is not None else float("nan"))
+        log_returns_gross_target.append(float(log_return_gross_target) if log_return_gross_target is not None else float("nan"))
         log_returns_net.append(float(log_return_net) if log_return_net is not None else float("nan"))
         log_returns_net_target.append(float(log_return_net_target) if log_return_net_target is not None else float("nan"))
         eta_ts.append(eta_t)
@@ -234,6 +240,7 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         "dates": dates,
         "rewards": rewards,
         "portfolio_returns": portfolio_returns,
+        "portfolio_returns_target": portfolio_returns_target,
         "turnovers": turnovers_exec,
         "turnovers_exec": turnovers_exec,
         "turnovers_target": turnovers_target,
@@ -244,6 +251,7 @@ def run_backtest_episode_detailed(model, env: DummyVecEnv) -> Tuple[PortfolioMet
         "net_returns_lin": net_returns_lin,
         "net_returns_lin_target": net_returns_lin_target,
         "log_returns_gross": log_returns_gross,
+        "log_returns_gross_target": log_returns_gross_target,
         "log_returns_net": log_returns_net,
         "log_returns_net_target": log_returns_net_target,
         "eta_t": eta_ts,
@@ -277,8 +285,10 @@ def trace_dict_to_frame(
     net_returns_exp = trace.get("net_returns_exp")
     net_returns_lin = trace.get("net_returns_lin")
     log_returns_gross = trace.get("log_returns_gross")
+    log_returns_gross_target = trace.get("log_returns_gross_target")
     log_returns_net = trace.get("log_returns_net")
     log_returns_net_target = trace.get("log_returns_net_target")
+    portfolio_returns_target = trace.get("portfolio_returns_target")
     if turnovers is None or not turnovers:
         turnovers = [np.nan] * len(dates)
     if turnover_exec is None or not turnover_exec:
@@ -295,14 +305,19 @@ def trace_dict_to_frame(
         net_returns_lin = [np.nan] * len(dates)
     if log_returns_gross is None or not log_returns_gross:
         log_returns_gross = [np.nan] * len(dates)
+    if log_returns_gross_target is None or not log_returns_gross_target:
+        log_returns_gross_target = [np.nan] * len(dates)
     if log_returns_net is None or not log_returns_net:
         log_returns_net = [np.nan] * len(dates)
     if log_returns_net_target is None or not log_returns_net_target:
         log_returns_net_target = [np.nan] * len(dates)
+    if portfolio_returns_target is None or not portfolio_returns_target:
+        portfolio_returns_target = [np.nan] * len(dates)
     df = pd.DataFrame(
         {
             "date": dates,
             "portfolio_return": trace.get("portfolio_returns", []),
+            "portfolio_return_target": portfolio_returns_target,
             "reward": trace.get("rewards", []),
             "turnover": turnovers,
             "turnover_exec": turnover_exec,
@@ -312,6 +327,7 @@ def trace_dict_to_frame(
             "net_return_exp": net_returns_exp,
             "net_return_lin": net_returns_lin,
             "log_return_gross": log_returns_gross,
+            "log_return_gross_target": log_returns_gross_target,
             "log_return_net": log_returns_net,
             "log_return_net_target": log_returns_net_target,
         }
@@ -329,6 +345,7 @@ def trace_dict_to_frame(
     df["seed"] = seed
     df["date"] = pd.to_datetime(df["date"])
     df["equity_gross"] = np.cumprod(1.0 + df["portfolio_return"].fillna(0.0))
+    df["equity_gross_target"] = np.cumprod(1.0 + df["portfolio_return_target"].fillna(0.0))
     if "net_return_exp" in df.columns:
         df["equity_net_exp"] = np.cumprod(1.0 + df["net_return_exp"].fillna(0.0))
     if "net_return_lin" in df.columns:
@@ -365,11 +382,17 @@ def eval_strategies_to_trace(
     eval_id: str,
     run_id: str,
     seed: int,
+    lookback: int = 252,
+    history_min: int = 30,
+    mean_variance_risk_aversion: float = 10.0,
 ) -> Tuple[Dict[str, PortfolioMetrics], pd.DataFrame]:
     results = run_all_baselines_detailed(
         returns,
         volatility,
         transaction_cost=transaction_cost,
+        lookback=lookback,
+        history_min=history_min,
+        mean_variance_risk_aversion=mean_variance_risk_aversion,
     )
     frames = []
     metrics_by_name: Dict[str, PortfolioMetrics] = {}

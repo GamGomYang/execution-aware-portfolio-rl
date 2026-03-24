@@ -1,0 +1,42 @@
+{
+  "root": "prl-dow30/tmp_validation_selector_smoke",
+  "baseline_eta": 1.0,
+  "positive_kappas": [
+    0.0005,
+    0.001
+  ],
+  "relative_threshold": 0.95,
+  "selected_eta": 0.082,
+  "rows": [
+    {
+      "eta": 1.0,
+      "n_positive_kappas": 2,
+      "n_pairs_vs_eta1": 4,
+      "score_mean_median_sharpe_pos_kappa": 0.7,
+      "score_mean_median_delta_sharpe_vs_eta1_pos_kappa": 0.0,
+      "median_turnover_exec_pos_kappa_mean": 0.3,
+      "qualifies": false,
+      "selected": false
+    },
+    {
+      "eta": 0.082,
+      "n_positive_kappas": 2,
+      "n_pairs_vs_eta1": 4,
+      "score_mean_median_sharpe_pos_kappa": 0.96,
+      "score_mean_median_delta_sharpe_vs_eta1_pos_kappa": 0.26,
+      "median_turnover_exec_pos_kappa_mean": 0.12,
+      "qualifies": true,
+      "selected": true
+    },
+    {
+      "eta": 0.05,
+      "n_positive_kappas": 2,
+      "n_pairs_vs_eta1": 4,
+      "score_mean_median_sharpe_pos_kappa": 0.98,
+      "score_mean_median_delta_sharpe_vs_eta1_pos_kappa": 0.28,
+      "median_turnover_exec_pos_kappa_mean": 0.1,
+      "qualifies": true,
+      "selected": false
+    }
+  ]
+}
