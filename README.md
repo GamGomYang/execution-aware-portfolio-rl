@@ -1,7 +1,9 @@
 # Execution-Aware Portfolio Reinforcement Learning
 ## A Two-Stage Decomposition with Execution Timescale Control
 
-Execution-aware RL framework for **multi-asset portfolio management** on the **Dow30** universe.
+Execution-aware RL framework for **multi-asset portfolio management** with a paper-audited **fixed 27-name large-cap U.S. equity snapshot**.
+
+Some repository paths retain legacy `prl-dow30` naming, but the locked paper rebuild itself uses the fixed 27-name universe documented in `paper.tex` and `data/processed_u27`.
 
 Most portfolio-RL formulations implicitly assume the policy's target weights are the same as what gets traded:
 
@@ -60,55 +62,49 @@ For deeper protocol details and definitions, see `docs/spec.md`.
 
 ---
 
-## Key Findings (Dow30)
+## Paper Rebuild Snapshot
 
-### 1) Baseline vs Controlled Execution
-- **Baseline:** `eta = 1.0` (fully reactive execution)
-- **Controlled:** `eta = 0.10`
-- Transaction cost levels: `kappa in {0.0, 0.0005, 0.001}`
-- Seeds: `{0, 1, 2}`
+The locked paper rebuild is a **frozen-policy execution study**, not a retraining comparison.
 
-Observed in our runs:
-- When `kappa > 0`, controlled execution typically improves **Sharpe**
-- When `kappa = 0`, improvements are not guaranteed but were often observed
-- Collapse rate: `0.0` (under the reported settings)
+- Universe: fixed 27-name large-cap U.S. equity snapshot
+- Train / validation / test splits: `2010--2021`, `2022--2023`, `2024--2025`
+- Effective realized windows after 30-day rolling features:
+  - validation: `2022-02-15` to `2023-12-29`
+  - held-out test: `2024-02-14` to `2025-12-31`
+- Locked execution grid: `eta in {1.0, 0.5, 0.2, 0.1, 0.082, 0.05, 0.02}`
+- Validation-selected operating point in the corrected full-window rebuild: `eta = 0.5`
 
-Artifacts:
-- `aggregate.csv`, `paired_delta.csv`, `collapse_report.md`
-- `fig_frontier.png`, `fig_misalignment.png`
+Held-out selected-vs-immediate (`eta=0.5` vs `eta=1.0`) summary:
 
-### 2) Execution Timescale Frontier (eta Sweep)
-Eta grid:
+- Median executed turnover falls from `0.02200` to `0.01095`
+- Paired median net Sharpe improves by `+0.0105` at `kappa = 0.0005`
+- Paired median net Sharpe improves by `+0.0213` at `kappa = 0.001`
+- At `kappa = 0`, evidence is negligible rather than strongly favorable
 
-```
-[1.0, 0.5, 0.2, 0.1, 0.05,
- 0.02, 0.01, 0.005, 0.002,
- 0.001, 0.0005, 0.0002]
-```
+Matched heuristic baseline summary:
 
-Across `kappa in {0, 0.0005, 0.001}`, we observe monotonic behavior:
+- Stronger than inverse-volatility risk parity and minimum-variance across reported cost regimes
+- Mixed against daily-rebalanced equal weight and long-only mean-variance
+- Does not beat buy-and-hold equal weight on this held-out window
 
-- Eta down -> `TO_exec` down
-- Eta down -> tracking error down
-- Eta down -> misalignment gap down
+Interpretation:
 
-Within the tested range, Sharpe often improves as eta decreases; plateau was not observed in our sweep.
+- The main claim is about **cost-aligned execution control**
+- The selected operating point looks most turnover-efficient relative to **higher-churn heuristic comparators**
+- The paper does **not** claim universal superiority of execution-aware retraining
 
-### 3) Adaptive Execution (Volatility-Based eta)
-Rule:
+Primary paper artifacts:
 
-```
-eta_t = clip(a / vol_t, eta_min, eta_max)
-```
+- `paper.tex`
+- `paper.pdf`
+- `paper_rebuild_20260324T065755Z/validation_eta/selection/validation_eta_selection.md`
+- `paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_vs_eta1_stats.md`
+- `paper_rebuild_20260324T065755Z/external_baselines/report.md`
+- `fig_frontier.png`, `fig_misalignment.png`, `fig_seed_scatter.png`
 
-Parameters:
-- `a in {0.5, 1.0, 2.0}`
-- Clip range: `[0.02, 1.0]`
+## Broader Repository Experiments
 
-Findings:
-- Larger `a` reduces effective eta
-- High eta -> higher turnover -> lower Sharpe (in our settings)
-- Configuration signatures cleanly separate eta / rule-vol regimes
+The repository also contains broader exploratory sweeps, including fixed-eta frontiers and adaptive execution schedules. Those experiments are useful for development, but the locked paper claims should be read from the paper rebuild artifacts above rather than from older exploratory runs.
 
 ---
 

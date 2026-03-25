@@ -5835,3 +5835,2395 @@ WROTE_JSON=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validat
 [DONE] phase=control_eta_validation_first complete
 [DONE] master_log=outputs/paper_rebuild_20260324T065755Z/logs/master.log
 [DONE] run_root=outputs/paper_rebuild_20260324T065755Z
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0 1 2 3 4 5 6 7 8 9
+[INFO] etas=1.0 0.5 0.2 0.1 0.082 0.05 0.02
+[INFO] kappas=0.0 0.0005 0.001
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z
+[INFO] python_cmd=uv run --with-requirements requirements.txt python
+[INFO] final_mode=selected_plus_baseline
+[STEP-START] materialize_validation_and_final_configs :: 2026-03-25T07:10:20Z
+Downloading nvidia-cusolver (191.6MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading sympy (6.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading torch (506.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading pillow (6.7MiB)
+Downloading scipy (33.7MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.96s
+Traceback (most recent call last):
+  File "/workspace/execution-aware-portfolio-rl/prl-dow30/scripts/materialize_u27_control_eta_paper_configs.py", line 240, in <module>
+    main()
+  File "/workspace/execution-aware-portfolio-rl/prl-dow30/scripts/materialize_u27_control_eta_paper_configs.py", line 212, in main
+    "snapshot_config_out": str(snapshot_config_path.relative_to(ROOT)),
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/.uv/python_install/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/pathlib.py", line 730, in relative_to
+    raise ValueError("{!r} is not in the subpath of {!r}"
+ValueError: '/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml' is not in the subpath of '/workspace/execution-aware-portfolio-rl/prl-dow30' OR one path is relative and the other is absolute.
+[STEP-END] materialize_validation_and_final_configs rc=1 :: 2026-03-25T07:10:57Z
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0 1 2 3 4 5 6 7 8 9
+[INFO] etas=1.0 0.5 0.2 0.1 0.082 0.05 0.02
+[INFO] kappas=0.0 0.0005 0.001
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z
+[INFO] python_cmd=uv run --with-requirements requirements.txt python
+[INFO] final_mode=selected_plus_baseline
+[STEP-START] materialize_validation_and_final_configs :: 2026-03-25T07:12:05Z
+Downloading pyarrow (45.4MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading setuptools (1.0MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading sympy (6.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading torch (506.0MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading scipy (33.7MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading triton (179.5MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded setuptools
+ Downloaded nvidia-cuda-runtime
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.46s
+{
+  "generated_at": "20260325T071205Z",
+  "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "snapshot_config_out": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
+  "signal_snapshot_out": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/selected_signals_snapshot.json",
+  "validation_config_out": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml",
+  "final_config_out": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+  "forward_config_out": "",
+  "processed_dir": "data/processed_u27",
+  "returns_path": "data/processed_u27/returns.parquet",
+  "cache_max_date": "2026-03-20",
+  "validation_start": "2022-01-01",
+  "validation_end": "2023-12-31",
+  "final_start": "2024-01-01",
+  "final_end": "2025-12-31",
+  "forward_start": "2026-01-01",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "sac_total_timesteps": null,
+  "train_output_root": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/train_control",
+  "validation_output_root": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/validation_eta",
+  "final_output_root": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/final_eta",
+  "forward_output_root": null
+}
+[STEP-END] materialize_validation_and_final_configs rc=0 :: 2026-03-25T07:12:46Z
+[INFO] skip training phase (RUN_TRAIN=0)
+[STEP-START] validation_eta_frontier :: 2026-03-25T07:12:46Z
+Downloading networkx (2.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pandas (10.7MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading pillow (6.7MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading sympy (6.0MiB)
+Downloading scipy (33.7MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded sympy
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.67s
+STEP6 SANITY FAILED: Model not found: outputs/paper_rebuild_20260324T065755Z/train_control/models/20260324T065859Z_95b3729b_seed0_prl_a87f_final.zip
+Traceback (most recent call last):
+  File "/workspace/execution-aware-portfolio-rl/prl-dow30/scripts/step6_run_matrix.py", line 642, in <module>
+    main()
+  File "/workspace/execution-aware-portfolio-rl/prl-dow30/scripts/step6_run_matrix.py", line 452, in main
+    _run_sanity(args, seeds[0], config_path, model_type=model_type)
+  File "/workspace/execution-aware-portfolio-rl/prl-dow30/scripts/step6_run_matrix.py", line 242, in _run_sanity
+    subprocess.run(cmd, check=True)
+  File "/.uv/python_install/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/.tmpx9e2ND/builds-v0/.tmpJe6GFv/bin/python', '/workspace/execution-aware-portfolio-rl/prl-dow30/scripts/step6_sanity.py', '--config', '/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml', '--model-type', 'prl', '--seed', '0', '--model-root', '/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/train_control', '--max-steps', '252', '--offline']' returned non-zero exit status 1.
+[STEP-END] validation_eta_frontier rc=1 :: 2026-03-25T07:13:41Z
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0 1 2 3 4 5 6 7 8 9
+[INFO] etas=1.0 0.5 0.2 0.1 0.082 0.05 0.02
+[INFO] kappas=0.0 0.0005 0.001
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=outputs/paper_rebuild_20260324T065755Z
+[INFO] python_cmd=uv run --with-requirements requirements.txt python
+[INFO] final_mode=selected_plus_baseline
+[STEP-START] materialize_validation_and_final_configs :: 2026-03-25T07:14:48Z
+Downloading nvidia-curand (56.8MiB)
+Downloading sympy (6.0MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading scipy (33.7MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading pyarrow (45.4MiB)
+Downloading triton (179.5MiB)
+Downloading setuptools (1.0MiB)
+Downloading numpy (16.1MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pandas (10.7MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading pillow (6.7MiB)
+Downloading fonttools (4.8MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.66s
+{
+  "generated_at": "20260325T071448Z",
+  "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "snapshot_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
+  "signal_snapshot_out": "outputs/paper_rebuild_20260324T065755Z/configs/selected_signals_snapshot.json",
+  "validation_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml",
+  "final_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+  "forward_config_out": "",
+  "processed_dir": "data/processed_u27",
+  "returns_path": "data/processed_u27/returns.parquet",
+  "cache_max_date": "2026-03-20",
+  "validation_start": "2022-01-01",
+  "validation_end": "2023-12-31",
+  "final_start": "2024-01-01",
+  "final_end": "2025-12-31",
+  "forward_start": "2026-01-01",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "sac_total_timesteps": null,
+  "train_output_root": "outputs/paper_rebuild_20260324T065755Z/train_control",
+  "validation_output_root": "outputs/paper_rebuild_20260324T065755Z/validation_eta",
+  "final_output_root": "outputs/paper_rebuild_20260324T065755Z/final_eta",
+  "forward_output_root": null
+}
+[STEP-END] materialize_validation_and_final_configs rc=0 :: 2026-03-25T07:15:39Z
+[INFO] skip training phase (RUN_TRAIN=0)
+[STEP-START] validation_eta_frontier :: 2026-03-25T07:15:39Z
+Downloading nvidia-cusolver (191.6MiB)
+Downloading sympy (6.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading networkx (2.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading pyarrow (45.4MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-curand
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.48s
+INFO:__main__:Using metadata config for model compatibility: /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml
+INFO:prl.data:Loading processed cache from data/processed_u27
+STEP6_SANITY_METRICS {"avg_turnover_exec_eta02": 0.0005597587494534618, "avg_turnover_exec_eta1": 0.021225016521196925, "test2_ratio": 0.026372594287238545}
+STEP6 SANITY PASSED
+[STEP-END] validation_eta_frontier rc=0 :: 2026-03-25T07:18:11Z
+[STEP-START] validation_eta_reports :: 2026-03-25T07:18:11Z
+Downloading networkx (2.0MiB)
+Downloading scipy (33.7MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading pyarrow (45.4MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading triton (179.5MiB)
+Downloading pillow (6.7MiB)
+Downloading sympy (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-curand (56.8MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.46s
+[STEP-END] validation_eta_reports rc=0 :: 2026-03-25T07:18:49Z
+[STEP-START] select_validation_eta :: 2026-03-25T07:18:49Z
+Downloading sympy (6.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading pandas (10.7MiB)
+Downloading matplotlib (8.3MiB)
+Downloading pillow (6.7MiB)
+Downloading networkx (2.0MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading numpy (16.1MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-curand (56.8MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.74s
+SELECTED_ETA=0.2
+[STEP-END] select_validation_eta rc=0 :: 2026-03-25T07:20:34Z
+[INFO] selected_eta=0.2
+[STEP-START] final_eta_eval :: 2026-03-25T07:21:09Z
+Downloading networkx (2.0MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading setuptools (1.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading pandas (10.7MiB)
+Downloading sympy (6.0MiB)
+Downloading fonttools (4.8MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 8.73s
+INFO:__main__:Using metadata config for model compatibility: /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml
+INFO:prl.data:Loading processed cache from data/processed_u27
+STEP6_SANITY_METRICS {"avg_turnover_exec_eta02": 0.0005597587494534618, "avg_turnover_exec_eta1": 0.021225016521196925, "test2_ratio": 0.026372594287238545}
+STEP6 SANITY PASSED
+[STEP-END] final_eta_eval rc=0 :: 2026-03-25T07:22:39Z
+[STEP-START] final_eta_reports :: 2026-03-25T07:22:39Z
+Downloading numpy (16.1MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading pillow (6.7MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pandas (10.7MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading matplotlib (8.3MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.50s
+[STEP-END] final_eta_reports rc=0 :: 2026-03-25T07:23:17Z
+[STEP-START] external_heuristic_baselines :: 2026-03-25T07:23:17Z
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pyarrow (45.4MiB)
+Downloading triton (179.5MiB)
+Downloading scipy (33.7MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading sympy (6.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading matplotlib (8.3MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading pillow (6.7MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 4.73s
+WROTE_METRICS=outputs/paper_rebuild_20260324T065755Z/external_baselines/metrics.csv
+WROTE_AGGREGATE=outputs/paper_rebuild_20260324T065755Z/external_baselines/aggregate.csv
+[STEP-END] external_heuristic_baselines rc=0 :: 2026-03-25T07:24:02Z
+[STEP-START] build_selected_eta_stats :: 2026-03-25T07:24:02Z
+Downloading sympy (6.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading scipy (33.7MiB)
+Downloading matplotlib (8.3MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading numpy (16.1MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading cuda-bindings (6.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded numpy
+ Downloaded pandas
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 10.30s
+WROTE_STATS=outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_vs_eta1_stats.csv
+WROTE_SEEDWISE=outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_seedwise_deltas.csv
+[STEP-END] build_selected_eta_stats rc=0 :: 2026-03-25T07:24:50Z
+[STEP-START] build_misalignment_v2 :: 2026-03-25T07:24:50Z
+Downloading scipy (33.7MiB)
+Downloading pillow (6.7MiB)
+Downloading networkx (2.0MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading triton (179.5MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading setuptools (1.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading torch (506.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading cuda-bindings (6.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 9.71s
+WROTE_DIAGNOSTIC=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2.csv
+WROTE_SEEDWISE=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2_seedwise.csv
+WROTE_REPRESENTATIVE=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/representative_seed_metrics.json
+[STEP-END] build_misalignment_v2 rc=0 :: 2026-03-25T07:25:36Z
+[STEP-START] build_validation_first_tables :: 2026-03-25T07:25:36Z
+Downloading networkx (2.0MiB)
+Downloading sympy (6.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading pandas (10.7MiB)
+Downloading pillow (6.7MiB)
+Downloading matplotlib (8.3MiB)
+Downloading numpy (16.1MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading triton (179.5MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded numpy
+ Downloaded pandas
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 9.80s
+WROTE_TABLES=outputs/paper_rebuild_20260324T065755Z/paper_pack/tables
+[STEP-END] build_validation_first_tables rc=0 :: 2026-03-25T07:26:18Z
+[STEP-START] build_paper_figures :: 2026-03-25T07:26:18Z
+Downloading numpy (16.1MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading pillow (6.7MiB)
+Downloading fonttools (4.8MiB)
+Downloading networkx (2.0MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading pyarrow (45.4MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading setuptools (1.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 6.14s
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_selected_trace.png
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_validation_frontier.png
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_seed_scatter.png
+[STEP-END] build_paper_figures rc=0 :: 2026-03-25T07:27:30Z
+[STEP-START] check_validation_first_outputs :: 2026-03-25T07:27:31Z
+Downloading kiwisolver (1.4MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading matplotlib (8.3MiB)
+Downloading numpy (16.1MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading pandas (10.7MiB)
+Downloading scipy (33.7MiB)
+Downloading pyarrow (45.4MiB)
+Downloading torch (506.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading cuda-bindings (6.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 10.10s
+WROTE_MD=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validation_first.md
+WROTE_JSON=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validation_first.json
+[STEP-END] check_validation_first_outputs rc=0 :: 2026-03-25T07:28:13Z
+[DONE] phase=control_eta_validation_first complete
+[DONE] master_log=outputs/paper_rebuild_20260324T065755Z/logs/master.log
+[DONE] run_root=outputs/paper_rebuild_20260324T065755Z
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0 1 2 3 4 5 6 7 8 9
+[INFO] etas=1.0 0.5 0.2 0.1 0.082 0.05 0.02
+[INFO] kappas=0.0 0.0005 0.001
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=outputs/paper_rebuild_20260324T065755Z
+[INFO] python_cmd=uv run --with-requirements requirements.txt python
+[INFO] final_mode=selected_plus_baseline
+[STEP-START] materialize_validation_and_final_configs :: 2026-03-25T07:30:36Z
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading networkx (2.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading torch (506.0MiB)
+Downloading cuda-bindings (6.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+ Downloaded cuda-bindings
+      Built multitasking==0.0.12
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.43s
+{
+  "generated_at": "20260325T073036Z",
+  "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "snapshot_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
+  "signal_snapshot_out": "outputs/paper_rebuild_20260324T065755Z/configs/selected_signals_snapshot.json",
+  "validation_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml",
+  "final_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+  "forward_config_out": "",
+  "processed_dir": "data/processed_u27",
+  "returns_path": "data/processed_u27/returns.parquet",
+  "cache_max_date": "2026-03-20",
+  "validation_start": "2022-01-01",
+  "validation_end": "2023-12-31",
+  "final_start": "2024-01-01",
+  "final_end": "2025-12-31",
+  "forward_start": "2026-01-01",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "sac_total_timesteps": null,
+  "train_output_root": "outputs/paper_rebuild_20260324T065755Z/train_control",
+  "validation_output_root": "outputs/paper_rebuild_20260324T065755Z/validation_eta",
+  "final_output_root": "outputs/paper_rebuild_20260324T065755Z/final_eta",
+  "forward_output_root": null
+}
+[STEP-END] materialize_validation_and_final_configs rc=0 :: 2026-03-25T07:31:12Z
+[INFO] skip training phase (RUN_TRAIN=0)
+[STEP-START] validation_eta_frontier :: 2026-03-25T07:31:12Z
+Downloading pillow (6.7MiB)
+Downloading setuptools (1.0MiB)
+Downloading sympy (6.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading scipy (33.7MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 10.36s
+INFO:__main__:Using metadata config for model compatibility: /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml
+INFO:prl.data:Loading processed cache from data/processed_u27
+STEP6_SANITY_METRICS {"avg_turnover_exec_eta02": 0.0005407465995322356, "avg_turnover_exec_eta1": 0.021119482116967712, "test2_ratio": 0.025604160013838202}
+STEP6 SANITY PASSED
+[STEP-END] validation_eta_frontier rc=0 :: 2026-03-25T07:35:24Z
+[STEP-START] validation_eta_reports :: 2026-03-25T07:35:24Z
+Downloading networkx (2.0MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading pyarrow (45.4MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading fonttools (4.8MiB)
+Downloading scipy (33.7MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading triton (179.5MiB)
+Downloading matplotlib (8.3MiB)
+Downloading cuda-bindings (6.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.59s
+[STEP-END] validation_eta_reports rc=0 :: 2026-03-25T07:36:03Z
+[STEP-START] select_validation_eta :: 2026-03-25T07:36:03Z
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading setuptools (1.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading scipy (33.7MiB)
+Downloading numpy (16.1MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading sympy (6.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading pillow (6.7MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.57s
+SELECTED_ETA=0.5
+[STEP-END] select_validation_eta rc=0 :: 2026-03-25T07:36:37Z
+[INFO] selected_eta=0.5
+[STEP-START] final_eta_eval :: 2026-03-25T07:37:14Z
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading triton (179.5MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading scipy (33.7MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading pandas (10.7MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading matplotlib (8.3MiB)
+Downloading fonttools (4.8MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.51s
+INFO:__main__:Using metadata config for model compatibility: /workspace/execution-aware-portfolio-rl/prl-dow30/outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml
+INFO:prl.data:Loading processed cache from data/processed_u27
+STEP6_SANITY_METRICS {"avg_turnover_exec_eta02": 0.0005407465995322356, "avg_turnover_exec_eta1": 0.021119482116967712, "test2_ratio": 0.025604160013838202}
+STEP6 SANITY PASSED
+[STEP-END] final_eta_eval rc=0 :: 2026-03-25T07:39:05Z
+[STEP-START] final_eta_reports :: 2026-03-25T07:39:05Z
+Downloading networkx (2.0MiB)
+Downloading sympy (6.0MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading pyarrow (45.4MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading setuptools (1.0MiB)
+Downloading triton (179.5MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.47s
+[STEP-END] final_eta_reports rc=0 :: 2026-03-25T07:40:03Z
+[STEP-START] external_heuristic_baselines :: 2026-03-25T07:40:03Z
+Downloading scipy (33.7MiB)
+Downloading pyarrow (45.4MiB)
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading networkx (2.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading triton (179.5MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading fonttools (4.8MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading matplotlib (8.3MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.54s
+WROTE_METRICS=outputs/paper_rebuild_20260324T065755Z/external_baselines/metrics.csv
+WROTE_AGGREGATE=outputs/paper_rebuild_20260324T065755Z/external_baselines/aggregate.csv
+[STEP-END] external_heuristic_baselines rc=0 :: 2026-03-25T07:40:47Z
+[STEP-START] build_selected_eta_stats :: 2026-03-25T07:40:47Z
+Downloading pillow (6.7MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading matplotlib (8.3MiB)
+Downloading networkx (2.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading fonttools (4.8MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+ Downloaded cuda-bindings
+      Built multitasking==0.0.12
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.28s
+WROTE_STATS=outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_vs_eta1_stats.csv
+WROTE_SEEDWISE=outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_seedwise_deltas.csv
+[STEP-END] build_selected_eta_stats rc=0 :: 2026-03-25T07:44:03Z
+[STEP-START] build_misalignment_v2 :: 2026-03-25T07:44:03Z
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading triton (179.5MiB)
+Downloading setuptools (1.0MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading torch (506.0MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading networkx (2.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading sympy (6.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading pandas (10.7MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.37s
+WROTE_DIAGNOSTIC=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2.csv
+WROTE_SEEDWISE=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2_seedwise.csv
+WROTE_REPRESENTATIVE=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/representative_seed_metrics.json
+[STEP-END] build_misalignment_v2 rc=0 :: 2026-03-25T07:45:37Z
+[STEP-START] build_validation_first_tables :: 2026-03-25T07:45:37Z
+Downloading numpy (16.1MiB)
+Downloading sympy (6.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading pillow (6.7MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading setuptools (1.0MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded setuptools
+ Downloaded nvidia-cuda-runtime
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded sympy
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.95s
+WROTE_TABLES=outputs/paper_rebuild_20260324T065755Z/paper_pack/tables
+[STEP-END] build_validation_first_tables rc=0 :: 2026-03-25T07:46:30Z
+[STEP-START] build_paper_figures :: 2026-03-25T07:46:30Z
+Downloading pandas (10.7MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading setuptools (1.0MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading matplotlib (8.3MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading networkx (2.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading triton (179.5MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading sympy (6.0MiB)
+Downloading pillow (6.7MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 3.67s
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_selected_trace.png
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_validation_frontier.png
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_seed_scatter.png
+[STEP-END] build_paper_figures rc=0 :: 2026-03-25T07:48:02Z
+[STEP-START] check_validation_first_outputs :: 2026-03-25T07:48:02Z
+Downloading pillow (6.7MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading scipy (33.7MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading pandas (10.7MiB)
+Downloading networkx (2.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading sympy (6.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading matplotlib (8.3MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 5.17s
+WROTE_MD=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validation_first.md
+WROTE_JSON=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validation_first.json
+[STEP-END] check_validation_first_outputs rc=0 :: 2026-03-25T07:49:26Z
+[DONE] phase=control_eta_validation_first complete
+[DONE] master_log=outputs/paper_rebuild_20260324T065755Z/logs/master.log
+[DONE] run_root=outputs/paper_rebuild_20260324T065755Z
+[INFO] phase=control_eta_validation_first
+[INFO] current_config=configs/prl_100k_signals_u27_eta082_current.yaml
+[INFO] seeds=0 1 2 3 4 5 6 7 8 9
+[INFO] etas=1.0 0.5 0.2 0.1 0.082 0.05 0.02
+[INFO] kappas=0.0 0.0005 0.001
+[INFO] validation_window=2022-01-01~2023-12-31
+[INFO] final_window=2024-01-01~2025-12-31
+[INFO] run_root=outputs/paper_rebuild_20260324T065755Z
+[INFO] python_cmd=uv run --with-requirements requirements.txt python
+[INFO] final_mode=selected_plus_baseline
+[STEP-START] materialize_validation_and_final_configs :: 2026-03-25T07:52:42Z
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading triton (179.5MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading fonttools (4.8MiB)
+Downloading sympy (6.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading torch (506.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading numpy (16.1MiB)
+Downloading pandas (10.7MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading pyarrow (45.4MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 6.26s
+{
+  "generated_at": "20260325T075242Z",
+  "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
+  "snapshot_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
+  "signal_snapshot_out": "outputs/paper_rebuild_20260324T065755Z/configs/selected_signals_snapshot.json",
+  "validation_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/validation_eta.yaml",
+  "final_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+  "forward_config_out": "",
+  "processed_dir": "data/processed_u27",
+  "returns_path": "data/processed_u27/returns.parquet",
+  "cache_max_date": "2026-03-20",
+  "validation_start": "2022-01-01",
+  "validation_end": "2023-12-31",
+  "final_start": "2024-01-01",
+  "final_end": "2025-12-31",
+  "forward_start": "2026-01-01",
+  "selected_signals": [
+    "reversal_5d",
+    "short_term_reversal"
+  ],
+  "sac_total_timesteps": null,
+  "train_output_root": "outputs/paper_rebuild_20260324T065755Z/train_control",
+  "validation_output_root": "outputs/paper_rebuild_20260324T065755Z/validation_eta",
+  "final_output_root": "outputs/paper_rebuild_20260324T065755Z/final_eta",
+  "forward_output_root": null
+}
+[STEP-END] materialize_validation_and_final_configs rc=0 :: 2026-03-25T07:53:23Z
+[INFO] skip training phase (RUN_TRAIN=0)
+[INFO] skip validation eta frontier phase (RUN_VALIDATION=0)
+[INFO] skip selection phase (RUN_SELECT=0)
+[INFO] skip final/test phase (RUN_FINAL=0)
+[INFO] external_baseline_window=2024-02-14~2025-12-31
+[STEP-START] external_heuristic_baselines :: 2026-03-25T07:54:07Z
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading pandas (10.7MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading scipy (33.7MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading pillow (6.7MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading setuptools (1.0MiB)
+Downloading torch (506.0MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 13.01s
+WROTE_METRICS=outputs/paper_rebuild_20260324T065755Z/external_baselines/metrics.csv
+WROTE_AGGREGATE=outputs/paper_rebuild_20260324T065755Z/external_baselines/aggregate.csv
+[STEP-END] external_heuristic_baselines rc=0 :: 2026-03-25T07:55:02Z
+[STEP-START] build_selected_eta_stats :: 2026-03-25T07:55:02Z
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading triton (179.5MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading scipy (33.7MiB)
+Downloading pillow (6.7MiB)
+Downloading pandas (10.7MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading pyarrow (45.4MiB)
+Downloading matplotlib (8.3MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading torch (506.0MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 8.75s
+WROTE_STATS=outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_vs_eta1_stats.csv
+WROTE_SEEDWISE=outputs/paper_rebuild_20260324T065755Z/paper_pack/stats/selected_eta_seedwise_deltas.csv
+[STEP-END] build_selected_eta_stats rc=0 :: 2026-03-25T07:55:58Z
+[STEP-START] build_misalignment_v2 :: 2026-03-25T07:55:58Z
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading setuptools (1.0MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading fonttools (4.8MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading pandas (10.7MiB)
+Downloading matplotlib (8.3MiB)
+Downloading sympy (6.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading pyarrow (45.4MiB)
+Downloading pillow (6.7MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading numpy (16.1MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 41.91s
+WROTE_DIAGNOSTIC=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2.csv
+WROTE_SEEDWISE=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/diagnostic_selected_eta_v2_seedwise.csv
+WROTE_REPRESENTATIVE=outputs/paper_rebuild_20260324T065755Z/paper_pack/diagnostics/representative_seed_metrics.json
+[STEP-END] build_misalignment_v2 rc=0 :: 2026-03-25T07:57:24Z
+[STEP-START] build_validation_first_tables :: 2026-03-25T07:57:24Z
+Downloading pandas (10.7MiB)
+Downloading numpy (16.1MiB)
+Downloading pyarrow (45.4MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading torch (506.0MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading networkx (2.0MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading triton (179.5MiB)
+Downloading curl-cffi (7.9MiB)
+Downloading cuda-bindings (6.0MiB)
+   Building multitasking==0.0.12
+ Downloaded setuptools
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded networkx
+ Downloaded nvidia-cuda-runtime
+      Built multitasking==0.0.12
+ Downloaded fonttools
+ Downloaded sympy
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 19.51s
+WROTE_TABLES=outputs/paper_rebuild_20260324T065755Z/paper_pack/tables
+[STEP-END] build_validation_first_tables rc=0 :: 2026-03-25T07:58:20Z
+[STEP-START] build_paper_figures :: 2026-03-25T07:58:20Z
+Downloading setuptools (1.0MiB)
+Downloading sympy (6.0MiB)
+Downloading networkx (2.0MiB)
+Downloading matplotlib (8.3MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading numpy (16.1MiB)
+Downloading pandas (10.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading fonttools (4.8MiB)
+Downloading pyarrow (45.4MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded setuptools
+ Downloaded nvidia-cuda-runtime
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded curl-cffi
+ Downloaded sympy
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 16.44s
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_selected_trace.png
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_validation_frontier.png
+WROTE_FIGURE=outputs/paper_rebuild_20260324T065755Z/paper_pack/figures/fig_seed_scatter.png
+[STEP-END] build_paper_figures rc=0 :: 2026-03-25T07:59:12Z
+[STEP-START] check_validation_first_outputs :: 2026-03-25T07:59:12Z
+Downloading numpy (16.1MiB)
+Downloading sympy (6.0MiB)
+Downloading networkx (2.0MiB)
+Downloading kiwisolver (1.4MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+Downloading fonttools (4.8MiB)
+Downloading pandas (10.7MiB)
+Downloading scipy (33.7MiB)
+Downloading nvidia-nvjitlink (38.8MiB)
+Downloading nvidia-cusparselt-cu13 (162.0MiB)
+Downloading setuptools (1.0MiB)
+Downloading nvidia-cusolver (191.6MiB)
+Downloading pillow (6.7MiB)
+Downloading nvidia-nccl-cu13 (187.4MiB)
+Downloading pyarrow (45.4MiB)
+Downloading matplotlib (8.3MiB)
+Downloading cuda-bindings (6.0MiB)
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-curand (56.8MiB)
+Downloading nvidia-nvshmem-cu13 (57.6MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading triton (179.5MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading torch (506.0MiB)
+Downloading nvidia-cudnn-cu13 (349.1MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading curl-cffi (7.9MiB)
+   Building multitasking==0.0.12
+ Downloaded nvidia-cufile
+ Downloaded kiwisolver
+ Downloaded nvidia-cuda-runtime
+ Downloaded setuptools
+ Downloaded networkx
+ Downloaded fonttools
+      Built multitasking==0.0.12
+ Downloaded cuda-bindings
+ Downloaded pillow
+ Downloaded sympy
+ Downloaded curl-cffi
+ Downloaded matplotlib
+ Downloaded nvidia-cuda-cupti
+ Downloaded pandas
+ Downloaded numpy
+ Downloaded scipy
+ Downloaded nvidia-nvjitlink
+ Downloaded pyarrow
+ Downloaded nvidia-curand
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded triton
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cudnn-cu13
+ Downloaded nvidia-cublas
+ Downloaded torch
+Installed 66 packages in 13.20s
+WROTE_MD=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validation_first.md
+WROTE_JSON=outputs/paper_rebuild_20260324T065755Z/checklists/control_eta_validation_first.json
+[STEP-END] check_validation_first_outputs rc=0 :: 2026-03-25T08:00:03Z
+[DONE] phase=control_eta_validation_first complete
+[DONE] master_log=outputs/paper_rebuild_20260324T065755Z/logs/master.log
+[DONE] run_root=outputs/paper_rebuild_20260324T065755Z

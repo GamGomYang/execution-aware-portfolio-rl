@@ -1,6 +1,6 @@
 # Validation-First Paper Protocol
 
-- selected_eta: 0.2
+- selected_eta: 0.5
 - baseline_eta: 1.0
 - eta grid fixed a priori.
 - eta selected on validation only.

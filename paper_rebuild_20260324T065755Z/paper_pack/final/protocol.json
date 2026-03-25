@@ -2,7 +2,7 @@
   "config": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
   "eval_window": {
     "name": "test",
-    "start": "2024-01-01",
+    "start": "2024-02-14",
     "end": "2025-12-31"
   },
   "kappas": [
@@ -15,5 +15,17 @@
     "risk_free_rate": 0.0,
     "cost_definition": "kappa * executed_turnover",
     "primary_metric": "executed_path_sharpe_net_lin"
+  },
+  "strategies": [
+    "buy_and_hold_equal_weight",
+    "daily_rebalanced_equal_weight",
+    "inverse_vol_risk_parity",
+    "minimum_variance",
+    "mean_variance_long_only"
+  ],
+  "heuristic_parameters": {
+    "lookback": 252,
+    "history_min": 30,
+    "mean_variance_risk_aversion": 10.0
   }
 }

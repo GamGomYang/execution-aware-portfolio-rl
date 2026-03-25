@@ -1,11 +1,11 @@
 {
-  "selected_eta": 0.2,
+  "selected_eta": 0.5,
   "representative_kappa": 0.001,
-  "representative_seed": 5,
-  "representative_trace_path": "outputs/paper_rebuild_20260324T065755Z/final_eta/kappa_0.001/eta_0.2/seed_5/trace.parquet",
-  "representative_sharpe_net_lin": 1.1985570545462676,
-  "median_sharpe_net_lin_at_kappa": 1.2043287935742208,
-  "mean_abs_return_gap": 4.258989673847024e-05,
-  "final_equity_gap": 0.004522578813050515,
-  "max_abs_daily_gap": 0.00022286990348079072
+  "representative_seed": 2,
+  "representative_trace_path": "outputs/paper_rebuild_20260324T065755Z/final_eta/kappa_0.001/eta_0.5/seed_2/trace.parquet",
+  "representative_sharpe_net_lin": 1.1361080758210251,
+  "median_sharpe_net_lin_at_kappa": 1.1339688930137783,
+  "mean_abs_return_gap": 3.134579804172133e-05,
+  "final_equity_gap": 0.0070170953843324835,
+  "max_abs_daily_gap": 0.00021253790931363703
 }

@@ -1,5 +1,5 @@
 {
-  "selected_eta": 0.2,
+  "selected_eta": 0.5,
   "baseline_eta": 1.0,
   "bootstrap": 5000,
   "bootstrap_alpha": 0.05,

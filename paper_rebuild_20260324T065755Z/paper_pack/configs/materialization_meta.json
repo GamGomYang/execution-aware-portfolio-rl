@@ -1,5 +1,5 @@
 {
-  "generated_at": "20260324T140938Z",
+  "generated_at": "20260325T075242Z",
   "current_config": "configs/prl_100k_signals_u27_eta082_current.yaml",
   "snapshot_config_out": "outputs/paper_rebuild_20260324T065755Z/configs/snapshot_control.yaml",
   "signal_snapshot_out": "outputs/paper_rebuild_20260324T065755Z/configs/selected_signals_snapshot.json",

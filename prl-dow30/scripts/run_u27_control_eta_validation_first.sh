@@ -104,6 +104,27 @@ print("" if value is None else value)
 PY
 }
 
+effective_window_from_trace() {
+  "${PYTHON[@]}" - "$1" <<'PY'
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+path = Path(sys.argv[1])
+if not path.exists():
+    raise FileNotFoundError(f"Trace not found: {path}")
+
+df = pd.read_parquet(path, columns=["date"])
+if df.empty:
+    raise ValueError(f"Trace is empty: {path}")
+
+dates = pd.to_datetime(df["date"])
+print(dates.iloc[0].strftime("%Y-%m-%d"))
+print(dates.iloc[-1].strftime("%Y-%m-%d"))
+PY
+}
+
 build_pack() {
   mkdir -p "$PACK_ROOT/configs" "$PACK_ROOT/validation" "$PACK_ROOT/final" "$PACK_ROOT/checklists"
   cp "$SNAPSHOT_CONFIG" "$PACK_ROOT/configs/" 2>/dev/null || true
@@ -215,11 +236,9 @@ if [[ "$RUN_VALIDATION" == "1" ]]; then
     --kappas "${KAPPAS[@]}"
     --etas "${ETAS[@]}"
     --out "$VALIDATION_ROOT"
+    --max-steps "$MAX_STEPS"
     --offline
   )
-  if [[ "$MAX_STEPS" != "0" ]]; then
-    validation_cmd+=(--max-steps "$MAX_STEPS")
-  fi
   run_cmd "validation_eta_frontier" "${validation_cmd[@]}"
   run_cmd "validation_eta_reports" \
     "${PYTHON[@]}" scripts/step6_build_reports.py \
@@ -283,11 +302,9 @@ if [[ "$RUN_FINAL" == "1" ]]; then
     --kappas "${KAPPAS[@]}"
     --etas "${FINAL_ETAS_ARGS[@]}"
     --out "$FINAL_ROOT"
+    --max-steps "$MAX_STEPS"
     --offline
   )
-  if [[ "$MAX_STEPS" != "0" ]]; then
-    final_cmd+=(--max-steps "$MAX_STEPS")
-  fi
   run_cmd "final_eta_eval" "${final_cmd[@]}"
   run_cmd "final_eta_reports" \
     "${PYTHON[@]}" scripts/step6_build_reports.py \
@@ -297,11 +314,27 @@ else
 fi
 
 if [[ "$RUN_BASELINES" == "1" ]]; then
+  BASELINE_START="$FINAL_START"
+  BASELINE_END="$FINAL_END"
+  TRACE_REF_ETA="${SELECTED_ETA:-$BASELINE_ETA}"
+  TRACE_REF_KAPPA="${KAPPAS[0]}"
+  TRACE_REF_SEED="${SEEDS[0]}"
+  TRACE_REF_PATH="${FINAL_ROOT}/kappa_$(printf '%g' "$TRACE_REF_KAPPA")/eta_$(printf '%g' "$TRACE_REF_ETA")/seed_${TRACE_REF_SEED}/trace.parquet"
+  if [[ -f "$TRACE_REF_PATH" ]]; then
+    mapfile -t EFFECTIVE_WINDOW < <(effective_window_from_trace "$TRACE_REF_PATH")
+    if [[ "${#EFFECTIVE_WINDOW[@]}" -ge 2 ]]; then
+      BASELINE_START="${EFFECTIVE_WINDOW[0]}"
+      BASELINE_END="${EFFECTIVE_WINDOW[1]}"
+    fi
+  fi
+  log "[INFO] external_baseline_window=${BASELINE_START}~${BASELINE_END}"
   run_cmd "external_heuristic_baselines" \
     "${PYTHON[@]}" scripts/run_external_heuristic_baselines.py \
       --config "$FINAL_CONFIG" \
       --kappas "${KAPPAS[@]}" \
       --out "$BASELINES_ROOT" \
+      --start "$BASELINE_START" \
+      --end "$BASELINE_END" \
       --offline
 else
   log "[INFO] skip external baseline phase (RUN_BASELINES=${RUN_BASELINES})"

@@ -108,6 +108,13 @@ def _relpath(target: Path, start: Path) -> str:
     return os.path.relpath(target.resolve(), start.resolve())
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def _selected_signals(config_path: Path, cfg: dict[str, Any]) -> list[str]:
     signals_cfg = cfg.get("signals", {}) or {}
     signal_names = list(signals_cfg.get("signal_names", []) or [])
@@ -150,7 +157,7 @@ def main() -> None:
     signal_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
     signal_payload = {
         "selected_signals": selected_signals,
-        "source_current_config": str(current_config_path.relative_to(ROOT)),
+        "source_current_config": _display_path(current_config_path),
         "generated_at": ts,
         "tag": f"u27_eta082_control_paper_{ts}",
     }
@@ -208,14 +215,14 @@ def main() -> None:
 
     payload = {
         "generated_at": ts,
-        "current_config": str(current_config_path.relative_to(ROOT)),
-        "snapshot_config_out": str(snapshot_config_path.relative_to(ROOT)),
-        "signal_snapshot_out": str(signal_snapshot_path.relative_to(ROOT)),
-        "validation_config_out": str(validation_config_path.relative_to(ROOT)) if validation_config_path is not None else "",
-        "final_config_out": str(final_config_path.relative_to(ROOT)) if final_config_path is not None else "",
-        "forward_config_out": str(forward_config_path.relative_to(ROOT)) if forward_config_path is not None else "",
+        "current_config": _display_path(current_config_path),
+        "snapshot_config_out": _display_path(snapshot_config_path),
+        "signal_snapshot_out": _display_path(signal_snapshot_path),
+        "validation_config_out": _display_path(validation_config_path) if validation_config_path is not None else "",
+        "final_config_out": _display_path(final_config_path) if final_config_path is not None else "",
+        "forward_config_out": _display_path(forward_config_path) if forward_config_path is not None else "",
         "processed_dir": processed_dir,
-        "returns_path": str(returns_path.relative_to(ROOT)),
+        "returns_path": _display_path(returns_path),
         "cache_max_date": cache_max_date,
         "validation_start": args.validation_start,
         "validation_end": args.validation_end,

@@ -1,8 +1,8 @@
 {
-  "config": "/workspace/execution-aware-portfolio-rl/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
+  "config": "outputs/paper_rebuild_20260324T065755Z/configs/final_eta.yaml",
   "eval_window": {
     "name": "test",
-    "start": "2024-01-01",
+    "start": "2024-02-14",
     "end": "2025-12-31"
   },
   "kappas": [

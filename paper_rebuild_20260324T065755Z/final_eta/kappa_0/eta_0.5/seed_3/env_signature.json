@@ -1,0 +1,65 @@
+{
+  "expected_env_signature_hash": "b886f789a048210c48602b005fc0000e86a707c233b6ebd66d6be51a68a85a12",
+  "expected_env_signature_version": "v3",
+  "current": {
+    "env_signature_hash": "d0800ff5aa57338a6432d038732c6812b46ece8ef3be8b9ee442c5d036ee290a",
+    "feature_flags": {
+      "returns_window": true,
+      "volatility": true,
+      "prev_weights": true,
+      "reward_type": "log_net_minus_r2",
+      "action_smoothing": true
+    },
+    "cost_params": {
+      "transaction_cost": 0.0,
+      "risk_lambda": 0.0,
+      "rebalance_eta": 0.5,
+      "eta_mode": "fixed",
+      "eta_clip_min": 0.02,
+      "eta_clip_max": 0.5,
+      "rule_vol_window": 20,
+      "rule_vol_a": 1.0
+    },
+    "window_size": 30,
+    "Lv": 30,
+    "asset_list": [
+      "AAPL",
+      "AMGN",
+      "AXP",
+      "BA",
+      "CAT",
+      "CRM",
+      "CSCO",
+      "CVX",
+      "DIS",
+      "GS",
+      "HD",
+      "HON",
+      "IBM",
+      "INTC",
+      "JNJ",
+      "JPM",
+      "KO",
+      "MCD",
+      "MMM",
+      "MRK",
+      "MSFT",
+      "NKE",
+      "PG",
+      "UNH",
+      "V",
+      "VZ",
+      "WMT"
+    ]
+  },
+  "experiment_name": "final_eta",
+  "arm": "eta_sweep",
+  "step6_params": {
+    "eta_mode": "fixed",
+    "rule_vol_window": 20,
+    "rule_vol_a": null,
+    "eta_clip_min": 0.02,
+    "eta_clip_max": 0.5
+  },
+  "step6_signature_hash": "51ee616faea1d91fd2e03d47f13cdaf021af9e3a346f1ad6f399572a48ab4906"
+}

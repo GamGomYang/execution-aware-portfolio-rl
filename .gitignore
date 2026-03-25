@@ -21,6 +21,19 @@ prl-dow30/outputs/
 paper_rebuild_*/train_control/logs/*.csv
 prl-dow30/ziuV6bRg
 
+# Local manuscript build artifacts
+paper.aux
+paper.fdb_latexmk
+paper.fls
+paper.log
+paper.out
+paper.pdf
+paper.synctex.gz
+overleaf.zip
+
+# Convenience symlinks recreated locally when needed
+paper_rebuild_*/train_control/models/prl_seed*_final.zip
+
 # Local working notes/results (non-source artifacts)
 결과
 
