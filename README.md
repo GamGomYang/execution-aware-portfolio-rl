@@ -47,23 +47,7 @@ Selection transfer is preserved when the offline-selected model and deployed-uti
 
 Event warning and Traffic-Hourly provide the main prediction-to-decision evidence. PM2.5 and inventory are retained as residual and operational support.
 
-## Rebuild
 
-Selected paper-facing figures and tables:
-
-```bash
-python paper/forecasting_workshop/results/build_v2_main_figures.py
-python scripts/forecast_eval/build_workshop_freeze_and_uncertainty.py
-```
-
-Manuscript:
-
-```bash
-cd paper/forecasting_workshop
-latexmk -pdf paper_forecasting_workshop_v2.tex
-```
-
-The rebuild scripts assume a Python scientific stack including `pandas` and `matplotlib`; manuscript and PDF-figure generation require a LaTeX installation.
 
 ## Scope
 
