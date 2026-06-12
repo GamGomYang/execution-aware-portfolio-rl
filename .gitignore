@@ -18,19 +18,8 @@ __pycache__/
 # Generated experiment outputs
 outputs/
 
-# Local manuscript build artifacts
-*.aux
-*.fdb_latexmk
-*.fls
-*.log
-*.out
-*.synctex.gz
-overleaf.zip
-paper/forecasting_workshop/page_renders/
-
 # Local tooling / generated diagnostics
 .tools/
-paper_v1_extension_artifacts/
 
 # OS/editor noise
 .DS_Store

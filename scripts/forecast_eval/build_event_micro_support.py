@@ -11,8 +11,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-matplotlib.rcParams["pdf.use14corefonts"] = True
-matplotlib.rcParams["ps.useafm"] = True
 matplotlib.rcParams["font.family"] = "serif"
 
 
@@ -54,10 +52,10 @@ DEFAULT_OUTPUT_DIR = (
     / "event_micro_hardening"
     / "fixed_threshold_tau055_seed100"
 )
-DEFAULT_PAPER_RESULTS_DIR = REPO_ROOT / "paper" / "forecasting_workshop" / "results"
-DEFAULT_PAPER_FIGURES_DIR = REPO_ROOT / "paper" / "forecasting_workshop" / "assets" / "figures"
+DEFAULT_REPORT_TABLES_DIR = REPO_ROOT / "results" / "tables"
+DEFAULT_REPORT_FIGURES_DIR = REPO_ROOT / "results" / "figures"
 
-PAPER_FORECASTER_LABELS = {
+REPORT_FORECASTER_LABELS = {
     "calibrated_baseline": "Calibrated baseline",
     "reactive_sharp": "Reactive sharp",
     "lagged_smoother": "Lagged smoother",
@@ -69,7 +67,7 @@ SUPPORT_READING = (
 )
 SCHEMA_NOTE = (
     "In the shared raw schema, `forecast_metric` is stored as `-brier` only to preserve the higher-is-better "
-    "ranking convention used by the summary builder; all paper-facing tables and text should still report Brier "
+    "ranking convention used by the summary builder; report-card tables and text should still report Brier "
     "in its standard lower-is-better interpretation."
 )
 
@@ -79,42 +77,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", default=str(DEFAULT_INPUT), help="Raw event-micro Q2 CSV.")
     parser.add_argument("--seed-metrics", default=str(DEFAULT_SEED_METRICS), help="Seed-level diagnostics CSV.")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="Output directory for derived event-micro summaries.")
-    parser.add_argument("--paper-results-dir", default=str(DEFAULT_PAPER_RESULTS_DIR), help="Paper results directory.")
-    parser.add_argument("--paper-figures-dir", default=str(DEFAULT_PAPER_FIGURES_DIR), help="Paper figures directory.")
+    parser.add_argument("--report-tables-dir", default=str(DEFAULT_REPORT_TABLES_DIR), help="Report-card table directory.")
+    parser.add_argument("--report-figures-dir", default=str(DEFAULT_REPORT_FIGURES_DIR), help="Report-card figure directory.")
     return parser.parse_args()
 
 
-def _paper_label(model_id: str) -> str:
-    return PAPER_FORECASTER_LABELS.get(str(model_id), str(model_id))
+def _report_label(model_id: str) -> str:
+    return REPORT_FORECASTER_LABELS.get(str(model_id), str(model_id))
 
 
 def _format_float(value: float, digits: int = 3) -> str:
     return f"{float(value):.{digits}f}"
 
 
-def _write_table_tex(frame: pd.DataFrame, path: Path) -> None:
-    lines = [
-        "\\begin{tabular}{lllll}",
-        "\\toprule",
-        "Friction & Forecast-side winner & Deployed winner & Agreement rate & Mean deployed gap \\\\",
-        "\\midrule",
-    ]
-    for row in frame.itertuples(index=False):
-        lines.append(
-            f"{row.Friction} & {row.Forecast_side_winner} & {row.Deployed_winner} & "
-            f"{row.Agreement_rate} & {row.Mean_deployed_gap} \\\\"
-        )
-    lines.extend(["\\bottomrule", "\\end{tabular}"])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n")
-
-
-def _build_paper_table(selection_summary: pd.DataFrame) -> pd.DataFrame:
+def _build_report_table(selection_summary: pd.DataFrame) -> pd.DataFrame:
     table = pd.DataFrame(
         {
             "Friction": selection_summary["friction"].map(lambda value: f"{float(value):.2f}"),
-            "Forecast_side_winner": selection_summary["forecast_winner_mode"].map(_paper_label),
-            "Deployed_winner": selection_summary["deployed_winner_mode"].map(_paper_label),
+            "Forecast_side_winner": selection_summary["forecast_winner_mode"].map(_report_label),
+            "Deployed_winner": selection_summary["deployed_winner_mode"].map(_report_label),
             "Agreement_rate": selection_summary["agreement_rate"].map(lambda value: f"{float(value):.2f}"),
             "Mean_deployed_gap": selection_summary["mean_deployed_gap"].map(lambda value: _format_float(value, 3)),
         }
@@ -272,8 +253,8 @@ def main() -> int:
     input_path = Path(args.input).resolve()
     seed_metrics_path = Path(args.seed_metrics).resolve()
     output_dir = Path(args.output_dir).resolve()
-    paper_results_dir = Path(args.paper_results_dir).resolve()
-    paper_figures_dir = Path(args.paper_figures_dir).resolve()
+    report_tables_dir = Path(args.report_tables_dir).resolve()
+    report_figures_dir = Path(args.report_figures_dir).resolve()
 
     q2_df = pd.read_csv(input_path)
     seed_metrics_df = pd.read_csv(seed_metrics_path)
@@ -296,23 +277,20 @@ def main() -> int:
     friction_summary_path = output_dir / "friction_summary.csv"
     friction_summary.to_csv(friction_summary_path, index=False)
 
-    paper_table = _build_paper_table(friction_summary)
-    paper_results_dir.mkdir(parents=True, exist_ok=True)
-    paper_table_csv = paper_results_dir / "table_q2_selection_drift_event_micro.csv"
-    paper_table_tex = paper_results_dir / "table_q2_selection_drift_event_micro.tex"
-    paper_table.to_csv(paper_table_csv, index=False)
-    _write_table_tex(paper_table, paper_table_tex)
+    report_table = _build_report_table(friction_summary)
+    report_tables_dir.mkdir(parents=True, exist_ok=True)
+    report_table_csv = report_tables_dir / "table_q2_selection_drift_event_micro.csv"
+    report_table.to_csv(report_table_csv, index=False)
 
     qualitative_pass = _qualitative_pass(friction_summary)
-    note_path = paper_results_dir / "event_micro_support_note.md"
+    note_path = report_tables_dir / "event_micro_support_note.md"
     _write_support_note(note_path, friction_summary, qualitative_pass)
 
-    figure_path = paper_figures_dir / "fig_q2_event_micro_support.pdf"
+    figure_path = report_figures_dir / "fig_q2_event_micro_support.png"
     _build_figure(friction_summary, figure_path)
 
     print(f"[event-micro-support] wrote {friction_summary_path}")
-    print(f"[event-micro-support] wrote {paper_table_csv}")
-    print(f"[event-micro-support] wrote {paper_table_tex}")
+    print(f"[event-micro-support] wrote {report_table_csv}")
     print(f"[event-micro-support] wrote {note_path}")
     print(f"[event-micro-support] wrote {figure_path}")
     print(f"[event-micro-support] qualitative_pass={qualitative_pass}")

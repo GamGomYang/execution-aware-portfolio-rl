@@ -1,11 +1,8 @@
-"""Compute share intervals used by the forecasting-workshop appendix tables.
+"""Compute share intervals for the actionability report-card tables.
 
 The reporting convention is intentionally simple:
 - Wilson score intervals for rows with n >= 30.
 - Clopper-Pearson exact intervals for rows with n < 30.
-
-The script writes an audit CSV and regenerates the two LaTeX recurrence/share
-tables used by paper_forecasting_workshop_v2.tex.
 """
 
 from __future__ import annotations
@@ -151,53 +148,11 @@ def write_audit_csv(path: Path, rows: list[ShareRow]) -> None:
         writer.writerows(records)
 
 
-def q2_table(rows: list[ShareRow]) -> str:
-    lines = [
-        r"\begin{tabular}{llllllll}",
-        r"\toprule",
-        r"Domain & Interface & $\kappa$ & Seeds & Agree. & Subopt. share/count & Subopt. 95\% CI & CI type \\",
-        r"\midrule",
-    ]
-    for row in rows:
-        lo, hi = share_interval(row)
-        lines.append(
-            f"{row.domain} & {row.interface} & {row.friction} & {row.seeds} & "
-            f"{row.agreement:.2f} & {row.share:.2f} ({row.suboptimal}/{row.seeds}) & "
-            f"{fmt_ci(lo, hi)} & {row.ci_type} \\\\"
-        )
-    lines += [r"\bottomrule", r"\end{tabular}", ""]
-    return "\n".join(lines)
-
-
-def event_interface_table(rows: list[ShareRow]) -> str:
-    lines = [
-        r"\begin{tabular}{lllllll}",
-        r"\toprule",
-        r"Interface & $\kappa$ & Seeds & Agree. & Subopt. share/count & Subopt. 95\% CI & CI type \\",
-        r"\midrule",
-    ]
-    for row in rows:
-        lo, hi = share_interval(row)
-        lines.append(
-            f"{row.domain} & {row.friction} & {row.seeds} & {row.agreement:.2f} & "
-            f"{row.share:.2f} ({row.suboptimal}/{row.seeds}) & {fmt_ci(lo, hi)} & {row.ci_type} \\\\"
-        )
-    lines += [r"\bottomrule", r"\end{tabular}", ""]
-    return "\n".join(lines)
-
-
 def main() -> None:
     repo = Path(__file__).resolve().parents[2]
-    audit_path = repo / "outputs" / "forecast_eval" / "reporting_diagnostic" / "share_interval_audit.csv"
-    results_dir = repo / "paper" / "forecasting_workshop" / "results"
+    audit_path = repo / "results" / "tables" / "share_interval_audit.csv"
     write_audit_csv(audit_path, Q2_ROWS + EVENT_INTERFACE_ROWS)
-    (results_dir / "table_q2_recurrence_tests.tex").write_text(q2_table(Q2_ROWS), encoding="utf-8")
-    (results_dir / "table_event_micro_interface_recurrence_tests.tex").write_text(
-        event_interface_table(EVENT_INTERFACE_ROWS), encoding="utf-8"
-    )
     print(f"Wrote {audit_path}")
-    print(f"Wrote {results_dir / 'table_q2_recurrence_tests.tex'}")
-    print(f"Wrote {results_dir / 'table_event_micro_interface_recurrence_tests.tex'}")
 
 
 if __name__ == "__main__":

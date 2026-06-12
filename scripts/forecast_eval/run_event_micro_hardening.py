@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import binomtest
 
-matplotlib.rcParams["pdf.use14corefonts"] = True
 matplotlib.rcParams["ps.useafm"] = True
 matplotlib.rcParams["font.family"] = "serif"
 
@@ -35,7 +34,7 @@ from revision_round_20260423 import (  # noqa: E402
     NEW_RERUNS_DIR,
     PHYSICAL_STORAGE_ROOT,
     STORY_REVISION_DIR,
-    EVENT_MICRO_PAPER_LABELS,
+    EVENT_MICRO_REPORT_LABELS,
     build_q2_from_seed_metrics,
     compact_selection_summary,
     ensure_dir,
@@ -43,7 +42,7 @@ from revision_round_20260423 import (  # noqa: E402
     friction_row,
     logical_root_relative,
     model_label,
-    paper_selection_table,
+    report_selection_table,
     physical_root_relative,
     repo_relative,
     write_json,
@@ -53,8 +52,6 @@ from revision_round_20260423 import (  # noqa: E402
 
 
 RUN_EVENT_MICRO_SCRIPT = SCRIPT_DIR / "run_event_micro.py"
-BUILD_MAIN_FIGURES_SCRIPT = ROOT / "paper" / "forecasting_workshop" / "results" / "build_v2_main_figures.py"
-
 HARDENING_CONFIG_DIR = ROOT / "configs" / "event_micro_revision_round_20260423" / "hardening"
 HARDENING_ROOT = NEW_RERUNS_DIR / "event_micro_hardening"
 CANONICAL_RUN_DIR = HARDENING_ROOT / "fixed_threshold_tau055_seed100"
@@ -67,10 +64,10 @@ CANONICAL_CONFIG = HARDENING_CONFIG_DIR / "event_micro_tau055_seed100.yaml"
 TAU050_CONFIG = HARDENING_CONFIG_DIR / "event_micro_tau050_seed100.yaml"
 HYSTERESIS_CONFIG = HARDENING_CONFIG_DIR / "event_micro_hysteresis_tau055_delta005_seed100.yaml"
 
-PAPER_DIR = ROOT / "paper" / "forecasting_workshop"
-PAPER_RESULTS_DIR = PAPER_DIR / "results"
-PAPER_FIGURES_DIR = PAPER_DIR / "assets" / "figures"
-WORKSHOP_TEX = PAPER_DIR / "paper_forecasting_workshop_v2.tex"
+REPORT_DIR = ROOT / "results"
+REPORT_TABLES_DIR = REPORT_DIR / "tables"
+REPORT_FIGURES_DIR = REPORT_DIR / "figures"
+REPORT_MANIFEST = REPORT_DIR / "report_card_manifest.md"
 
 SYNTHETIC_Q2_RAW = ROOT / "outputs" / "forecast_eval" / "synthetic_step2_candidate_lock" / "q2_diff_forecasts_same_interface.csv"
 INVENTORY_Q2_SEED = (
@@ -345,8 +342,8 @@ def main_table(summary: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {
                 "Friction": f"{float(row.friction_level):.2f}",
-                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_PAPER_LABELS),
-                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_PAPER_LABELS),
+                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_REPORT_LABELS),
+                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_REPORT_LABELS),
                 "Agreement rate": f"{float(row.agreement_rate):.2f}",
                 "Mean deployed gap": f"{float(row.mean_deployed_gap_of_forecast_selected):.3f}",
                 "Deployed-suboptimal seeds / total": str(row.deployed_suboptimal_seeds_over_total),
@@ -362,8 +359,8 @@ def full_table(summary: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {
                 "Friction": f"{float(row.friction_level):.2f}",
-                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_PAPER_LABELS),
-                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_PAPER_LABELS),
+                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_REPORT_LABELS),
+                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_REPORT_LABELS),
                 "Agreement rate": f"{float(row.agreement_rate):.2f}",
                 "Mean deployed gap": f"{float(row.mean_deployed_gap_of_forecast_selected):.3f}",
             }
@@ -380,8 +377,8 @@ def threshold_robustness_table(canonical: pd.DataFrame, tau050: pd.DataFrame) ->
                 {
                     "Threshold": threshold_name,
                     "Friction": f"{float(row.friction_level):.2f}",
-                    "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_PAPER_LABELS),
-                    "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_PAPER_LABELS),
+                    "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_REPORT_LABELS),
+                    "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_REPORT_LABELS),
                     "Agreement rate": f"{float(row.agreement_rate):.2f}",
                     "Mean deployed gap": f"{float(row.mean_deployed_gap_of_forecast_selected):.3f}",
                     "Median deployed gap": f"{float(row.median_deployed_gap_of_forecast_selected):.3f}",
@@ -398,8 +395,8 @@ def logloss_table(summary: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {
                 "Friction": f"{float(row.friction_level):.2f}",
-                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_PAPER_LABELS),
-                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_PAPER_LABELS),
+                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_REPORT_LABELS),
+                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_REPORT_LABELS),
                 "Agreement rate": f"{float(row.agreement_rate):.2f}",
                 "Mean deployed gap": f"{float(row.mean_deployed_gap_of_forecast_selected):.3f}",
                 "Median deployed gap": f"{float(row.median_deployed_gap_of_forecast_selected):.3f}",
@@ -417,8 +414,8 @@ def hysteresis_table(summary: pd.DataFrame) -> pd.DataFrame:
             {
                 "Interface": "Hysteresis threshold",
                 "Friction": f"{float(row.friction_level):.2f}",
-                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_PAPER_LABELS),
-                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_PAPER_LABELS),
+                "Forecast-side winner": model_label(str(row.most_frequent_forecast_best), EVENT_MICRO_REPORT_LABELS),
+                "Deployed winner": model_label(str(row.most_frequent_deployed_best), EVENT_MICRO_REPORT_LABELS),
                 "Agreement rate": f"{float(row.agreement_rate):.2f}",
                 "Mean deployed gap": f"{float(row.mean_deployed_gap_of_forecast_selected):.3f}",
                 "Median deployed gap": f"{float(row.median_deployed_gap_of_forecast_selected):.3f}",
@@ -521,7 +518,7 @@ def build_cross_domain_stats(canonical: VariantResult) -> None:
     ]
     recurrence_table = pd.DataFrame(recurrence_rows)
     write_table_bundle(recurrence_table, HARDENING_ANALYSIS_DIR / "table_q2_recurrence_tests")
-    write_table_bundle(recurrence_table, PAPER_RESULTS_DIR / "table_q2_recurrence_tests")
+    write_table_bundle(recurrence_table, REPORT_TABLES_DIR / "table_q2_recurrence_tests")
 
     gap_rows = [
         gap_ci_row("Event micro", 0.50, canonical.seed_selection),
@@ -534,7 +531,7 @@ def build_cross_domain_stats(canonical: VariantResult) -> None:
     ]
     gap_table = pd.DataFrame(gap_rows)
     write_table_bundle(gap_table, HARDENING_ANALYSIS_DIR / "table_q2_gap_bootstrap_cis")
-    write_table_bundle(gap_table, PAPER_RESULTS_DIR / "table_q2_gap_bootstrap_cis")
+    write_table_bundle(gap_table, REPORT_TABLES_DIR / "table_q2_gap_bootstrap_cis")
 
     fig, axes = plt.subplots(1, 2, figsize=(6.8, 2.7), constrained_layout=True)
     for label, color, rank_df, summary_df in [
@@ -572,10 +569,10 @@ def build_cross_domain_stats(canonical: VariantResult) -> None:
     axes[1].set_ylim(-0.02, 1.02)
     axes[1].grid(alpha=0.25, linewidth=0.6)
     axes[1].legend(frameon=False, fontsize=8, loc="upper left")
-    uncertainty_fig = HARDENING_ANALYSIS_DIR / "fig_q2_uncertainty_appendix.pdf"
+    uncertainty_fig = HARDENING_ANALYSIS_DIR / "fig_q2_uncertainty_appendix.png"
     fig.savefig(uncertainty_fig, bbox_inches="tight")
     plt.close(fig)
-    shutil.copy2(uncertainty_fig, PAPER_FIGURES_DIR / "fig_q2_uncertainty_appendix.pdf")
+    shutil.copy2(uncertainty_fig, REPORT_FIGURES_DIR / "fig_q2_uncertainty_appendix.png")
 
     strip_domains = [
         ("Event micro", canonical.seed_selection, [0.0, 0.5, 1.0]),
@@ -604,10 +601,10 @@ def build_cross_domain_stats(canonical: VariantResult) -> None:
         ax.set_xlabel("Friction")
         ax.set_ylabel("Seed")
         ax.grid(alpha=0.15, linewidth=0.5, axis="y")
-    strip_fig = HARDENING_ANALYSIS_DIR / "fig_q2_seed_recurrence_appendix.pdf"
+    strip_fig = HARDENING_ANALYSIS_DIR / "fig_q2_seed_recurrence_appendix.png"
     fig.savefig(strip_fig, bbox_inches="tight")
     plt.close(fig)
-    shutil.copy2(strip_fig, PAPER_FIGURES_DIR / "fig_q2_seed_recurrence_appendix.pdf")
+    shutil.copy2(strip_fig, REPORT_FIGURES_DIR / "fig_q2_seed_recurrence_appendix.png")
 
 
 def build_hysteresis_stats_addendum(canonical: VariantResult, hysteresis: VariantResult) -> None:
@@ -622,7 +619,7 @@ def build_hysteresis_stats_addendum(canonical: VariantResult, hysteresis: Varian
         ["Interface", "Friction", "Deployed-suboptimal seeds / total", "Share", "95% exact CI", "One-sided binomial p"]
     ]
     write_table_bundle(recurrence_table, HARDENING_ANALYSIS_DIR / "table_event_micro_interface_recurrence_tests")
-    write_table_bundle(recurrence_table, PAPER_RESULTS_DIR / "table_event_micro_interface_recurrence_tests")
+    write_table_bundle(recurrence_table, REPORT_TABLES_DIR / "table_event_micro_interface_recurrence_tests")
 
     gap_rows = [
         interface_gap_ci_row("Fixed threshold", 0.50, canonical.seed_selection),
@@ -635,7 +632,7 @@ def build_hysteresis_stats_addendum(canonical: VariantResult, hysteresis: Varian
         ["Interface", "Friction", "Mean deployed gap", "Mean gap 95% bootstrap CI", "Median deployed gap", "Median gap 95% bootstrap CI"]
     ]
     write_table_bundle(gap_table, HARDENING_ANALYSIS_DIR / "table_event_micro_interface_gap_bootstrap_cis")
-    write_table_bundle(gap_table, PAPER_RESULTS_DIR / "table_event_micro_interface_gap_bootstrap_cis")
+    write_table_bundle(gap_table, REPORT_TABLES_DIR / "table_event_micro_interface_gap_bootstrap_cis")
 
     fig, axes = plt.subplots(2, 2, figsize=(7.0, 4.8), constrained_layout=True)
     for row_idx, variant in enumerate([canonical, hysteresis]):
@@ -679,10 +676,10 @@ def build_hysteresis_stats_addendum(canonical: VariantResult, hysteresis: Varian
         axes[row_idx, 1].set_ylim(-0.02, 1.02)
         axes[row_idx, 1].grid(alpha=0.25, linewidth=0.6)
 
-    uncertainty_fig = HARDENING_ANALYSIS_DIR / "fig_event_micro_interface_uncertainty_appendix.pdf"
+    uncertainty_fig = HARDENING_ANALYSIS_DIR / "fig_event_micro_interface_uncertainty_appendix.png"
     fig.savefig(uncertainty_fig, bbox_inches="tight")
     plt.close(fig)
-    shutil.copy2(uncertainty_fig, PAPER_FIGURES_DIR / "fig_event_micro_interface_uncertainty_appendix.pdf")
+    shutil.copy2(uncertainty_fig, REPORT_FIGURES_DIR / "fig_event_micro_interface_uncertainty_appendix.png")
 
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.8), constrained_layout=True)
     for ax, variant in zip(axes, [canonical, hysteresis]):
@@ -709,13 +706,13 @@ def build_hysteresis_stats_addendum(canonical: VariantResult, hysteresis: Varian
         ax.set_ylabel("Seed")
         ax.grid(alpha=0.15, linewidth=0.5, axis="y")
 
-    seed_fig = HARDENING_ANALYSIS_DIR / "fig_event_micro_interface_seed_recurrence_appendix.pdf"
+    seed_fig = HARDENING_ANALYSIS_DIR / "fig_event_micro_interface_seed_recurrence_appendix.png"
     fig.savefig(seed_fig, bbox_inches="tight")
     plt.close(fig)
-    shutil.copy2(seed_fig, PAPER_FIGURES_DIR / "fig_event_micro_interface_seed_recurrence_appendix.pdf")
+    shutil.copy2(seed_fig, REPORT_FIGURES_DIR / "fig_event_micro_interface_seed_recurrence_appendix.png")
 
 
-def write_paper_artifacts(
+def write_report_artifacts(
     canonical: VariantResult,
     tau050: VariantResult,
     logloss: VariantResult,
@@ -723,19 +720,19 @@ def write_paper_artifacts(
     hysteresis_category: str,
 ) -> None:
     write_table_bundle(main_table(canonical.selection_summary), HARDENING_ANALYSIS_DIR / "table_q2_selection_drift_event_micro_main")
-    write_table_bundle(main_table(canonical.selection_summary), PAPER_RESULTS_DIR / "table_q2_selection_drift_event_micro_main")
+    write_table_bundle(main_table(canonical.selection_summary), REPORT_TABLES_DIR / "table_q2_selection_drift_event_micro_main")
     write_table_bundle(full_table(canonical.selection_summary), HARDENING_ANALYSIS_DIR / "table_q2_selection_drift_event_micro")
-    write_table_bundle(full_table(canonical.selection_summary), PAPER_RESULTS_DIR / "table_q2_selection_drift_event_micro")
+    write_table_bundle(full_table(canonical.selection_summary), REPORT_TABLES_DIR / "table_q2_selection_drift_event_micro")
     write_table_bundle(
         threshold_robustness_table(canonical.selection_summary, tau050.selection_summary),
         HARDENING_ANALYSIS_DIR / "table_q2_selection_drift_event_micro_threshold_robustness",
     )
     write_table_bundle(
         threshold_robustness_table(canonical.selection_summary, tau050.selection_summary),
-        PAPER_RESULTS_DIR / "table_q2_selection_drift_event_micro_threshold_robustness",
+        REPORT_TABLES_DIR / "table_q2_selection_drift_event_micro_threshold_robustness",
     )
     write_table_bundle(logloss_table(logloss.selection_summary), HARDENING_ANALYSIS_DIR / "table_q2_selection_drift_event_micro_logloss")
-    write_table_bundle(logloss_table(logloss.selection_summary), PAPER_RESULTS_DIR / "table_q2_selection_drift_event_micro_logloss")
+    write_table_bundle(logloss_table(logloss.selection_summary), REPORT_TABLES_DIR / "table_q2_selection_drift_event_micro_logloss")
 
     if hysteresis is not None and hysteresis_category in {"strong_pass", "weak_pass"}:
         write_table_bundle(
@@ -744,11 +741,11 @@ def write_paper_artifacts(
         )
         write_table_bundle(
             hysteresis_table(hysteresis.selection_summary),
-            PAPER_RESULTS_DIR / "table_q2_selection_drift_event_micro_hysteresis_robustness",
+            REPORT_TABLES_DIR / "table_q2_selection_drift_event_micro_hysteresis_robustness",
         )
 
-    build_support_figure(canonical.selection_summary, HARDENING_ANALYSIS_DIR / "fig_q2_event_micro_support.pdf")
-    shutil.copy2(HARDENING_ANALYSIS_DIR / "fig_q2_event_micro_support.pdf", PAPER_FIGURES_DIR / "fig_q2_event_micro_support.pdf")
+    build_support_figure(canonical.selection_summary, HARDENING_ANALYSIS_DIR / "fig_q2_event_micro_support.png")
+    shutil.copy2(HARDENING_ANALYSIS_DIR / "fig_q2_event_micro_support.png", REPORT_FIGURES_DIR / "fig_q2_event_micro_support.png")
 
     support_note_lines = [
         "# Event Micro Hardening Note",
@@ -761,17 +758,7 @@ def write_paper_artifacts(
     ]
     if hysteresis is not None:
         support_note_lines.append(f"- Hysteresis verdict: {hysteresis_category}.")
-    write_markdown(PAPER_RESULTS_DIR / "event_micro_support_note.md", support_note_lines)
-
-    run_command(
-        [
-            sys.executable,
-            str(BUILD_MAIN_FIGURES_SCRIPT),
-            "--event-micro-q2-raw",
-            str(canonical.output_dir / "q2_diff_forecasts_same_interface.csv"),
-        ]
-    )
-
+    write_markdown(REPORT_TABLES_DIR / "event_micro_support_note.md", support_note_lines)
 
 def build_manifest(
     canonical: VariantResult,
@@ -786,45 +773,45 @@ def build_manifest(
     artifact_entries = [
         {
             "artifact": "Event-micro main table",
-            "manuscript_source": "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_main.csv",
+            "artifact_source": "results/tables/table_q2_selection_drift_event_micro_main.csv",
             "raw_source_of_truth": logical_display_path(canonical.output_dir / "q2_diff_forecasts_same_interface.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
         {
             "artifact": "Event-micro appendix full table",
-            "manuscript_source": "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro.csv",
+            "artifact_source": "results/tables/table_q2_selection_drift_event_micro.csv",
             "raw_source_of_truth": logical_display_path(canonical.output_dir / "q2_diff_forecasts_same_interface.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
         {
             "artifact": "Event-micro threshold robustness table",
-            "manuscript_source": "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_threshold_robustness.csv",
+            "artifact_source": "results/tables/table_q2_selection_drift_event_micro_threshold_robustness.csv",
             "raw_source_of_truth": logical_display_path(tau050.output_dir / "q2_diff_forecasts_same_interface.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
         {
             "artifact": "Event-micro log-loss robustness table",
-            "manuscript_source": "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_logloss.csv",
+            "artifact_source": "results/tables/table_q2_selection_drift_event_micro_logloss.csv",
             "raw_source_of_truth": logical_display_path(logloss.output_dir / "selection_summary_by_friction.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
         {
             "artifact": "Main Q2 figure",
-            "manuscript_source": "paper/forecasting_workshop/assets/figures/fig_q2_results_v2.pdf",
+            "artifact_source": "results/figures/fig_q2_results_v2.png",
             "raw_source_of_truth": logical_display_path(canonical.output_dir / "q2_diff_forecasts_same_interface.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
         {
             "artifact": "Cross-domain recurrence table",
-            "manuscript_source": "paper/forecasting_workshop/results/table_q2_recurrence_tests.csv",
+            "artifact_source": "results/tables/table_q2_recurrence_tests.csv",
             "raw_source_of_truth": logical_display_path(canonical.output_dir / "derived/seed_level_selection_stats.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
         {
             "artifact": "Cross-domain gap CI table",
-            "manuscript_source": "paper/forecasting_workshop/results/table_q2_gap_bootstrap_cis.csv",
+            "artifact_source": "results/tables/table_q2_gap_bootstrap_cis.csv",
             "raw_source_of_truth": logical_display_path(canonical.output_dir / "derived/seed_level_selection_stats.csv"),
-            "paper_facing": True,
+            "report_facing": True,
         },
     ]
     if hysteresis is not None and hysteresis_gate["category"] in {"strong_pass", "weak_pass"}:
@@ -832,21 +819,21 @@ def build_manifest(
             [
                 {
                     "artifact": "Event-micro hysteresis robustness table",
-                    "manuscript_source": "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_hysteresis_robustness.csv",
+                    "artifact_source": "results/tables/table_q2_selection_drift_event_micro_hysteresis_robustness.csv",
                     "raw_source_of_truth": logical_display_path(hysteresis.output_dir / "q2_diff_forecasts_same_interface.csv"),
-                    "paper_facing": True,
+                    "report_facing": True,
                 },
                 {
                     "artifact": "Event-micro interface recurrence table",
-                    "manuscript_source": "paper/forecasting_workshop/results/table_event_micro_interface_recurrence_tests.csv",
+                    "artifact_source": "results/tables/table_event_micro_interface_recurrence_tests.csv",
                     "raw_source_of_truth": logical_display_path(hysteresis.output_dir / "derived/seed_level_selection_stats.csv"),
-                    "paper_facing": True,
+                    "report_facing": True,
                 },
                 {
                     "artifact": "Event-micro interface gap CI table",
-                    "manuscript_source": "paper/forecasting_workshop/results/table_event_micro_interface_gap_bootstrap_cis.csv",
+                    "artifact_source": "results/tables/table_event_micro_interface_gap_bootstrap_cis.csv",
                     "raw_source_of_truth": logical_display_path(hysteresis.output_dir / "derived/seed_level_selection_stats.csv"),
-                    "paper_facing": True,
+                    "report_facing": True,
                 },
             ]
         )
@@ -879,21 +866,21 @@ def build_manifest(
     claim_map = {
         "headline_q2_event_micro": {
             "claim": (
-                "The canonical fixed-threshold event-micro benchmark is the paper's main forecasting-native "
+                "The canonical fixed-threshold event-micro benchmark is the report-card's main forecasting-native "
                 "Q2 evidence block."
             ),
             "evidence": [
-                "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_main.csv",
-                "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro.csv",
-                "paper/forecasting_workshop/assets/figures/fig_q2_results_v2.pdf",
+                "results/tables/table_q2_selection_drift_event_micro_main.csv",
+                "results/tables/table_q2_selection_drift_event_micro.csv",
+                "results/figures/fig_q2_results_v2.png",
             ],
             "raw_source_of_truth": logical_display_path(canonical.output_dir / "q2_diff_forecasts_same_interface.csv"),
         },
         "event_micro_robustness_package": {
             "claim": "The event-micro direction persists under alternate threshold and log-loss reranking.",
             "evidence": [
-                "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_threshold_robustness.csv",
-                "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_logloss.csv",
+                "results/tables/table_q2_selection_drift_event_micro_threshold_robustness.csv",
+                "results/tables/table_q2_selection_drift_event_micro_logloss.csv",
             ],
             "raw_source_of_truth": [
                 logical_display_path(tau050.output_dir / "q2_diff_forecasts_same_interface.csv"),
@@ -905,9 +892,9 @@ def build_manifest(
         claim_map["event_micro_hysteresis_support"] = {
             "claim": "A second hysteresis-threshold interface preserves event-micro direction at appendix support strength.",
             "evidence": [
-                "paper/forecasting_workshop/results/table_q2_selection_drift_event_micro_hysteresis_robustness.csv",
-                "paper/forecasting_workshop/results/table_event_micro_interface_recurrence_tests.csv",
-                "paper/forecasting_workshop/results/table_event_micro_interface_gap_bootstrap_cis.csv",
+                "results/tables/table_q2_selection_drift_event_micro_hysteresis_robustness.csv",
+                "results/tables/table_event_micro_interface_recurrence_tests.csv",
+                "results/tables/table_event_micro_interface_gap_bootstrap_cis.csv",
             ],
             "raw_source_of_truth": logical_display_path(hysteresis.output_dir / "q2_diff_forecasts_same_interface.csv"),
         }
@@ -960,7 +947,7 @@ def main() -> int:
     step7_gate = evaluate_step7(canonical.selection_summary)
     hysteresis_gate = evaluate_hysteresis(hysteresis.selection_summary)
 
-    write_paper_artifacts(canonical, tau050, logloss, hysteresis, hysteresis_gate["category"])
+    write_report_artifacts(canonical, tau050, logloss, hysteresis, hysteresis_gate["category"])
     build_cross_domain_stats(canonical)
     if hysteresis_gate["category"] in {"strong_pass", "weak_pass"}:
         build_hysteresis_stats_addendum(canonical, hysteresis)
@@ -983,7 +970,7 @@ def main() -> int:
         },
         "step7_gate": step7_gate,
         "hysteresis_gate": hysteresis_gate,
-        "workshop_tex": str(WORKSHOP_TEX.relative_to(ROOT)),
+        "report_tex": str(REPORT_MANIFEST.relative_to(ROOT)),
     }
     write_json(HARDENING_ROOT / "event_micro_hardening_ledger.json", ledger)
     write_markdown(
@@ -1005,3 +992,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
