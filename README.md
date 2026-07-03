@@ -1,6 +1,7 @@
-# Forecasting Actionability Report Card
+## Forecasting Actionability Report Card
 
-arXiv: https://arxiv.org/abs/2606.24996
+**Paper:** arXiv:2606.24996  
+https://arxiv.org/abs/2606.24996
 
 Code and reusable results for **When Is a Forecasting Winner Deployment-Actionable? A Fail-Closed Report Card**.
 
