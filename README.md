@@ -1,6 +1,6 @@
 # Forecasting Actionability Report Card
 
-Code and reusable results for **When Is a Forecasting Winner Deployment-Actionable? A Fail-Closed Report Card**.
+Code and reusable results for **[From Forecasting Leaderboards to Deployment Decisions: A Fail-Closed Certification Protocol](https://arxiv.org/abs/2606.24996)**.
 
 This repository asks a deployment-facing model-selection question: when a forecasting metric selects a winner, is that winner also supported as top-1 advice after the same fixed forecast-to-decision interface and friction model are applied?
 
@@ -52,3 +52,26 @@ The first command writes `results/tables/share_interval_audit.csv`. The second c
 ## Scope
 
 This is a reporting diagnostic, not a new forecasting benchmark suite, forecaster, or universal deployed metric. Deployed utility is specific to the chosen interface, simulator, and friction model.
+
+## Paper
+
+This repository accompanies the arXiv paper:
+
+**From Forecasting Leaderboards to Deployment Decisions: A Fail-Closed Certification Protocol**  
+Geumyoung Kim, 2026  
+[arXiv:2606.24996](https://arxiv.org/abs/2606.24996) | [DOI: 10.48550/arXiv.2606.24996](https://doi.org/10.48550/arXiv.2606.24996)
+
+## Citation
+
+```bibtex
+@misc{kim2026forecastingleaderboardsdeploymentdecisions,
+  title={From Forecasting Leaderboards to Deployment Decisions: A Fail-Closed Certification Protocol},
+  author={Geumyoung Kim},
+  year={2026},
+  eprint={2606.24996},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG},
+  doi={10.48550/arXiv.2606.24996},
+  url={https://arxiv.org/abs/2606.24996}
+}
+```
